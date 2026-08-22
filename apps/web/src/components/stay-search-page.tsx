@@ -224,9 +224,9 @@ function StayCard({ stay }: { stay: PublicStay }) {
 
           <a
             className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] bg-green px-5 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
-            href="#contacto"
+            href={`/stay/properties/${stay.id}`}
           >
-            Solicitar propuesta
+            Ver detalle
             <ArrowRight aria-hidden className="h-4 w-4" />
           </a>
         </div>

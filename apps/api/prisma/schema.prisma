@@ -56,13 +56,20 @@ enum RoleScope {
   RESERVATION
 }
 
+enum StayProposalRequestStatus {
+  NEW
+  REVIEWING
+  CONTACTED
+  CLOSED
+}
+
 model Organization {
-  id        String     @id @default(uuid())
-  name      String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  users     User[]
-  owners    Owner[]
+  id         String     @id @default(uuid())
+  name       String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  users      User[]
+  owners     Owner[]
   properties Property[]
 }
 
@@ -85,16 +92,16 @@ model User {
 }
 
 model Identity {
-  id          String           @id @default(uuid())
-  userId      String
-  provider    IdentityProvider
-  subject     String
-  status      IdentityStatus   @default(PENDING)
-  verifiedAt  DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  user        User             @relation(fields: [userId], references: [id])
-  challenges  AuthChallenge[]
+  id         String           @id @default(uuid())
+  userId     String
+  provider   IdentityProvider
+  subject    String
+  status     IdentityStatus   @default(PENDING)
+  verifiedAt DateTime?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  user       User             @relation(fields: [userId], references: [id])
+  challenges AuthChallenge[]
 
   @@unique([provider, subject])
   @@index([userId, status])
@@ -122,8 +129,8 @@ model RolePermission {
   roleId       String
   permissionId String
   createdAt    DateTime   @default(now())
-  role          Role       @relation(fields: [roleId], references: [id])
-  permission    Permission @relation(fields: [permissionId], references: [id])
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
 
   @@id([roleId, permissionId])
 }
@@ -139,23 +146,23 @@ model UserRole {
   user             User      @relation(fields: [userId], references: [id])
   role             Role      @relation(fields: [roleId], references: [id])
 
+  @@unique([userId, roleId, scope, resourceId])
   @@index([userId, scope, resourceId])
   @@index([roleId])
-  @@unique([userId, roleId, scope, resourceId])
 }
 
 model AuthChallenge {
-  id              String     @id @default(uuid())
+  id              String    @id @default(uuid())
   identityId      String?
   channel         String
   destinationHash String
   purpose         String
   expiresAt       DateTime
   consumedAt      DateTime?
-  attempts        Int        @default(0)
+  attempts        Int       @default(0)
   correlationId   String
-  createdAt       DateTime   @default(now())
-  identity        Identity?  @relation(fields: [identityId], references: [id])
+  createdAt       DateTime  @default(now())
+  identity        Identity? @relation(fields: [identityId], references: [id])
 
   @@index([destinationHash, purpose, createdAt])
   @@index([correlationId])
@@ -208,41 +215,41 @@ model Property {
 }
 
 model Unit {
-  id          String        @id @default(uuid())
-  propertyId  String
-  name        String
-  maxGuests   Int
-  bedrooms    Int
-  bathrooms   Decimal      @db.Decimal(5, 2)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  property    Property     @relation(fields: [propertyId], references: [id])
+  id           String        @id @default(uuid())
+  propertyId   String
+  name         String
+  maxGuests    Int
+  bedrooms     Int
+  bathrooms    Decimal       @db.Decimal(5, 2)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  property     Property      @relation(fields: [propertyId], references: [id])
   reservations Reservation[]
 }
 
 model StayCode {
-  id          String   @id @default(uuid())
-  propertyId  String
-  code        String
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  property    Property @relation(fields: [propertyId], references: [id])
+  id         String   @id @default(uuid())
+  propertyId String
+  code       String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  property   Property @relation(fields: [propertyId], references: [id])
 
   @@unique([code])
 }
 
 model Contract {
-  id             String   @id @default(uuid())
-  propertyId      String
-  ownerId         String
-  startsOn        DateTime
-  endsOn          DateTime?
-  ownerShareBps   Int
-  kuqubaShareBps  Int
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  property        Property @relation(fields: [propertyId], references: [id])
-  owner           Owner    @relation(fields: [ownerId], references: [id])
+  id             String    @id @default(uuid())
+  propertyId     String
+  ownerId        String
+  startsOn       DateTime
+  endsOn         DateTime?
+  ownerShareBps  Int
+  kuqubaShareBps Int
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  property       Property  @relation(fields: [propertyId], references: [id])
+  owner          Owner     @relation(fields: [ownerId], references: [id])
 
   @@index([propertyId, ownerId])
 }
@@ -261,20 +268,20 @@ model Guest {
 }
 
 model Reservation {
-  id          String            @id @default(uuid())
-  guestId     String
-  propertyId  String
-  unitId      String
-  status      ReservationStatus @default(HOLD)
-  arrivalDate DateTime
+  id            String            @id @default(uuid())
+  guestId       String
+  propertyId    String
+  unitId        String
+  status        ReservationStatus @default(HOLD)
+  arrivalDate   DateTime
   departureDate DateTime
-  privateCode String            @unique
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  guest       Guest             @relation(fields: [guestId], references: [id])
-  property    Property          @relation(fields: [propertyId], references: [id])
-  unit        Unit              @relation(fields: [unitId], references: [id])
-  payments    Payment[]
+  privateCode   String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  guest         Guest             @relation(fields: [guestId], references: [id])
+  property      Property          @relation(fields: [propertyId], references: [id])
+  unit          Unit              @relation(fields: [unitId], references: [id])
+  payments      Payment[]
   ledgerEntries LedgerEntry[]
 
   @@index([propertyId, arrivalDate, departureDate])
@@ -314,20 +321,44 @@ model LedgerEntry {
   @@index([reservationId, type])
 }
 
+model StayProposalRequest {
+  id            String                    @id @default(uuid())
+  stayId        String
+  stayName      String
+  destination   String
+  guestName     String
+  email         String
+  phone         String?
+  arrivalDate   DateTime?
+  departureDate DateTime?
+  guests        Int
+  message       String?
+  status        StayProposalRequestStatus @default(NEW)
+  source        String                    @default("public_stay_detail")
+  correlationId String
+  ipAddress     String?
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@index([stayId, status, createdAt])
+  @@index([email, createdAt])
+  @@index([correlationId])
+}
+
 model AuditEvent {
-  id             String   @id @default(uuid())
-  actorUserId    String?
-  action         String
-  entityType     String
-  entityId       String?
-  previousValue  Json?
-  nextValue      Json?
-  ipAddress      String?
-  correlationId  String
-  result         String
-  reason         String?
-  createdAt      DateTime @default(now())
-  actor          User?    @relation(fields: [actorUserId], references: [id])
+  id            String   @id @default(uuid())
+  actorUserId   String?
+  action        String
+  entityType    String
+  entityId      String?
+  previousValue Json?
+  nextValue     Json?
+  ipAddress     String?
+  correlationId String
+  result        String
+  reason        String?
+  createdAt     DateTime @default(now())
+  actor         User?    @relation(fields: [actorUserId], references: [id])
 
   @@index([entityType, entityId])
   @@index([correlationId])

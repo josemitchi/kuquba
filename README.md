@@ -60,11 +60,13 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 
 - Web publica: `GET /`
 - Busqueda publica de estancias: `GET /stay/search`
+- Detalle publico de estancia: `GET /stay/properties/[id]`
 - Mi estancia: `GET /stay`
 - Portal del propietario: `GET /owner`
 - Equipo KUQUBA: `GET /ops`
 - API healthcheck: `GET /health`
 - API bootstrap publico: `GET /api/public/bootstrap`
+- API solicitudes de propuesta: `POST /api/public/stay-proposal-requests`
 - API requisitos de acceso: `GET /api/identity/access-requirements`
 - API passwordless dev: `POST /api/identity/passwordless/start`
 
