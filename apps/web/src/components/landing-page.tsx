@@ -146,7 +146,7 @@ export function LandingPage() {
                 </a>
                 <a
                   className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] border border-white/55 px-6 text-sm font-semibold text-white transition hover:border-white hover:bg-white/8"
-                  href="/owner"
+                  href="/owner/evaluate"
                 >
                   Administra tu propiedad
                   <Building2 aria-hidden className="h-4 w-4" />
@@ -201,7 +201,7 @@ function AudiencePanel({
         </ul>
         <a
           className="focus-ring mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] bg-green px-6 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
-          href={eyebrow.includes("propietarios") ? "/owner" : "/stay/search"}
+          href={eyebrow.includes("propietarios") ? "/owner/evaluate" : "/stay/search"}
         >
           {cta}
           <ArrowRight aria-hidden className="h-4 w-4" />

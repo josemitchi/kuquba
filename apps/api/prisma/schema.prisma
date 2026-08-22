@@ -63,6 +63,13 @@ enum StayProposalRequestStatus {
   CLOSED
 }
 
+enum OwnerLeadStatus {
+  NEW
+  REVIEWING
+  CONTACTED
+  CLOSED
+}
+
 model Organization {
   id         String     @id @default(uuid())
   name       String
@@ -346,6 +353,28 @@ model StayProposalRequest {
 
   @@index([stayId, status, createdAt])
   @@index([email, createdAt])
+  @@index([correlationId])
+}
+
+model OwnerLead {
+  id               String          @id @default(uuid())
+  ownerName        String
+  email            String
+  phone            String?
+  propertyName     String?
+  propertyType     String
+  propertyLocation String
+  operatingStatus  String
+  message          String?
+  status           OwnerLeadStatus @default(NEW)
+  source           String          @default("public_owner_evaluate")
+  correlationId    String
+  ipAddress        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([email, createdAt])
+  @@index([status, createdAt])
   @@index([correlationId])
 }
 

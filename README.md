@@ -61,6 +61,7 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - Web publica: `GET /`
 - Busqueda publica de estancias: `GET /stay/search`
 - Detalle publico de estancia: `GET /stay/properties/[id]`
+- Evaluacion publica de propiedad: `GET /owner/evaluate`
 - Mi estancia: `GET /stay`
 - Portal del propietario: `GET /owner`
 - Home autenticado propietario: `GET /owner/home`
@@ -68,6 +69,7 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - API healthcheck: `GET /health`
 - API bootstrap publico: `GET /api/public/bootstrap`
 - API solicitudes de propuesta: `POST /api/public/stay-proposal-requests`
+- API leads de propietario: `POST /api/public/owner-leads`
 - API portal propietario: `GET /api/owner/portal`
 - API requisitos de acceso: `GET /api/identity/access-requirements`
 - API passwordless dev: `POST /api/identity/passwordless/start`

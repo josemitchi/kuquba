@@ -37,6 +37,17 @@ const stayProposalRequestSchema = z
     }
   });
 
+const ownerLeadSchema = z.object({
+  email: z.string().trim().email().max(160),
+  message: z.string().trim().max(1000).optional(),
+  operatingStatus: z.string().trim().min(2).max(80),
+  ownerName: z.string().trim().min(2).max(120),
+  phone: z.string().trim().max(32).optional(),
+  propertyLocation: z.string().trim().min(2).max(160),
+  propertyName: z.string().trim().max(160).optional(),
+  propertyType: z.string().trim().min(2).max(80)
+});
+
 export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
   app.get("/bootstrap", async () => ({
     brand: kuqubaBrand,
@@ -46,7 +57,7 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
     featureFlags: {
       search: "static-shell",
       stayProposalRequests: "persisted-dev",
-      ownerLead: "static-shell",
+      ownerLead: "persisted-dev",
       ownerPortal: "persisted-dev",
       payments: "adapter-pending"
     }
@@ -99,6 +110,57 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
       notice: "proposal_request_received_not_reservation"
     });
   });
+
+  app.post("/owner-leads", async (request, reply) => {
+    const body = ownerLeadSchema.parse(request.body);
+    const message = normalizeOptionalText(body.message);
+    const phone = normalizeOptionalText(body.phone);
+    const propertyName = normalizeOptionalText(body.propertyName);
+
+    const ownerLead = await prisma.ownerLead.create({
+      data: {
+        correlationId: request.id,
+        email: body.email.toLowerCase(),
+        ipAddress: request.ip,
+        message,
+        operatingStatus: body.operatingStatus,
+        ownerName: body.ownerName,
+        phone,
+        propertyLocation: body.propertyLocation,
+        propertyName,
+        propertyType: body.propertyType
+      },
+      select: {
+        createdAt: true,
+        id: true,
+        status: true
+      }
+    });
+
+    await writeOwnerLeadAudit({
+      entityId: ownerLead.id,
+      nextValue: {
+        contactHash: hashContact(body.email),
+        hasMessage: Boolean(message),
+        hasPhone: Boolean(phone),
+        hasPropertyName: Boolean(propertyName),
+        locationHash: hashValue(body.propertyLocation),
+        operatingStatus: body.operatingStatus,
+        propertyType: body.propertyType
+      },
+      request
+    });
+
+    return reply.code(201).send({
+      ownerLead: {
+        createdAt: ownerLead.createdAt.toISOString(),
+        id: ownerLead.id,
+        status: ownerLead.status
+      },
+      correlationId: request.id,
+      notice: "owner_lead_received_not_commercial_offer"
+    });
+  });
 };
 
 async function writeProposalAudit(input: {
@@ -133,8 +195,48 @@ async function writeProposalAudit(input: {
   input.request.log.info({ auditEvent }, "audit.event");
 }
 
+async function writeOwnerLeadAudit(input: {
+  entityId: string;
+  nextValue: Prisma.InputJsonValue;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const auditEvent = createAuditEventEnvelope({
+    action: "public.owner_lead.create",
+    entityId: input.entityId,
+    entityType: "OwnerLead",
+    ipAddress: input.request.ip,
+    correlationId: input.request.id,
+    nextValue: input.nextValue,
+    result: "SUCCESS",
+    reason: "public_owner_lead_received"
+  });
+
+  await prisma.auditEvent.create({
+    data: {
+      action: auditEvent.action,
+      entityId: auditEvent.entityId,
+      entityType: auditEvent.entityType,
+      ipAddress: auditEvent.ipAddress,
+      correlationId: auditEvent.correlationId,
+      nextValue: auditEvent.nextValue as Prisma.InputJsonValue,
+      result: auditEvent.result,
+      reason: auditEvent.reason
+    }
+  });
+
+  input.request.log.info({ auditEvent }, "audit.event");
+}
+
 function hashContact(email: string) {
-  return createHash("sha256").update(email.trim().toLowerCase()).digest("hex");
+  return hashValue(email.trim().toLowerCase());
+}
+
+function hashValue(value: string) {
+  return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
+}
+
+function normalizeOptionalText(value: string | undefined) {
+  return value && value.length > 0 ? value : undefined;
 }
 
 function parseDateOnly(value: string) {

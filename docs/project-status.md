@@ -9,6 +9,8 @@ Ultima actualizacion: 2026-08-22
 - Experiencia publica de busqueda y seleccion disponible en `/stay/search`.
 - Detalle publico de estancia disponible en `/stay/properties/[id]`.
 - Solicitudes publicas de propuesta persistidas por `POST /api/public/stay-proposal-requests`.
+- Experiencia publica de captacion de propietarios disponible en `/owner/evaluate`.
+- Leads publicos de propietario persistidos por `POST /api/public/owner-leads`.
 - Portal autenticado de propietario disponible en `/owner/home` conectado a `GET /api/owner/portal`.
 - Datos dev persistidos para owner: propiedades asignadas, contratos, reservas, tareas y documentos.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad y rutas owner protegidas.
@@ -28,6 +30,8 @@ Ultima actualizacion: 2026-08-22
 - `GET /stay/search?destination=Atitlan&guests=6`
 - `GET /stay/properties/atitlan-villa-luz`
 - `POST /api/public/stay-proposal-requests`
+- `GET /owner/evaluate`
+- `POST /api/public/owner-leads`
 - `GET /api/owner/portal`
 - `GET /owner/home`
 
@@ -59,22 +63,34 @@ Alcance entregado:
 - UI owner conectada a API; no renderiza datos operativos sin sesion owner vigente.
 - Copia explicita para no prometer montos, rentabilidad ni reglas financieras definitivas.
 
+## Incremento captacion propietario implementado
+
+Se agrego una experiencia publica para captar propiedades candidatas, separada del portal autenticado de propietario.
+
+Alcance entregado:
+
+- Ruta publica `/owner/evaluate` con formulario de evaluacion inicial.
+- Modelo Prisma `OwnerLead` con migracion `20260822000500_owner_lead`.
+- Endpoint publico `POST /api/public/owner-leads` con correlacion y auditoria sin contacto en claro.
+- CTAs publicos de propietarios enlazados a captacion, no al portal privado.
+- Copia explicita para no prometer rentabilidad, contrato ni condiciones comerciales definitivas.
+
 ## Siguiente incremento recomendado
 
-Construir el enfoque publico de captacion para propietarios y persistir leads iniciales sin mezclarlo con el portal autenticado.
+Construir una bandeja interna de operaciones para revisar leads de propietarios y solicitudes de propuesta.
 
 Alcance propuesto:
 
-- Crear experiencia `/owner/evaluate` o seccion publica de evaluacion inicial para propietarios.
-- Agregar formulario de lead con propiedad, ubicacion, contacto y estado operativo.
-- Persistir `OwnerLead` con modelo minimo y auditoria sin datos sensibles innecesarios.
-- Mantener separado `/owner` y `/owner/home` del flujo publico de captacion.
-- No prometer porcentajes, rentabilidad ni condiciones comerciales definitivas.
+- Crear vista ops autenticada para listar `OwnerLead` y `StayProposalRequest`.
+- Permitir marcar estado `REVIEWING`, `CONTACTED` o `CLOSED`.
+- Agregar filtros por tipo, estado y fecha de captura.
+- Mantener auditoria por cada cambio de estado.
+- Conservar separacion entre captacion publica, portal owner y operacion interna.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- El flujo publico de propietarios no requiere autenticacion.
-- El formulario valida contacto, ubicacion y estado de propiedad.
-- El endpoint publico persiste lead con correlacion y auditoria.
-- La UI conserva consistencia con la experiencia publica de estancias y marca KUQUBA.
+- La bandeja ops requiere sesion interna valida.
+- Las listas muestran leads y solicitudes sin exponer datos si no hay sesion ops.
+- Los cambios de estado persisten en Prisma y generan auditoria.
+- La UI conserva consistencia con portales existentes y permite revision rapida.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.
