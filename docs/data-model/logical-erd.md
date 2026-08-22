@@ -1,6 +1,6 @@
-# ERD lógico inicial
+# ERD lÃ³gico inicial
 
-Este modelo es una base conceptual para orientar Fase 1 y Fase 2. No representa todavía migraciones definitivas.
+Este modelo es una base conceptual para orientar Fase 1 y Fase 2. No representa todavÃ­a migraciones definitivas.
 
 ```mermaid
 erDiagram
@@ -19,11 +19,17 @@ erDiagram
   Property ||--o{ HousekeepingTask : schedules
   Property ||--o{ MaintenanceTicket : tracks
   User ||--o{ AuditEvent : performs
+  User ||--o{ OpsCaseNote : writes
+  OwnerLead ||--o| OpsCase : opens
+  StayProposalRequest ||--o| OpsCase : opens
+  OpsCase ||--o{ OpsCaseNote : records
+  OpsCase ||--o{ OpsCaseTask : drives
 ```
 
 ## Principios
 
-- El Código de Estancia localiza una propiedad, pero no es una credencial de seguridad.
+- El CÃ³digo de Estancia localiza una propiedad, pero no es una credencial de seguridad.
 - El ledger financiero debe ser append-only.
-- La participación de propietario/KUQUBA debe vivir en contrato o configuración, no en código.
+- La participaciÃ³n de propietario/KUQUBA debe vivir en contrato o configuraciÃ³n, no en cÃ³digo.
 - El dominio no debe depender directamente de proveedores de pagos, OTA, FEL, WhatsApp o storage.
+- `OpsCase` concentra seguimiento interno y no sustituye las entidades publicas de origen.

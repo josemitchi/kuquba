@@ -1,8 +1,8 @@
 # KUQUBA
 
-Plataforma de hospitality y administración profesional de propiedades para Guatemala.
+Plataforma de hospitality y administraciÃ³n profesional de propiedades para Guatemala.
 
-Este repositorio cubre el bootstrap de Fase 0 y el kernel inicial de Fase 1: monorepo, tooling, base visual pública, API modular, Prisma, Docker local, identidad inicial y documentación de arquitectura.
+Este repositorio cubre el bootstrap de Fase 0 y el kernel inicial de Fase 1: monorepo, tooling, base visual pÃºblica, API modular, Prisma, Docker local, identidad inicial y documentaciÃ³n de arquitectura.
 
 ## Stack
 
@@ -10,7 +10,7 @@ Este repositorio cubre el bootstrap de Fase 0 y el kernel inicial de Fase 1: mon
 - Backend: Node.js, Fastify, TypeScript.
 - Persistencia: PostgreSQL y Prisma.
 - Cache/jobs: Redis.
-- Arquitectura: modular monolith con límites de dominio explícitos.
+- Arquitectura: modular monolith con lÃ­mites de dominio explÃ­citos.
 
 ## Primer arranque
 
@@ -43,14 +43,14 @@ npm run format
 
 ## Alcance actual
 
-- Landing pública KUQUBA con navegación, acceso, buscador y secciones principales.
+- Landing pÃºblica KUQUBA con navegaciÃ³n, acceso, buscador y secciones principales.
 - Assets oficiales de marca y hero generado para uso local del proyecto.
-- API Fastify con healthcheck y endpoint público de bootstrap.
+- API Fastify con healthcheck y endpoint pÃºblico de bootstrap.
 - Kernel inicial de identidad con roles, permisos, requisitos de acceso y passwordless dev.
 - Prisma schema con migracion local inicial reproducible.
 - Seed IAM dev para roles, permisos y usuarios de prueba.
 - Docker Compose para PostgreSQL y Redis.
-- Documentos iniciales de fase y modelo lógico.
+- Documentos iniciales de fase y modelo lÃ³gico.
 
 ## Estado y siguiente paso
 
@@ -74,6 +74,10 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - API portal propietario: `GET /api/owner/portal`
 - API bandeja ops: `GET /api/ops/workbench`
 - API estados ops: `PATCH /api/ops/workbench/:itemType/:id/status`
+- API detalle caso ops: `GET/PATCH /api/ops/workbench/:itemType/:id/case`
+- API notas caso ops: `POST /api/ops/workbench/:itemType/:id/case/notes`
+- API tareas caso ops: `POST /api/ops/workbench/:itemType/:id/case/tasks`
+- API estado tarea ops: `PATCH /api/ops/workbench/:itemType/:id/case/tasks/:taskId`
 - API requisitos de acceso: `GET /api/identity/access-requirements`
 - API passwordless dev: `POST /api/identity/passwordless/start`
 
@@ -83,7 +87,7 @@ Estas decisiones quedan encapsuladas y no bloquean Fase 0:
 
 - Proveedor de pagos en Guatemala.
 - Proveedor WhatsApp/correo transaccional.
-- Facturación/FEL.
+- FacturaciÃ³n/FEL.
 - Channel manager/OTA.
-- Reglas avanzadas de segmentación.
-- Políticas de cancelación por propiedad/rate plan.
+- Reglas avanzadas de segmentaciÃ³n.
+- PolÃ­ticas de cancelaciÃ³n por propiedad/rate plan.

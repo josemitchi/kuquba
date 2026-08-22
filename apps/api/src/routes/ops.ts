@@ -9,12 +9,34 @@ import { authorizeDevPortalSession, type AuthorizedDevPortalSession } from "../m
 const opsReadPermissions = ["operation:calendar:read", "audit:event:read"];
 const opsUpdatePermissions = ["operation:task:update"];
 const reviewStatusSchema = z.enum(["NEW", "REVIEWING", "CONTACTED", "CLOSED"]);
+const caseStatusSchema = z.enum(["OPEN", "QUALIFYING", "ACTION_PENDING", "CLOSED"]);
+const taskStatusSchema = z.enum(["OPEN", "DONE"]);
+const prioritySchema = z.enum(["high", "normal", "medium", "low"]);
 const workbenchParamsSchema = z.object({
   id: z.string().uuid(),
   itemType: z.enum(["owner-lead", "stay-proposal-request"])
 });
+const caseTaskParamsSchema = workbenchParamsSchema.extend({
+  taskId: z.string().uuid()
+});
 const statusUpdateSchema = z.object({
   status: reviewStatusSchema
+});
+const caseUpdateSchema = z.object({
+  nextStep: z.string().trim().max(240).nullable().optional(),
+  priority: prioritySchema.optional(),
+  status: caseStatusSchema.optional()
+});
+const noteCreateSchema = z.object({
+  body: z.string().trim().min(3).max(1000)
+});
+const taskCreateSchema = z.object({
+  dueLabel: z.string().trim().max(80).optional(),
+  priority: prioritySchema.default("normal"),
+  title: z.string().trim().min(3).max(160)
+});
+const taskUpdateSchema = z.object({
+  status: taskStatusSchema
 });
 
 const statusLabels: Record<ReviewStatus, string> = {
@@ -24,10 +46,67 @@ const statusLabels: Record<ReviewStatus, string> = {
   CLOSED: "Cerrado"
 };
 
+const caseStatusLabels: Record<CaseStatus, string> = {
+  OPEN: "Abierto",
+  QUALIFYING: "Calificando",
+  ACTION_PENDING: "Accion pendiente",
+  CLOSED: "Cerrado"
+};
+
+const taskStatusLabels: Record<TaskStatus, string> = {
+  OPEN: "Abierta",
+  DONE: "Completada"
+};
+
+const priorityLabels: Record<Priority, string> = {
+  high: "Alta",
+  normal: "Normal",
+  medium: "Media",
+  low: "Baja"
+};
+
+const sourceTypeByItemType: Record<WorkbenchItemType, OpsCaseSourceType> = {
+  "owner-lead": "OWNER_LEAD",
+  "stay-proposal-request": "STAY_PROPOSAL_REQUEST"
+};
+
 type ReviewStatus = z.infer<typeof reviewStatusSchema>;
+type CaseStatus = z.infer<typeof caseStatusSchema>;
+type TaskStatus = z.infer<typeof taskStatusSchema>;
+type Priority = z.infer<typeof prioritySchema>;
 type OwnerLeadRecord = Awaited<ReturnType<typeof loadOwnerLeads>>[number];
 type ProposalRequestRecord = Awaited<ReturnType<typeof loadProposalRequests>>[number];
+type WorkbenchItem = ReturnType<typeof buildOwnerLeadItem> | ReturnType<typeof buildProposalRequestItem>;
 type WorkbenchItemType = "owner-lead" | "stay-proposal-request";
+type OpsCaseSourceType = "OWNER_LEAD" | "STAY_PROPOSAL_REQUEST";
+type OpsCaseEntityType = "OwnerLead" | "StayProposalRequest";
+type OpsCaseSource = {
+  contactEmail: string;
+  contactName: string;
+  contactPhone?: string | null;
+  defaultNextStep: string;
+  entityType: OpsCaseEntityType;
+  item: WorkbenchItem;
+  sourceId: string;
+  sourceType: OpsCaseSourceType;
+  title: string;
+};
+type OpsCaseWithRelations = Prisma.OpsCaseGetPayload<{
+  include: {
+    notes: {
+      include: {
+        author: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+      };
+    };
+    tasks: true;
+  };
+}>;
 
 export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
   app.get("/workbench", async (request, reply) => {
@@ -66,6 +145,217 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.get("/workbench/:itemType/:id/case", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.read",
+      request,
+      requiredPermissions: opsReadPermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const source = await loadOpsCaseSource(params.itemType, params.id);
+
+    if (!source) {
+      await writeOpsAudit({
+        action: "ops.case.read",
+        actorUserId: authorization.session.user.id,
+        entityId: params.id,
+        entityType: resolveEntityType(params.itemType),
+        nextValue: {
+          itemType: params.itemType
+        },
+        reason: "workbench_item_not_found",
+        request,
+        result: "DENIED"
+      });
+
+      return reply.code(404).send({
+        error: "workbench_item_not_found",
+        correlationId: request.id
+      });
+    }
+
+    const opsCase = await ensureOpsCaseForSource(source);
+    const caseDetail = buildOpsCaseDetail(opsCase, source);
+
+    await writeOpsAudit({
+      action: "ops.case.read",
+      actorUserId: authorization.session.user.id,
+      entityId: opsCase.id,
+      entityType: "OpsCase",
+      nextValue: {
+        itemType: params.itemType,
+        noteCount: caseDetail.notes.length,
+        openTaskCount: caseDetail.tasks.filter((task) => task.status === "OPEN").length,
+        sourceId: params.id
+      },
+      reason: "ops_case_loaded",
+      request,
+      result: "SUCCESS"
+    });
+
+    return reply.send({
+      caseDetail,
+      correlationId: request.id
+    });
+  });
+
+  app.patch("/workbench/:itemType/:id/case", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.update",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = caseUpdateSchema.parse(request.body);
+    const updateResult = await updateOpsCase({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!updateResult) {
+      return reply.code(404).send({
+        error: "workbench_item_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: updateResult.caseDetail,
+      correlationId: request.id
+    });
+  });
+
+  app.post("/workbench/:itemType/:id/case/notes", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.note.create",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = noteCreateSchema.parse(request.body);
+    const updateResult = await createOpsCaseNote({
+      actor: authorization.session,
+      body: body.body,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!updateResult) {
+      return reply.code(404).send({
+        error: "workbench_item_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.code(201).send({
+      caseDetail: updateResult.caseDetail,
+      correlationId: request.id
+    });
+  });
+
+  app.post("/workbench/:itemType/:id/case/tasks", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.task.create",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = taskCreateSchema.parse(request.body);
+    const updateResult = await createOpsCaseTask({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!updateResult) {
+      return reply.code(404).send({
+        error: "workbench_item_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.code(201).send({
+      caseDetail: updateResult.caseDetail,
+      correlationId: request.id
+    });
+  });
+
+  app.patch("/workbench/:itemType/:id/case/tasks/:taskId", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.task.update",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = caseTaskParamsSchema.parse(request.params);
+    const body = taskUpdateSchema.parse(request.body);
+    const updateResult = await updateOpsCaseTask({
+      actor: authorization.session,
+      id: params.id,
+      itemType: params.itemType,
+      request,
+      status: body.status,
+      taskId: params.taskId
+    });
+
+    if (!updateResult) {
+      return reply.code(404).send({
+        error: "case_task_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: updateResult.caseDetail,
+      correlationId: request.id
+    });
+  });
+
   app.patch("/workbench/:itemType/:id/status", async (request, reply) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.workbench.status.update",
@@ -95,7 +385,7 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
         action: "ops.workbench.status.update",
         actorUserId: authorization.session.user.id,
         entityId: params.id,
-        entityType: params.itemType === "owner-lead" ? "OwnerLead" : "StayProposalRequest",
+        entityType: resolveEntityType(params.itemType),
         nextValue: {
           attemptedStatus: body.status,
           itemType: params.itemType
@@ -166,7 +456,7 @@ async function loadOpsWorkbench() {
       take: 10,
       where: {
         entityType: {
-          in: ["OwnerLead", "StayProposalRequest", "OpsWorkbench"]
+          in: ["OwnerLead", "StayProposalRequest", "OpsWorkbench", "OpsCase", "OpsCaseNote", "OpsCaseTask"]
         }
       }
     })
@@ -338,6 +628,396 @@ async function updateWorkbenchItemStatus(input: {
   };
 }
 
+async function loadOpsCaseSource(itemType: WorkbenchItemType, id: string): Promise<OpsCaseSource | null> {
+  if (itemType === "owner-lead") {
+    const lead = await prisma.ownerLead.findUnique({
+      where: {
+        id
+      }
+    });
+
+    if (!lead) {
+      return null;
+    }
+
+    return {
+      contactEmail: lead.email,
+      contactName: lead.ownerName,
+      contactPhone: lead.phone,
+      defaultNextStep: "Calificar propiedad y coordinar siguiente contacto.",
+      entityType: "OwnerLead",
+      item: buildOwnerLeadItem(lead),
+      sourceId: lead.id,
+      sourceType: sourceTypeByItemType[itemType],
+      title: lead.propertyName ?? lead.propertyType
+    };
+  }
+
+  const proposalRequest = await prisma.stayProposalRequest.findUnique({
+    where: {
+      id
+    }
+  });
+
+  if (!proposalRequest) {
+    return null;
+  }
+
+  return {
+    contactEmail: proposalRequest.email,
+    contactName: proposalRequest.guestName,
+    contactPhone: proposalRequest.phone,
+    defaultNextStep: "Preparar propuesta personalizada y confirmar disponibilidad.",
+    entityType: "StayProposalRequest",
+    item: buildProposalRequestItem(proposalRequest),
+    sourceId: proposalRequest.id,
+    sourceType: sourceTypeByItemType[itemType],
+    title: proposalRequest.stayName
+  };
+}
+
+async function ensureOpsCaseForSource(source: OpsCaseSource) {
+  const opsCase = await prisma.opsCase.upsert({
+    where: {
+      sourceType_sourceId: {
+        sourceId: source.sourceId,
+        sourceType: source.sourceType
+      }
+    },
+    create: {
+      contactEmail: source.contactEmail,
+      contactName: source.contactName,
+      contactPhone: source.contactPhone,
+      nextStep: source.defaultNextStep,
+      sourceId: source.sourceId,
+      sourceType: source.sourceType,
+      title: source.title
+    },
+    update: {
+      contactEmail: source.contactEmail,
+      contactName: source.contactName,
+      contactPhone: source.contactPhone,
+      title: source.title
+    }
+  });
+
+  return loadOpsCaseById(opsCase.id);
+}
+
+async function loadOpsCaseById(id: string) {
+  return prisma.opsCase.findUniqueOrThrow({
+    include: {
+      notes: {
+        include: {
+          author: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      },
+      tasks: {
+        orderBy: [
+          {
+            status: "asc"
+          },
+          {
+            sortOrder: "asc"
+          },
+          {
+            createdAt: "asc"
+          }
+        ]
+      }
+    },
+    where: {
+      id
+    }
+  });
+}
+
+async function updateOpsCase(input: {
+  actor: AuthorizedDevPortalSession;
+  body: z.infer<typeof caseUpdateSchema>;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.update",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const previous = await ensureOpsCaseForSource(source);
+  const data: Prisma.OpsCaseUpdateInput = {};
+
+  if (input.body.status) {
+    data.status = input.body.status;
+  }
+
+  if (input.body.priority) {
+    data.priority = input.body.priority;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input.body, "nextStep")) {
+    data.nextStep = normalizeNullableText(input.body.nextStep);
+  }
+
+  const updated = Object.keys(data).length
+    ? await prisma.opsCase.update({
+        data,
+        where: {
+          id: previous.id
+        }
+      })
+    : previous;
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(updated.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.update",
+    actorUserId: input.actor.user.id,
+    entityId: updated.id,
+    entityType: "OpsCase",
+    previousValue: {
+      nextStep: previous.nextStep,
+      priority: previous.priority,
+      status: previous.status
+    },
+    nextValue: {
+      nextStep: updated.nextStep,
+      priority: updated.priority,
+      status: updated.status
+    },
+    reason: "ops_case_updated",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail
+  };
+}
+
+async function createOpsCaseNote(input: {
+  actor: AuthorizedDevPortalSession;
+  body: string;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.note.create",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const note = await prisma.opsCaseNote.create({
+    data: {
+      authorUserId: input.actor.user.id,
+      body: input.body,
+      opsCaseId: opsCase.id
+    }
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.note.create",
+    actorUserId: input.actor.user.id,
+    entityId: note.id,
+    entityType: "OpsCaseNote",
+    nextValue: {
+      bodyLength: input.body.length,
+      opsCaseId: opsCase.id
+    },
+    reason: "ops_case_note_created",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail
+  };
+}
+
+async function createOpsCaseTask(input: {
+  actor: AuthorizedDevPortalSession;
+  body: z.infer<typeof taskCreateSchema>;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.task.create",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const maxSortOrder = await prisma.opsCaseTask.aggregate({
+    _max: {
+      sortOrder: true
+    },
+    where: {
+      opsCaseId: opsCase.id
+    }
+  });
+  const task = await prisma.opsCaseTask.create({
+    data: {
+      dueLabel: normalizeNullableText(input.body.dueLabel),
+      opsCaseId: opsCase.id,
+      priority: input.body.priority,
+      sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 10,
+      title: input.body.title
+    }
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.task.create",
+    actorUserId: input.actor.user.id,
+    entityId: task.id,
+    entityType: "OpsCaseTask",
+    nextValue: {
+      opsCaseId: opsCase.id,
+      priority: task.priority,
+      title: task.title
+    },
+    reason: "ops_case_task_created",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail
+  };
+}
+
+async function updateOpsCaseTask(input: {
+  actor: AuthorizedDevPortalSession;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  status: TaskStatus;
+  taskId: string;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.task.update",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const previous = await prisma.opsCaseTask.findFirst({
+    where: {
+      id: input.taskId,
+      opsCaseId: opsCase.id
+    }
+  });
+
+  if (!previous) {
+    await writeOpsAudit({
+      action: "ops.case.task.update",
+      actorUserId: input.actor.user.id,
+      entityId: input.taskId,
+      entityType: "OpsCaseTask",
+      nextValue: {
+        attemptedStatus: input.status,
+        opsCaseId: opsCase.id
+      },
+      reason: "case_task_not_found",
+      request: input.request,
+      result: "DENIED"
+    });
+    return null;
+  }
+
+  const updated = await prisma.opsCaseTask.update({
+    data: {
+      status: input.status
+    },
+    where: {
+      id: previous.id
+    }
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.task.update",
+    actorUserId: input.actor.user.id,
+    entityId: updated.id,
+    entityType: "OpsCaseTask",
+    previousValue: {
+      status: previous.status
+    },
+    nextValue: {
+      status: updated.status
+    },
+    reason: "ops_case_task_updated",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail
+  };
+}
+
+async function writeMissingCaseSourceAudit(input: {
+  action: string;
+  actor: AuthorizedDevPortalSession;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  await writeOpsAudit({
+    action: input.action,
+    actorUserId: input.actor.user.id,
+    entityId: input.id,
+    entityType: resolveEntityType(input.itemType),
+    nextValue: {
+      itemType: input.itemType
+    },
+    reason: "workbench_item_not_found",
+    request: input.request,
+    result: "DENIED"
+  });
+}
+
 function buildOwnerLeadItem(lead: OwnerLeadRecord) {
   return {
     kind: "ownerLead" as const,
@@ -380,6 +1060,85 @@ function buildProposalRequestItem(request: ProposalRequestRecord) {
     updatedAt: request.updatedAt.toISOString(),
     summary: `${request.guests} huesped(es), ${request.destination}`
   };
+}
+
+function buildOpsCaseDetail(opsCase: OpsCaseWithRelations, source: OpsCaseSource) {
+  const openTasks = opsCase.tasks.filter((task) => task.status === "OPEN").length;
+
+  return {
+    id: opsCase.id,
+    source: {
+      entityType: source.entityType,
+      item: source.item,
+      sourceId: source.sourceId,
+      sourceType: source.sourceType
+    },
+    status: opsCase.status,
+    statusLabel: caseStatusLabels[opsCase.status],
+    priority: opsCase.priority,
+    priorityLabel: priorityLabels[opsCase.priority as Priority] ?? opsCase.priority,
+    nextStep: opsCase.nextStep,
+    contact: {
+      email: opsCase.contactEmail,
+      name: opsCase.contactName,
+      phone: opsCase.contactPhone
+    },
+    metrics: {
+      noteCount: opsCase.notes.length,
+      openTaskCount: openTasks,
+      taskCount: opsCase.tasks.length
+    },
+    options: {
+      priorities: prioritySchema.options.map((priority) => ({
+        label: priorityLabels[priority],
+        value: priority
+      })),
+      statuses: caseStatusSchema.options.map((status) => ({
+        label: caseStatusLabels[status],
+        value: status
+      })),
+      taskStatuses: taskStatusSchema.options.map((status) => ({
+        label: taskStatusLabels[status],
+        value: status
+      }))
+    },
+    notes: opsCase.notes.map((note) => ({
+      author: note.author
+        ? {
+            displayName: note.author.displayName,
+            email: note.author.email,
+            id: note.author.id
+          }
+        : null,
+      body: note.body,
+      createdAt: note.createdAt.toISOString(),
+      id: note.id
+    })),
+    tasks: opsCase.tasks.map((task) => ({
+      createdAt: task.createdAt.toISOString(),
+      dueLabel: task.dueLabel,
+      id: task.id,
+      priority: task.priority,
+      priorityLabel: priorityLabels[task.priority as Priority] ?? task.priority,
+      sortOrder: task.sortOrder,
+      status: task.status,
+      statusLabel: taskStatusLabels[task.status],
+      title: task.title,
+      updatedAt: task.updatedAt.toISOString()
+    })),
+    createdAt: opsCase.createdAt.toISOString(),
+    updatedAt: opsCase.updatedAt.toISOString()
+  };
+}
+
+function resolveEntityType(itemType: WorkbenchItemType): OpsCaseEntityType {
+  return itemType === "owner-lead" ? "OwnerLead" : "StayProposalRequest";
+}
+
+function normalizeNullableText(value: string | null | undefined) {
+  const normalized = value?.trim();
+
+  return normalized ? normalized : null;
 }
 
 async function writeOpsAudit(input: {

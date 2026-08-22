@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   BadgeCheck,
   Building2,
+  ClipboardList,
   Home,
   Inbox,
   LogOut,
@@ -20,6 +21,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { OpsCasePanel } from "./ops-case-panel";
 import { getDevPortalApiBaseUrl, useDevPortalSession } from "./use-dev-portal-session";
 
 type ReviewStatus = "NEW" | "REVIEWING" | "CONTACTED" | "CLOSED";
@@ -136,6 +138,7 @@ export function OpsWorkbenchPage() {
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [activeQueue, setActiveQueue] = useState<QueueKey>("ownerLeads");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [selectedItem, setSelectedItem] = useState<WorkbenchItem | null>(null);
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -197,6 +200,10 @@ export function OpsWorkbenchPage() {
     } catch {
       setLoadState("error");
     }
+  }
+
+  function handleOpenCase(item: WorkbenchItem) {
+    setSelectedItem(item);
   }
 
   async function handleStatusChange(item: WorkbenchItem, status: ReviewStatus) {
@@ -361,7 +368,9 @@ export function OpsWorkbenchPage() {
                 isValidating,
                 items: visibleItems,
                 loadState,
+                onOpenCase: handleOpenCase,
                 onStatusChange: handleStatusChange,
+                selectedItemKey: selectedItem ? buildItemKey(selectedItem) : null,
                 statusOptions: workbench?.statusOptions ?? [],
                 updatingKey
               })}
@@ -407,6 +416,8 @@ export function OpsWorkbenchPage() {
               )}
             </section>
 
+            <OpsCasePanel selectedItem={selectedItem} sessionToken={session?.sessionToken ?? null} />
+
             <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-[6px] bg-midnight/8 text-midnight">
@@ -444,7 +455,9 @@ function renderWorkbenchContent({
   isValidating,
   items,
   loadState,
+  onOpenCase,
   onStatusChange,
+  selectedItemKey,
   statusOptions,
   updatingKey
 }: {
@@ -452,7 +465,9 @@ function renderWorkbenchContent({
   isValidating: boolean;
   items: WorkbenchItem[];
   loadState: LoadState;
+  onOpenCase: (item: WorkbenchItem) => void;
   onStatusChange: (item: WorkbenchItem, status: ReviewStatus) => void;
+  selectedItemKey: string | null;
   statusOptions: WorkbenchStatusOption[];
   updatingKey: string | null;
 }) {
@@ -478,9 +493,11 @@ function renderWorkbenchContent({
     <WorkbenchItemCard
       item={item}
       key={`${item.kind}:${item.id}`}
+      onOpenCase={onOpenCase}
       onStatusChange={onStatusChange}
+      selected={selectedItemKey === buildItemKey(item)}
       statusOptions={statusOptions}
-      updating={updatingKey === `${item.kind}:${item.id}`}
+      updating={updatingKey === buildItemKey(item)}
     />
   ));
 }
@@ -497,17 +514,21 @@ function MetricCard({ metric }: { metric: WorkbenchMetric }) {
 
 function WorkbenchItemCard({
   item,
+  onOpenCase,
   onStatusChange,
+  selected,
   statusOptions,
   updating
 }: {
   item: WorkbenchItem;
+  onOpenCase: (item: WorkbenchItem) => void;
   onStatusChange: (item: WorkbenchItem, status: ReviewStatus) => void;
+  selected: boolean;
   statusOptions: WorkbenchStatusOption[];
   updating: boolean;
 }) {
   return (
-    <article className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
+    <article className={`rounded-[8px] border bg-white p-5 shadow-soft ${selected ? "border-green" : "border-line"}`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-green">
@@ -547,6 +568,18 @@ function WorkbenchItemCard({
 
       <div className="mt-5 border-t border-line pt-4">
         <div className="flex flex-wrap gap-2">
+          <button
+            className={`focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-[6px] border px-3 text-xs font-semibold transition ${
+              selected
+                ? "border-midnight bg-midnight text-white"
+                : "border-line bg-white text-midnight hover:border-midnight"
+            }`}
+            onClick={() => onOpenCase(item)}
+            type="button"
+          >
+            <ClipboardList aria-hidden className="h-4 w-4" />
+            {selected ? "Caso abierto" : "Abrir caso"}
+          </button>
           {statusOptions.map((option) => (
             <button
               className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
@@ -633,6 +666,10 @@ async function patchStatus(item: WorkbenchItem, status: ReviewStatus, sessionTok
   }
 
   return payload;
+}
+
+function buildItemKey(item: WorkbenchItem) {
+  return `${item.kind}:${item.id}`;
 }
 
 function buildEmptyMetrics(): WorkbenchMetric[] {

@@ -29,7 +29,18 @@ const devIds = {
   ownerLeadAtitlan: "00000000-0000-4000-8000-000000000801",
   ownerLeadAntigua: "00000000-0000-4000-8000-000000000802",
   proposalRequestAtitlan: "00000000-0000-4000-8000-000000000811",
-  proposalRequestAntigua: "00000000-0000-4000-8000-000000000812"
+  proposalRequestAntigua: "00000000-0000-4000-8000-000000000812",
+  opsCaseOwnerLeadAtitlan: "00000000-0000-4000-8000-000000000901",
+  opsCaseOwnerLeadAntigua: "00000000-0000-4000-8000-000000000902",
+  opsCaseProposalAtitlan: "00000000-0000-4000-8000-000000000911",
+  opsNoteOwnerLeadAtitlan: "00000000-0000-4000-8000-000000000931",
+  opsNoteOwnerLeadAntigua: "00000000-0000-4000-8000-000000000932",
+  opsNoteProposalAtitlan: "00000000-0000-4000-8000-000000000933",
+  opsTaskOwnerLeadCall: "00000000-0000-4000-8000-000000000951",
+  opsTaskOwnerLeadPhotos: "00000000-0000-4000-8000-000000000952",
+  opsTaskOwnerLeadAntiguaCalendar: "00000000-0000-4000-8000-000000000953",
+  opsTaskProposalQuote: "00000000-0000-4000-8000-000000000961",
+  opsTaskProposalAvailability: "00000000-0000-4000-8000-000000000962"
 } as const;
 
 async function main() {
@@ -724,6 +735,194 @@ async function seedOpsWorkbench(prismaClient: PrismaClient) {
       correlationId: "seed-proposal-antigua"
     }
   });
+  await seedOpsCase(prismaClient, {
+    id: devIds.opsCaseOwnerLeadAtitlan,
+    sourceType: "OWNER_LEAD",
+    sourceId: devIds.ownerLeadAtitlan,
+    title: "Casa Brisa Atitlan",
+    contactName: "Mariana Castillo",
+    contactEmail: "mariana.castillo@example.com",
+    contactPhone: "+50255551111",
+    status: "QUALIFYING",
+    priority: "high",
+    nextStep: "Confirmar visita tecnica y validar reglas de acceso al muelle.",
+    notes: [
+      {
+        id: devIds.opsNoteOwnerLeadAtitlan,
+        body: "Lead con potencial alto por ubicacion y disponibilidad familiar flexible. Requiere validacion operativa en sitio."
+      }
+    ],
+    tasks: [
+      {
+        id: devIds.opsTaskOwnerLeadCall,
+        title: "Llamar a Mariana para confirmar disponibilidad",
+        dueLabel: "Hoy",
+        priority: "high",
+        sortOrder: 10
+      },
+      {
+        id: devIds.opsTaskOwnerLeadPhotos,
+        title: "Solicitar fotos actuales de habitaciones y muelle",
+        dueLabel: "Esta semana",
+        priority: "medium",
+        sortOrder: 20
+      }
+    ]
+  });
+
+  await seedOpsCase(prismaClient, {
+    id: devIds.opsCaseOwnerLeadAntigua,
+    sourceType: "OWNER_LEAD",
+    sourceId: devIds.ownerLeadAntigua,
+    title: "Suite Patio Central",
+    contactName: "Roberto Herrera",
+    contactEmail: "roberto.herrera@example.com",
+    contactPhone: "+50255552222",
+    status: "ACTION_PENDING",
+    priority: "normal",
+    nextStep: "Revisar calendario OTA y propuesta de separacion de uso familiar.",
+    notes: [
+      {
+        id: devIds.opsNoteOwnerLeadAntigua,
+        body: "Ya opera en OTAs. El valor inmediato esta en orden operativo, calendario y limpieza."
+      }
+    ],
+    tasks: [
+      {
+        id: devIds.opsTaskOwnerLeadAntiguaCalendar,
+        title: "Pedir acceso o captura del calendario actual",
+        dueLabel: "Manana",
+        priority: "medium",
+        sortOrder: 10
+      }
+    ]
+  });
+
+  await seedOpsCase(prismaClient, {
+    id: devIds.opsCaseProposalAtitlan,
+    sourceType: "STAY_PROPOSAL_REQUEST",
+    sourceId: devIds.proposalRequestAtitlan,
+    title: "Villa Luz de Atitlan",
+    contactName: "Laura Mendoza",
+    contactEmail: "laura.mendoza@example.com",
+    contactPhone: "+50255553333",
+    status: "OPEN",
+    priority: "normal",
+    nextStep: "Preparar propuesta con cocina equipada y llegada flexible.",
+    notes: [
+      {
+        id: devIds.opsNoteProposalAtitlan,
+        body: "Familia de cuatro personas. Conviene responder con tarifa total y condiciones de llegada flexible."
+      }
+    ],
+    tasks: [
+      {
+        id: devIds.opsTaskProposalAvailability,
+        title: "Validar disponibilidad del 12 al 15 de septiembre",
+        dueLabel: "Hoy",
+        priority: "high",
+        sortOrder: 10
+      },
+      {
+        id: devIds.opsTaskProposalQuote,
+        title: "Enviar propuesta inicial por correo",
+        dueLabel: "Despues de validar disponibilidad",
+        priority: "medium",
+        sortOrder: 20
+      }
+    ]
+  });
+}
+
+async function seedOpsCase(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    sourceType: "OWNER_LEAD" | "STAY_PROPOSAL_REQUEST";
+    sourceId: string;
+    title: string;
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string | null;
+    status: "OPEN" | "QUALIFYING" | "ACTION_PENDING" | "CLOSED";
+    priority: "high" | "normal" | "medium" | "low";
+    nextStep: string;
+    notes: Array<{ id: string; body: string }>;
+    tasks: Array<{ id: string; title: string; dueLabel: string; priority: "high" | "normal" | "medium" | "low"; sortOrder: number }>;
+  }
+) {
+  const opsCase = await prismaClient.opsCase.upsert({
+    where: {
+      sourceType_sourceId: {
+        sourceType: input.sourceType,
+        sourceId: input.sourceId
+      }
+    },
+    create: {
+      id: input.id,
+      sourceType: input.sourceType,
+      sourceId: input.sourceId,
+      title: input.title,
+      contactName: input.contactName,
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      status: input.status,
+      priority: input.priority,
+      nextStep: input.nextStep
+    },
+    update: {
+      title: input.title,
+      contactName: input.contactName,
+      contactEmail: input.contactEmail,
+      contactPhone: input.contactPhone,
+      status: input.status,
+      priority: input.priority,
+      nextStep: input.nextStep
+    }
+  });
+
+  for (const note of input.notes) {
+    await prismaClient.opsCaseNote.upsert({
+      where: {
+        id: note.id
+      },
+      create: {
+        id: note.id,
+        opsCaseId: opsCase.id,
+        body: note.body
+      },
+      update: {
+        opsCaseId: opsCase.id,
+        body: note.body
+      }
+    });
+  }
+
+  for (const task of input.tasks) {
+    await prismaClient.opsCaseTask.upsert({
+      where: {
+        id: task.id
+      },
+      create: {
+        id: task.id,
+        opsCaseId: opsCase.id,
+        title: task.title,
+        dueLabel: task.dueLabel,
+        priority: task.priority,
+        status: "OPEN",
+        sortOrder: task.sortOrder
+      },
+      update: {
+        opsCaseId: opsCase.id,
+        title: task.title,
+        dueLabel: task.dueLabel,
+        priority: task.priority,
+        status: "OPEN",
+        sortOrder: task.sortOrder
+      }
+    });
+  }
+
 }
 
 function parseDateOnly(value: string) {

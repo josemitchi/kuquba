@@ -70,6 +70,23 @@ enum OwnerLeadStatus {
   CLOSED
 }
 
+enum OpsCaseSourceType {
+  OWNER_LEAD
+  STAY_PROPOSAL_REQUEST
+}
+
+enum OpsCaseStatus {
+  OPEN
+  QUALIFYING
+  ACTION_PENDING
+  CLOSED
+}
+
+enum OpsTaskStatus {
+  OPEN
+  DONE
+}
+
 model Organization {
   id         String     @id @default(uuid())
   name       String
@@ -81,19 +98,20 @@ model Organization {
 }
 
 model User {
-  id             String       @id @default(uuid())
+  id             String        @id @default(uuid())
   organizationId String
   email          String
   displayName    String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization  @relation(fields: [organizationId], references: [id])
   identities     Identity[]
   roles          UserRole[]
   devSessions    DevSession[]
   auditEvents    AuditEvent[]
-  ownerProfile   Owner?       @relation("OwnerUser")
-  guestProfile   Guest?       @relation("GuestUser")
+  opsCaseNotes   OpsCaseNote[]
+  ownerProfile   Owner?        @relation("OwnerUser")
+  guestProfile   Guest?        @relation("GuestUser")
 
   @@unique([organizationId, email])
 }
@@ -192,15 +210,15 @@ model DevSession {
 }
 
 model Owner {
-  id             String       @id @default(uuid())
+  id             String          @id @default(uuid())
   organizationId String
-  userId         String?      @unique
+  userId         String?         @unique
   displayName    String
   email          String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  user           User?        @relation("OwnerUser", fields: [userId], references: [id])
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  user           User?           @relation("OwnerUser", fields: [userId], references: [id])
   contracts      Contract[]
   tasks          OwnerTask[]
   documents      OwnerDocument[]
@@ -376,6 +394,55 @@ model OwnerLead {
   @@index([email, createdAt])
   @@index([status, createdAt])
   @@index([correlationId])
+}
+
+model OpsCase {
+  id           String            @id @default(uuid())
+  sourceType   OpsCaseSourceType
+  sourceId     String
+  title        String
+  contactName  String
+  contactEmail String
+  contactPhone String?
+  status       OpsCaseStatus     @default(OPEN)
+  priority     String            @default("normal")
+  nextStep     String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  notes        OpsCaseNote[]
+  tasks        OpsCaseTask[]
+
+  @@unique([sourceType, sourceId])
+  @@index([status, updatedAt])
+  @@index([sourceType, updatedAt])
+}
+
+model OpsCaseNote {
+  id           String   @id @default(uuid())
+  opsCaseId    String
+  authorUserId String?
+  body         String
+  createdAt    DateTime @default(now())
+  opsCase      OpsCase  @relation(fields: [opsCaseId], references: [id])
+  author       User?    @relation(fields: [authorUserId], references: [id])
+
+  @@index([opsCaseId, createdAt])
+  @@index([authorUserId])
+}
+
+model OpsCaseTask {
+  id        String        @id @default(uuid())
+  opsCaseId String
+  title     String
+  dueLabel  String?
+  priority  String        @default("normal")
+  status    OpsTaskStatus @default(OPEN)
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  opsCase   OpsCase       @relation(fields: [opsCaseId], references: [id])
+
+  @@index([opsCaseId, status, sortOrder])
 }
 
 model OwnerTask {

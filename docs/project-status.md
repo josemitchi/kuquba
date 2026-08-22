@@ -14,6 +14,8 @@ Ultima actualizacion: 2026-08-22
 - Portal autenticado de propietario disponible en `/owner/home` conectado a `GET /api/owner/portal`.
 - Bandeja ops autenticada disponible en `/ops/home` conectada a `GET /api/ops/workbench`.
 - Cambios de estado ops persistidos por `PATCH /api/ops/workbench/:itemType/:id/status`.
+- Expediente ops autenticado disponible por item con `GET/PATCH /api/ops/workbench/:itemType/:id/case`.
+- Notas y tareas internas ops persistidas por endpoints protegidos de caso.
 - Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
 - Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
@@ -90,22 +92,35 @@ Alcance entregado:
 - Auditoria por lectura denegada, lectura exitosa y cambios de estado sin guardar contacto en eventos de estado.
 - Seed dev de `OwnerLead` y `StayProposalRequest` para bandeja reproducible.
 
+## Incremento detalle ops implementado
+
+Se agrego un expediente interno por lead o solicitud para convertir la bandeja ops en flujo accionable.
+
+Alcance entregado:
+
+- Modelos Prisma `OpsCase`, `OpsCaseNote` y `OpsCaseTask` con migracion `20260822000600_ops_case`.
+- Endpoint protegido `GET /api/ops/workbench/:itemType/:id/case` que crea o carga expediente por item.
+- Endpoint protegido `PATCH /api/ops/workbench/:itemType/:id/case` para estado, prioridad y siguiente paso.
+- Endpoints protegidos para notas y tareas internas de caso.
+- Panel lateral en `/ops/home` para abrir expediente, registrar nota, crear tarea y completar/reabrir tarea.
+- Auditoria por lectura, actualizacion de expediente, nota creada, tarea creada y tarea actualizada.
+- Seed dev de expedientes, notas y tareas para leads/solicitudes demo.
+
 ## Siguiente incremento recomendado
 
-Construir detalle interno de caso ops para convertir un lead o solicitud en flujo operativo accionable.
+Construir la transicion desde expediente ops hacia flujo formal.
 
 Alcance propuesto:
 
-- Crear detalle ops por `OwnerLead` y `StayProposalRequest`.
-- Agregar notas internas y siguiente accion por caso.
-- Crear tareas operativas desde un lead o solicitud aceptada.
-- Mantener auditoria por nota, cambio de estado y tarea creada.
-- Preparar transicion posterior a onboarding de propiedad o propuesta formal de estancia.
+- Convertir caso de propietario en checklist de onboarding de propiedad.
+- Convertir solicitud de estancia en propuesta formal versionada.
+- Asociar responsable ops y fechas objetivo reales por tarea.
+- Preparar estados de aprobacion antes de publicar propiedad o enviar propuesta.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- El detalle ops requiere sesion interna valida.
-- Cada caso muestra historial, datos de contacto y siguiente accion sin exponerlo fuera de ops.
-- Las notas y tareas persisten en Prisma y generan auditoria.
-- La UI conserva consistencia con la bandeja ops y permite revision rapida.
+- La conversion requiere sesion interna valida.
+- El caso conserva historial y referencia al item publico original.
+- La transicion crea entidades persistidas y auditadas, no solo cambios visuales.
+- La UI muestra claramente si el caso ya fue convertido.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.
