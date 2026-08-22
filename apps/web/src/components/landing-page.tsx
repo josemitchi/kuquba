@@ -139,7 +139,7 @@ export function LandingPage() {
               <div className="flex flex-col gap-3 sm:flex-row">
                 <a
                   className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] bg-green px-6 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
-                  href="#estancias"
+                  href="/stay/search"
                 >
                   Buscar estancia
                   <ArrowRight aria-hidden className="h-4 w-4" />
@@ -201,7 +201,7 @@ function AudiencePanel({
         </ul>
         <a
           className="focus-ring mt-8 inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] bg-green px-6 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
-          href={eyebrow.includes("propietarios") ? "/owner" : "/stay"}
+          href={eyebrow.includes("propietarios") ? "/owner" : "/stay/search"}
         >
           {cta}
           <ArrowRight aria-hidden className="h-4 w-4" />

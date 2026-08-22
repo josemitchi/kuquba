@@ -2,10 +2,19 @@ import { accessOptions, publicNavigation } from "@kuquba/config";
 import { ChevronDown, Menu, UserRound } from "lucide-react";
 import Image from "next/image";
 
-export function SiteHeader() {
+export function SiteHeader({
+  homeHref = "#",
+  navigationBaseHref = ""
+}: {
+  homeHref?: string;
+  navigationBaseHref?: string;
+} = {}) {
+  const resolveNavigationHref = (href: string) =>
+    href.startsWith("#") ? `${navigationBaseHref}${href}` : href;
+
   return (
     <header className="container-shell relative z-20 flex items-center justify-between py-5 text-white">
-      <a className="focus-ring flex min-w-0 items-center gap-3 rounded-md" href="#" aria-label="KUQUBA">
+      <a className="focus-ring flex min-w-0 items-center gap-3 rounded-md" href={homeHref} aria-label="KUQUBA">
         <Image
           src="/brand/kuquba-isotipo.svg"
           alt=""
@@ -28,7 +37,7 @@ export function SiteHeader() {
             className={`focus-ring rounded-sm pb-2 ${
               index === 0 ? "border-b-2 border-terracotta text-white" : "text-white/88"
             }`}
-            href={item.href}
+            href={resolveNavigationHref(item.href)}
             key={item.href}
           >
             {item.label}

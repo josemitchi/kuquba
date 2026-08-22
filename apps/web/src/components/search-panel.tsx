@@ -1,15 +1,53 @@
 import { ArrowRight, CalendarDays, LockKeyhole, MapPin, Search, UsersRound } from "lucide-react";
 
-export function SearchPanel() {
+export type SearchPanelDefaults = {
+  arrival?: string;
+  departure?: string;
+  destination?: string;
+  guests?: string;
+};
+
+export function SearchPanel({
+  defaults,
+  tone = "dark"
+}: {
+  defaults?: SearchPanelDefaults;
+  tone?: "dark" | "light";
+}) {
+  const isLight = tone === "light";
+  const labelClass = isLight ? "text-midnight/66" : "text-white/72";
+  const fieldClass = isLight
+    ? "border-line bg-white px-4 text-ink shadow-sm"
+    : "border-white/28 bg-white/5 px-4 text-white";
+  const iconClass = isLight ? "text-green" : "text-beige";
+  const inputClass = isLight
+    ? "min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink/45"
+    : "min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/68";
+  const dateInputClass = isLight
+    ? "min-w-0 flex-1 bg-transparent text-sm outline-none [color-scheme:light]"
+    : "min-w-0 flex-1 bg-transparent text-sm outline-none [color-scheme:dark]";
+  const selectClass = isLight
+    ? "min-w-0 flex-1 appearance-none bg-transparent text-sm outline-none text-ink"
+    : "min-w-0 flex-1 appearance-none bg-transparent text-sm outline-none text-white";
+
   return (
-    <form className="w-full rounded-[8px] border border-white/18 bg-midnight/78 p-4 shadow-panel backdrop-blur-md md:p-6">
+    <form
+      action="/stay/search"
+      className={
+        isLight
+          ? "w-full rounded-[8px] border border-line bg-white p-4 shadow-panel md:p-6"
+          : "w-full rounded-[8px] border border-white/18 bg-midnight/78 p-4 shadow-panel backdrop-blur-md md:p-6"
+      }
+      method="get"
+    >
       <div className="grid gap-4 lg:grid-cols-[1.15fr_1.2fr_1fr_auto] lg:items-end">
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase text-white/72">Destino</span>
-          <span className="flex min-h-14 items-center gap-3 rounded-[6px] border border-white/28 bg-white/5 px-4 text-white">
-            <MapPin aria-hidden className="h-5 w-5 shrink-0 text-beige" />
+          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>Destino</span>
+          <span className={`flex min-h-14 items-center gap-3 rounded-[6px] border ${fieldClass}`}>
+            <MapPin aria-hidden className={`h-5 w-5 shrink-0 ${iconClass}`} />
             <input
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-white/68"
+              className={inputClass}
+              defaultValue={defaults?.destination}
               name="destination"
               placeholder="Antigua Guatemala"
               type="text"
@@ -18,21 +56,23 @@ export function SearchPanel() {
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase text-white/72">Fechas</span>
-          <span className="flex min-h-14 items-center gap-3 rounded-[6px] border border-white/28 bg-white/5 px-4 text-white">
-            <CalendarDays aria-hidden className="h-5 w-5 shrink-0 text-beige" />
+          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>Fechas</span>
+          <span className={`flex min-h-14 items-center gap-3 rounded-[6px] border ${fieldClass}`}>
+            <CalendarDays aria-hidden className={`h-5 w-5 shrink-0 ${iconClass}`} />
             <input
               aria-label="Llegada"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none [color-scheme:dark]"
+              className={dateInputClass}
+              defaultValue={defaults?.arrival}
               name="arrival"
               type="date"
             />
-            <span aria-hidden className="text-white/52">
+            <span aria-hidden className={isLight ? "text-ink/34" : "text-white/52"}>
               /
             </span>
             <input
               aria-label="Salida"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none [color-scheme:dark]"
+              className={dateInputClass}
+              defaultValue={defaults?.departure}
               name="departure"
               type="date"
             />
@@ -40,14 +80,10 @@ export function SearchPanel() {
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase text-white/72">Huespedes</span>
-          <span className="flex min-h-14 items-center gap-3 rounded-[6px] border border-white/28 bg-white/5 px-4 text-white">
-            <UsersRound aria-hidden className="h-5 w-5 shrink-0 text-beige" />
-            <select
-              className="min-w-0 flex-1 appearance-none bg-transparent text-sm outline-none"
-              defaultValue="2"
-              name="guests"
-            >
+          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>Huespedes</span>
+          <span className={`flex min-h-14 items-center gap-3 rounded-[6px] border ${fieldClass}`}>
+            <UsersRound aria-hidden className={`h-5 w-5 shrink-0 ${iconClass}`} />
+            <select className={selectClass} defaultValue={defaults?.guests ?? "2"} name="guests">
               <option className="text-ink" value="1">
                 1 huesped
               </option>
@@ -74,8 +110,12 @@ export function SearchPanel() {
         </button>
       </div>
 
-      <div className="mt-5 flex items-center justify-center gap-2 text-sm text-white/78">
-        <LockKeyhole aria-hidden className="h-4 w-4 text-beige" />
+      <div
+        className={`mt-5 flex items-center justify-center gap-2 text-sm ${
+          isLight ? "text-ink/64" : "text-white/78"
+        }`}
+      >
+        <LockKeyhole aria-hidden className={`h-4 w-4 ${iconClass}`} />
         <span>Reserva segura. Atencion personalizada. Sin sorpresas.</span>
       </div>
     </form>

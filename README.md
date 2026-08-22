@@ -59,6 +59,7 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 ## Rutas locales
 
 - Web publica: `GET /`
+- Busqueda publica de estancias: `GET /stay/search`
 - Mi estancia: `GET /stay`
 - Portal del propietario: `GET /owner`
 - Equipo KUQUBA: `GET /ops`
