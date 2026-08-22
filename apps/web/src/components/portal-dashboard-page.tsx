@@ -14,23 +14,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 
-type DevSession = {
-  audience: PortalAudience;
-  expiresAt: string;
-  sessionId: string;
-  sessionToken: string;
-  user: {
-    displayName: string;
-    emailMasked: string;
-  };
-  role: {
-    key: string;
-    name: string;
-  };
-  permissions: string[];
-};
+import { useDevPortalSession } from "./use-dev-portal-session";
 
 const dashboardCopy: Record<
   PortalAudience,
@@ -66,88 +51,13 @@ const dashboardCopy: Record<
 };
 
 export function PortalDashboardPage({ audience }: { audience: PortalAudience }) {
-  const [session, setSession] = useState<DevSession | null>(null);
-  const [isValidating, setIsValidating] = useState(true);
+  const { isValidating, logout, session } = useDevPortalSession(audience);
   const router = useRouter();
   const copy = dashboardCopy[audience];
   const Icon = copy.icon;
 
-  useEffect(() => {
-    let isMounted = true;
-
-    async function validateSession() {
-      const rawSession = window.localStorage.getItem("kuquba.devSession");
-
-      if (!rawSession) {
-        setIsValidating(false);
-        return;
-      }
-
-      try {
-        const storedSession = JSON.parse(rawSession) as DevSession;
-
-        if (!storedSession.sessionToken || storedSession.audience !== audience) {
-          window.localStorage.removeItem("kuquba.devSession");
-          setIsValidating(false);
-          return;
-        }
-
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/api/identity/session?audience=${audience}`,
-          {
-            headers: {
-              "x-kuquba-dev-session": storedSession.sessionToken
-            }
-          }
-        );
-
-        if (!response.ok) {
-          window.localStorage.removeItem("kuquba.devSession");
-          setSession(null);
-          setIsValidating(false);
-          return;
-        }
-
-        const payload = (await response.json()) as { session: DevSession };
-
-        if (isMounted) {
-          window.localStorage.setItem("kuquba.devSession", JSON.stringify(payload.session));
-          setSession(payload.session);
-          setIsValidating(false);
-        }
-      } catch {
-        window.localStorage.removeItem("kuquba.devSession");
-        if (isMounted) {
-          setSession(null);
-          setIsValidating(false);
-        }
-      }
-    }
-
-    void validateSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [audience]);
-
   async function handleLogout() {
-    const token = session?.sessionToken;
-
-    if (token) {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000"}/api/identity/session/logout`,
-        {
-          headers: {
-            "x-kuquba-dev-session": token
-          },
-          method: "POST"
-        }
-      ).catch(() => undefined);
-    }
-
-    window.localStorage.removeItem("kuquba.devSession");
-    setSession(null);
+    await logout();
     router.push(`/${audience === "guest" ? "stay" : audience}`);
   }
 
@@ -211,19 +121,16 @@ export function PortalDashboardPage({ audience }: { audience: PortalAudience }) 
             {session ? (
               <div className="mt-4 space-y-3 text-sm text-ink/70">
                 <p>
-                  <span className="font-semibold text-midnight">Usuario:</span>{" "}
-                  {session.user.displayName}
+                  <span className="font-semibold text-midnight">Usuario:</span> {session.user.displayName}
                 </p>
                 <p>
-                  <span className="font-semibold text-midnight">Correo:</span>{" "}
-                  {session.user.emailMasked}
+                  <span className="font-semibold text-midnight">Correo:</span> {session.user.emailMasked}
                 </p>
                 <p>
                   <span className="font-semibold text-midnight">Rol:</span> {session.role.name}
                 </p>
                 <p>
-                  <span className="font-semibold text-midnight">Permisos:</span>{" "}
-                  {session.permissions.length}
+                  <span className="font-semibold text-midnight">Permisos:</span> {session.permissions.length}
                 </p>
                 <p>
                   <span className="font-semibold text-midnight">Expira:</span>{" "}
@@ -239,9 +146,7 @@ export function PortalDashboardPage({ audience }: { audience: PortalAudience }) 
                 </button>
               </div>
             ) : isValidating ? (
-              <p className="mt-4 text-sm leading-6 text-ink/68">
-                Confirmando sesion con la API.
-              </p>
+              <p className="mt-4 text-sm leading-6 text-ink/68">Confirmando sesion con la API.</p>
             ) : (
               <p className="mt-4 text-sm leading-6 text-ink/68">
                 Ingresa desde la pantalla de acceso para cargar una sesion validada por API.

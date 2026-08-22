@@ -63,6 +63,7 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - Detalle publico de estancia: `GET /stay/properties/[id]`
 - Mi estancia: `GET /stay`
 - Portal del propietario: `GET /owner`
+- Home autenticado propietario: `GET /owner/home`
 - Equipo KUQUBA: `GET /ops`
 - API healthcheck: `GET /health`
 - API bootstrap publico: `GET /api/public/bootstrap`
