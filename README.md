@@ -66,11 +66,14 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - Portal del propietario: `GET /owner`
 - Home autenticado propietario: `GET /owner/home`
 - Equipo KUQUBA: `GET /ops`
+- Home ops autenticado: `GET /ops/home`
 - API healthcheck: `GET /health`
 - API bootstrap publico: `GET /api/public/bootstrap`
 - API solicitudes de propuesta: `POST /api/public/stay-proposal-requests`
 - API leads de propietario: `POST /api/public/owner-leads`
 - API portal propietario: `GET /api/owner/portal`
+- API bandeja ops: `GET /api/ops/workbench`
+- API estados ops: `PATCH /api/ops/workbench/:itemType/:id/status`
 - API requisitos de acceso: `GET /api/identity/access-requirements`
 - API passwordless dev: `POST /api/identity/passwordless/start`
 

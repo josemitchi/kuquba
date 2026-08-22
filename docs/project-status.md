@@ -12,16 +12,16 @@ Ultima actualizacion: 2026-08-22
 - Experiencia publica de captacion de propietarios disponible en `/owner/evaluate`.
 - Leads publicos de propietario persistidos por `POST /api/public/owner-leads`.
 - Portal autenticado de propietario disponible en `/owner/home` conectado a `GET /api/owner/portal`.
-- Datos dev persistidos para owner: propiedades asignadas, contratos, reservas, tareas y documentos.
-- API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad y rutas owner protegidas.
-- Prisma configurado con migraciones versionadas y seed IAM/dev owner.
+- Bandeja ops autenticada disponible en `/ops/home` conectada a `GET /api/ops/workbench`.
+- Cambios de estado ops persistidos por `PATCH /api/ops/workbench/:itemType/:id/status`.
+- Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
+- API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
+- Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
 - PostgreSQL y Redis corren en Docker Compose.
 - Web y API dev corren localmente con `npm run dev`, fuera de Docker por ahora.
 
 ## Validacion reciente
 
-- `npm run prisma:generate`
-- `npm run prisma:deploy`
 - `npm run prisma:seed`
 - `npm run lint`
 - `npm run typecheck`
@@ -34,6 +34,9 @@ Ultima actualizacion: 2026-08-22
 - `POST /api/public/owner-leads`
 - `GET /api/owner/portal`
 - `GET /owner/home`
+- `GET /api/ops/workbench`
+- `PATCH /api/ops/workbench/:itemType/:id/status`
+- `GET /ops/home`
 
 ## Incremento publico implementado
 
@@ -75,22 +78,34 @@ Alcance entregado:
 - CTAs publicos de propietarios enlazados a captacion, no al portal privado.
 - Copia explicita para no prometer rentabilidad, contrato ni condiciones comerciales definitivas.
 
+## Incremento ops implementado
+
+Se agrego una bandeja interna para revisar leads de propietarios y solicitudes de propuesta con cambios de estado persistidos.
+
+Alcance entregado:
+
+- Ruta `/ops/home` conectada a API y protegida por sesion dev ops.
+- Endpoint protegido `GET /api/ops/workbench` con metricas, colas y auditoria reciente.
+- Endpoint protegido `PATCH /api/ops/workbench/:itemType/:id/status` para cambiar estados `NEW`, `REVIEWING`, `CONTACTED` o `CLOSED`.
+- Auditoria por lectura denegada, lectura exitosa y cambios de estado sin guardar contacto en eventos de estado.
+- Seed dev de `OwnerLead` y `StayProposalRequest` para bandeja reproducible.
+
 ## Siguiente incremento recomendado
 
-Construir una bandeja interna de operaciones para revisar leads de propietarios y solicitudes de propuesta.
+Construir detalle interno de caso ops para convertir un lead o solicitud en flujo operativo accionable.
 
 Alcance propuesto:
 
-- Crear vista ops autenticada para listar `OwnerLead` y `StayProposalRequest`.
-- Permitir marcar estado `REVIEWING`, `CONTACTED` o `CLOSED`.
-- Agregar filtros por tipo, estado y fecha de captura.
-- Mantener auditoria por cada cambio de estado.
-- Conservar separacion entre captacion publica, portal owner y operacion interna.
+- Crear detalle ops por `OwnerLead` y `StayProposalRequest`.
+- Agregar notas internas y siguiente accion por caso.
+- Crear tareas operativas desde un lead o solicitud aceptada.
+- Mantener auditoria por nota, cambio de estado y tarea creada.
+- Preparar transicion posterior a onboarding de propiedad o propuesta formal de estancia.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- La bandeja ops requiere sesion interna valida.
-- Las listas muestran leads y solicitudes sin exponer datos si no hay sesion ops.
-- Los cambios de estado persisten en Prisma y generan auditoria.
-- La UI conserva consistencia con portales existentes y permite revision rapida.
+- El detalle ops requiere sesion interna valida.
+- Cada caso muestra historial, datos de contacto y siguiente accion sin exponerlo fuera de ops.
+- Las notas y tareas persisten en Prisma y generan auditoria.
+- La UI conserva consistencia con la bandeja ops y permite revision rapida.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.

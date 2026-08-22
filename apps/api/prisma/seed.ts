@@ -25,7 +25,11 @@ const devIds = {
   taskPhotoAntigua: "00000000-0000-4000-8000-000000000604",
   documentReservations: "00000000-0000-4000-8000-000000000701",
   documentExpenses: "00000000-0000-4000-8000-000000000702",
-  documentTax: "00000000-0000-4000-8000-000000000703"
+  documentTax: "00000000-0000-4000-8000-000000000703",
+  ownerLeadAtitlan: "00000000-0000-4000-8000-000000000801",
+  ownerLeadAntigua: "00000000-0000-4000-8000-000000000802",
+  proposalRequestAtitlan: "00000000-0000-4000-8000-000000000811",
+  proposalRequestAntigua: "00000000-0000-4000-8000-000000000812"
 } as const;
 
 async function main() {
@@ -127,6 +131,8 @@ async function main() {
     ownerUserId: ownerUser.id,
     guestUserId: guestUser.id
   });
+
+  await seedOpsWorkbench(prisma);
 }
 
 async function seedDevUser(prismaClient: PrismaClient, input: {
@@ -584,6 +590,138 @@ async function seedOwnerDocument(
       statusLabel: input.statusLabel,
       detail: input.detail,
       sortOrder: input.sortOrder
+    }
+  });
+}
+
+async function seedOpsWorkbench(prismaClient: PrismaClient) {
+  await prismaClient.ownerLead.upsert({
+    where: {
+      id: devIds.ownerLeadAtitlan
+    },
+    create: {
+      id: devIds.ownerLeadAtitlan,
+      ownerName: "Mariana Castillo",
+      email: "mariana.castillo@example.com",
+      phone: "+50255551111",
+      propertyName: "Casa Brisa Atitlan",
+      propertyType: "Casa completa",
+      propertyLocation: "San Marcos La Laguna",
+      operatingStatus: "Por evaluar",
+      message: "Propiedad familiar con muelle compartido y necesidad de revisar reglas de acceso.",
+      status: "NEW",
+      correlationId: "seed-owner-lead-atitlan"
+    },
+    update: {
+      ownerName: "Mariana Castillo",
+      email: "mariana.castillo@example.com",
+      phone: "+50255551111",
+      propertyName: "Casa Brisa Atitlan",
+      propertyType: "Casa completa",
+      propertyLocation: "San Marcos La Laguna",
+      operatingStatus: "Por evaluar",
+      message: "Propiedad familiar con muelle compartido y necesidad de revisar reglas de acceso.",
+      status: "NEW",
+      correlationId: "seed-owner-lead-atitlan"
+    }
+  });
+
+  await prismaClient.ownerLead.upsert({
+    where: {
+      id: devIds.ownerLeadAntigua
+    },
+    create: {
+      id: devIds.ownerLeadAntigua,
+      ownerName: "Roberto Herrera",
+      email: "roberto.herrera@example.com",
+      phone: "+50255552222",
+      propertyName: "Suite Patio Central",
+      propertyType: "Apartamento",
+      propertyLocation: "Antigua Guatemala",
+      operatingStatus: "Ya publicada en OTAs",
+      message: "Busca separar uso familiar de calendario comercial y revisar soporte de limpieza.",
+      status: "REVIEWING",
+      correlationId: "seed-owner-lead-antigua"
+    },
+    update: {
+      ownerName: "Roberto Herrera",
+      email: "roberto.herrera@example.com",
+      phone: "+50255552222",
+      propertyName: "Suite Patio Central",
+      propertyType: "Apartamento",
+      propertyLocation: "Antigua Guatemala",
+      operatingStatus: "Ya publicada en OTAs",
+      message: "Busca separar uso familiar de calendario comercial y revisar soporte de limpieza.",
+      status: "REVIEWING",
+      correlationId: "seed-owner-lead-antigua"
+    }
+  });
+
+  await prismaClient.stayProposalRequest.upsert({
+    where: {
+      id: devIds.proposalRequestAtitlan
+    },
+    create: {
+      id: devIds.proposalRequestAtitlan,
+      stayId: "atitlan-villa-luz",
+      stayName: "Villa Luz de Atitlan",
+      destination: "Lago de Atitlan",
+      guestName: "Laura Mendoza",
+      email: "laura.mendoza@example.com",
+      phone: "+50255553333",
+      arrivalDate: parseDateOnly("2026-09-12"),
+      departureDate: parseDateOnly("2026-09-15"),
+      guests: 4,
+      message: "Viaje familiar con llegada flexible y solicitud de cocina equipada.",
+      status: "NEW",
+      correlationId: "seed-proposal-atitlan"
+    },
+    update: {
+      stayId: "atitlan-villa-luz",
+      stayName: "Villa Luz de Atitlan",
+      destination: "Lago de Atitlan",
+      guestName: "Laura Mendoza",
+      email: "laura.mendoza@example.com",
+      phone: "+50255553333",
+      arrivalDate: parseDateOnly("2026-09-12"),
+      departureDate: parseDateOnly("2026-09-15"),
+      guests: 4,
+      message: "Viaje familiar con llegada flexible y solicitud de cocina equipada.",
+      status: "NEW",
+      correlationId: "seed-proposal-atitlan"
+    }
+  });
+
+  await prismaClient.stayProposalRequest.upsert({
+    where: {
+      id: devIds.proposalRequestAntigua
+    },
+    create: {
+      id: devIds.proposalRequestAntigua,
+      stayId: "antigua-suite-jardin",
+      stayName: "Suite Jardin Antigua",
+      destination: "Antigua Guatemala",
+      guestName: "Diego Pineda",
+      email: "diego.pineda@example.com",
+      arrivalDate: parseDateOnly("2026-10-03"),
+      departureDate: parseDateOnly("2026-10-05"),
+      guests: 2,
+      message: "Escapada de fin de semana con interes en late checkout.",
+      status: "REVIEWING",
+      correlationId: "seed-proposal-antigua"
+    },
+    update: {
+      stayId: "antigua-suite-jardin",
+      stayName: "Suite Jardin Antigua",
+      destination: "Antigua Guatemala",
+      guestName: "Diego Pineda",
+      email: "diego.pineda@example.com",
+      arrivalDate: parseDateOnly("2026-10-03"),
+      departureDate: parseDateOnly("2026-10-05"),
+      guests: 2,
+      message: "Escapada de fin de semana con interes en late checkout.",
+      status: "REVIEWING",
+      correlationId: "seed-proposal-antigua"
     }
   });
 }

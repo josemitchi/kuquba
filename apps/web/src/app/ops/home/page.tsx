@@ -1,5 +1,5 @@
-import { PortalDashboardPage } from "@/components/portal-dashboard-page";
+import { OpsWorkbenchPage } from "@/components/ops-workbench-page";
 
 export default function OpsHomePage() {
-  return <PortalDashboardPage audience="ops" />;
+  return <OpsWorkbenchPage />;
 }
