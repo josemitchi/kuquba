@@ -47,6 +47,7 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
       search: "static-shell",
       stayProposalRequests: "persisted-dev",
       ownerLead: "static-shell",
+      ownerPortal: "persisted-dev",
       payments: "adapter-pending"
     }
   }));

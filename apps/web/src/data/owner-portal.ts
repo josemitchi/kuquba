@@ -1,5 +1,11 @@
 export type OwnerPropertyStatus = "active" | "attention" | "onboarding";
 
+export type OwnerPortalMetric = {
+  hint: string;
+  label: string;
+  value: string;
+};
+
 export type OwnerProperty = {
   contractStage: string;
   highlights: string[];
@@ -21,6 +27,13 @@ export type OwnerProperty = {
   statusLabel: string;
 };
 
+export type OwnerUpcomingStay = {
+  date: string;
+  property: string;
+  status: string;
+  traveler: string;
+};
+
 export type OwnerTask = {
   due: string;
   id: string;
@@ -36,7 +49,19 @@ export type OwnerSettlementItem = {
   status: string;
 };
 
-export const ownerPortalSnapshot = {
+export type OwnerPortalSnapshot = {
+  governance: string[];
+  metrics: OwnerPortalMetric[];
+  ownerName: string;
+  periodLabel: string;
+  properties: OwnerProperty[];
+  settlementItems: OwnerSettlementItem[];
+  summary: string;
+  tasks: OwnerTask[];
+  upcomingStays: OwnerUpcomingStay[];
+};
+
+export const ownerPortalSnapshot: OwnerPortalSnapshot = {
   ownerName: "Propietario KUQUBA",
   periodLabel: "Agosto 2026",
   summary:
@@ -106,7 +131,7 @@ export const ownerPortalSnapshot = {
         { label: "Mantenimiento", state: "Inspeccion inicial" }
       ]
     }
-  ] satisfies OwnerProperty[],
+  ],
   upcomingStays: [
     {
       date: "24 Ago",
@@ -160,7 +185,7 @@ export const ownerPortalSnapshot = {
       priority: "low",
       ownerAction: false
     }
-  ] satisfies OwnerTask[],
+  ],
   settlementItems: [
     {
       label: "Reservas conciliadas",
@@ -177,10 +202,10 @@ export const ownerPortalSnapshot = {
       status: "2 pendientes",
       detail: "Datos fiscales e inventario sensible requieren confirmacion."
     }
-  ] satisfies OwnerSettlementItem[],
+  ],
   governance: [
     "El portal respeta permisos de propietario y no muestra propiedades no asignadas.",
     "Liquidaciones y montos quedan fuera del mock hasta definir contrato y ledger.",
     "Acciones sensibles quedan preparadas para auditoria por sesion."
   ]
-} as const;
+};

@@ -21,7 +21,7 @@ export type DevPortalSession = {
 
 const devSessionStorageKey = "kuquba.devSession";
 
-function getApiBaseUrl() {
+export function getDevPortalApiBaseUrl() {
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 }
 
@@ -54,7 +54,7 @@ export function useDevPortalSession(audience: PortalAudience) {
           return;
         }
 
-        const response = await fetch(`${getApiBaseUrl()}/api/identity/session?audience=${audience}`, {
+        const response = await fetch(`${getDevPortalApiBaseUrl()}/api/identity/session?audience=${audience}`, {
           headers: {
             "x-kuquba-dev-session": storedSession.sessionToken
           }
@@ -96,7 +96,7 @@ export function useDevPortalSession(audience: PortalAudience) {
     const token = session?.sessionToken;
 
     if (token) {
-      await fetch(`${getApiBaseUrl()}/api/identity/session/logout`, {
+      await fetch(`${getDevPortalApiBaseUrl()}/api/identity/session/logout`, {
         headers: {
           "x-kuquba-dev-session": token
         },

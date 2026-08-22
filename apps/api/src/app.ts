@@ -5,6 +5,7 @@ import Fastify from "fastify";
 
 import { env } from "./config/env";
 import { registerIdentityRoutes } from "./modules/identity/routes";
+import { registerOwnerRoutes } from "./routes/owner";
 import { registerErrorHandler } from "./plugins/error-handler";
 import { registerRequestContext } from "./plugins/request-context";
 import { registerHealthRoutes } from "./routes/health";
@@ -34,6 +35,7 @@ export async function buildApp() {
   registerErrorHandler(app);
   await app.register(registerHealthRoutes);
   await app.register(registerIdentityRoutes, { prefix: "/api/identity" });
+  await app.register(registerOwnerRoutes, { prefix: "/api/owner" });
   await app.register(registerPublicRoutes, { prefix: "/api/public" });
 
   return app;

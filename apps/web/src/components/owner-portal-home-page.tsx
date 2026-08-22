@@ -20,14 +20,18 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
-import type { DevPortalSession } from "@/components/use-dev-portal-session";
-import { useDevPortalSession } from "@/components/use-dev-portal-session";
 import {
-  ownerPortalSnapshot,
-  type OwnerProperty,
-  type OwnerPropertyStatus,
-  type OwnerTask
+  getDevPortalApiBaseUrl,
+  type DevPortalSession,
+  useDevPortalSession
+} from "@/components/use-dev-portal-session";
+import type {
+  OwnerPortalSnapshot,
+  OwnerProperty,
+  OwnerPropertyStatus,
+  OwnerTask
 } from "@/data/owner-portal";
 
 const propertyStatusClasses: Record<OwnerPropertyStatus, string> = {
@@ -43,10 +47,72 @@ const taskPriorityClasses: Record<OwnerTask["priority"], string> = {
 };
 
 const metricIcons: LucideIcon[] = [Building2, CalendarCheck2, ClipboardCheck, FileText];
+const protectedPortalSummary =
+  "Vista protegida para propietarios verificados. Las propiedades, tareas y documentos se cargan desde API con una sesion owner vigente.";
+
+type OwnerPortalResponse = {
+  correlationId: string;
+  portal: OwnerPortalSnapshot;
+};
 
 export function OwnerPortalHomePage() {
   const { isValidating, logout, session } = useDevPortalSession("owner");
+  const [portal, setPortal] = useState<OwnerPortalSnapshot | null>(null);
+  const [portalError, setPortalError] = useState<string | null>(null);
+  const [isPortalLoading, setIsPortalLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const sessionToken = session?.sessionToken;
+
+    if (!sessionToken) {
+      setPortal(null);
+      setPortalError(null);
+      setIsPortalLoading(false);
+      return;
+    }
+
+    const activeSessionToken: string = sessionToken;
+
+    async function loadOwnerPortal() {
+      setIsPortalLoading(true);
+      setPortalError(null);
+
+      try {
+        const response = await fetch(`${getDevPortalApiBaseUrl()}/api/owner/portal`, {
+          headers: {
+            "x-kuquba-dev-session": activeSessionToken
+          }
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => undefined)) as { error?: string } | undefined;
+          throw new Error(payload?.error ?? "owner_portal_load_failed");
+        }
+
+        const payload = (await response.json()) as OwnerPortalResponse;
+
+        if (isMounted) {
+          setPortal(payload.portal);
+          setIsPortalLoading(false);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setPortal(null);
+          setPortalError(error instanceof Error ? error.message : "owner_portal_load_failed");
+          setIsPortalLoading(false);
+        }
+      }
+    }
+
+    void loadOwnerPortal();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [session?.sessionToken]);
 
   async function handleLogout() {
     await logout();
@@ -106,7 +172,7 @@ export function OwnerPortalHomePage() {
               Portfolio y operacion de propiedades
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">
-              {ownerPortalSnapshot.summary}
+              {portal?.summary ?? protectedPortalSummary}
             </p>
           </div>
 
@@ -115,7 +181,15 @@ export function OwnerPortalHomePage() {
       </section>
 
       <section className="container-shell py-8">
-        {session ? <OwnerDashboard session={session} /> : <AccessState isValidating={isValidating} />}
+        {session ? (
+          portal ? (
+            <OwnerDashboard session={session} snapshot={portal} />
+          ) : (
+            <PortalLoadState error={portalError} isLoading={isPortalLoading} />
+          )
+        ) : (
+          <AccessState isValidating={isValidating} />
+        )}
       </section>
     </main>
   );
@@ -161,11 +235,17 @@ function SessionPanel({
   );
 }
 
-function OwnerDashboard({ session }: { session: DevPortalSession }) {
+function OwnerDashboard({
+  session,
+  snapshot
+}: {
+  session: DevPortalSession;
+  snapshot: OwnerPortalSnapshot;
+}) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {ownerPortalSnapshot.metrics.map((metric, index) => (
+        {snapshot.metrics.map((metric, index) => (
           <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
         ))}
       </div>
@@ -174,25 +254,25 @@ function OwnerDashboard({ session }: { session: DevPortalSession }) {
         <div className="space-y-8">
           <section>
             <SectionHeading
-              eyebrow={ownerPortalSnapshot.periodLabel}
+              eyebrow={snapshot.periodLabel}
               title="Propiedades asignadas"
-              value={`${ownerPortalSnapshot.properties.length} activas o en activacion`}
+              value={`${snapshot.properties.length} activas o en activacion`}
             />
             <div className="mt-5 space-y-5">
-              {ownerPortalSnapshot.properties.map((property) => (
+              {snapshot.properties.map((property) => (
                 <PropertyCard key={property.id} property={property} />
               ))}
             </div>
           </section>
 
-          <TasksPanel />
+          <TasksPanel snapshot={snapshot} />
         </div>
 
         <aside className="space-y-6">
-          <OwnerIdentityCard session={session} />
-          <UpcomingStaysPanel />
-          <SettlementPanel />
-          <GovernancePanel />
+          <OwnerIdentityCard session={session} snapshot={snapshot} />
+          <UpcomingStaysPanel snapshot={snapshot} />
+          <SettlementPanel snapshot={snapshot} />
+          <GovernancePanel snapshot={snapshot} />
         </aside>
       </div>
     </>
@@ -204,7 +284,7 @@ function MetricCard({
   metric
 }: {
   icon: LucideIcon;
-  metric: (typeof ownerPortalSnapshot.metrics)[number];
+  metric: OwnerPortalSnapshot["metrics"][number];
 }) {
   return (
     <article className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
@@ -301,16 +381,12 @@ function PropertyFact({
   );
 }
 
-function TasksPanel() {
+function TasksPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <SectionHeading
-        eyebrow="Acciones abiertas"
-        title="Pendientes operativos"
-        value={`${ownerPortalSnapshot.tasks.length} tareas`}
-      />
+      <SectionHeading eyebrow="Acciones abiertas" title="Pendientes operativos" value={`${snapshot.tasks.length} tareas`} />
       <div className="mt-5 divide-y divide-line">
-        {ownerPortalSnapshot.tasks.map((task) => (
+        {snapshot.tasks.map((task) => (
           <div className="grid gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[1fr_auto] md:items-center" key={task.id}>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -332,7 +408,13 @@ function TasksPanel() {
   );
 }
 
-function OwnerIdentityCard({ session }: { session: DevPortalSession }) {
+function OwnerIdentityCard({
+  session,
+  snapshot
+}: {
+  session: DevPortalSession;
+  snapshot: OwnerPortalSnapshot;
+}) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
       <div className="flex items-center gap-3">
@@ -340,7 +422,7 @@ function OwnerIdentityCard({ session }: { session: DevPortalSession }) {
           <UserRound aria-hidden className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase text-green">{ownerPortalSnapshot.ownerName}</p>
+          <p className="text-xs font-semibold uppercase text-green">{snapshot.ownerName}</p>
           <h2 className="text-lg font-semibold text-midnight">{session.user.displayName}</h2>
         </div>
       </div>
@@ -351,12 +433,12 @@ function OwnerIdentityCard({ session }: { session: DevPortalSession }) {
   );
 }
 
-function UpcomingStaysPanel() {
+function UpcomingStaysPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <SectionHeading eyebrow="Calendario" title="Proximas estancias" value="Dev" />
+      <SectionHeading eyebrow="Calendario" title="Proximas estancias" value="API" />
       <div className="mt-5 divide-y divide-line">
-        {ownerPortalSnapshot.upcomingStays.map((stay) => (
+        {snapshot.upcomingStays.map((stay) => (
           <div className="grid grid-cols-[64px_1fr] gap-4 py-4 first:pt-0 last:pb-0" key={`${stay.date}-${stay.traveler}`}>
             <div className="rounded-[6px] bg-ivory px-3 py-2 text-center">
               <p className="text-xs font-semibold uppercase text-green">{stay.date}</p>
@@ -373,12 +455,12 @@ function UpcomingStaysPanel() {
   );
 }
 
-function SettlementPanel() {
+function SettlementPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
       <SectionHeading eyebrow="Documentos" title="Cierre mensual" value="Sin montos" />
       <div className="mt-5 divide-y divide-line">
-        {ownerPortalSnapshot.settlementItems.map((item) => (
+        {snapshot.settlementItems.map((item) => (
           <div className="py-4 first:pt-0 last:pb-0" key={item.label}>
             <div className="flex items-start justify-between gap-4">
               <h3 className="text-sm font-semibold text-midnight">{item.label}</h3>
@@ -394,7 +476,7 @@ function SettlementPanel() {
   );
 }
 
-function GovernancePanel() {
+function GovernancePanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
       <div className="flex items-center gap-3">
@@ -402,7 +484,7 @@ function GovernancePanel() {
         <h2 className="text-lg font-semibold text-midnight">Gobernanza</h2>
       </div>
       <ul className="mt-5 space-y-3 text-sm leading-6 text-ink/68">
-        {ownerPortalSnapshot.governance.map((item) => (
+        {snapshot.governance.map((item) => (
           <li className="flex gap-3" key={item}>
             <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
             <span>{item}</span>
@@ -434,6 +516,22 @@ function AccessState({ isValidating }: { isValidating: boolean }) {
           Entrar al portal
         </a>
       ) : null}
+    </section>
+  );
+}
+
+function PortalLoadState({ error, isLoading }: { error: string | null; isLoading: boolean }) {
+  return (
+    <section className="rounded-[8px] border border-line bg-white p-8 text-center shadow-soft">
+      <ShieldCheck aria-hidden className="mx-auto h-10 w-10 text-green" />
+      <h2 className="mt-4 text-xl font-semibold text-midnight">
+        {isLoading ? "Cargando datos de propietario" : "No se pudo cargar el portal"}
+      </h2>
+      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-ink/68">
+        {isLoading
+          ? "La API esta preparando propiedades asignadas, tareas y documentos."
+          : `La API respondio: ${error ?? "owner_portal_load_failed"}.`}
+      </p>
     </section>
   );
 }

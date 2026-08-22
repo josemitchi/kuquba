@@ -68,6 +68,7 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - API healthcheck: `GET /health`
 - API bootstrap publico: `GET /api/public/bootstrap`
 - API solicitudes de propuesta: `POST /api/public/stay-proposal-requests`
+- API portal propietario: `GET /api/owner/portal`
 - API requisitos de acceso: `GET /api/identity/access-requirements`
 - API passwordless dev: `POST /api/identity/passwordless/start`
 

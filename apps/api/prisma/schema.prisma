@@ -195,6 +195,8 @@ model Owner {
   organization   Organization @relation(fields: [organizationId], references: [id])
   user           User?        @relation("OwnerUser", fields: [userId], references: [id])
   contracts      Contract[]
+  tasks          OwnerTask[]
+  documents      OwnerDocument[]
 }
 
 model Property {
@@ -210,6 +212,8 @@ model Property {
   stayCodes      StayCode[]
   contracts      Contract[]
   reservations   Reservation[]
+  ownerTasks     OwnerTask[]
+  ownerDocuments OwnerDocument[]
 
   @@index([organizationId, destination])
 }
@@ -343,6 +347,42 @@ model StayProposalRequest {
   @@index([stayId, status, createdAt])
   @@index([email, createdAt])
   @@index([correlationId])
+}
+
+model OwnerTask {
+  id          String    @id @default(uuid())
+  ownerId     String
+  propertyId  String?
+  title       String
+  dueLabel    String
+  priority    String
+  ownerAction Boolean   @default(false)
+  status      String    @default("OPEN")
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  owner       Owner     @relation(fields: [ownerId], references: [id])
+  property    Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([ownerId, status, sortOrder])
+  @@index([propertyId, status])
+}
+
+model OwnerDocument {
+  id          String    @id @default(uuid())
+  ownerId     String
+  propertyId  String?
+  label       String
+  statusLabel String
+  detail      String
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  owner       Owner     @relation(fields: [ownerId], references: [id])
+  property    Property? @relation(fields: [propertyId], references: [id])
+
+  @@index([ownerId, sortOrder])
+  @@index([propertyId])
 }
 
 model AuditEvent {

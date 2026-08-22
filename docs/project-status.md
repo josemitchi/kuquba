@@ -9,9 +9,10 @@ Ultima actualizacion: 2026-08-22
 - Experiencia publica de busqueda y seleccion disponible en `/stay/search`.
 - Detalle publico de estancia disponible en `/stay/properties/[id]`.
 - Solicitudes publicas de propuesta persistidas por `POST /api/public/stay-proposal-requests`.
-- Portal autenticado de propietario disponible en `/owner/home` con portfolio, tareas y cierre documental dev.
-- API Fastify disponible con healthcheck, bootstrap publico y kernel inicial de identidad.
-- Prisma configurado con migraciones versionadas y seed IAM dev.
+- Portal autenticado de propietario disponible en `/owner/home` conectado a `GET /api/owner/portal`.
+- Datos dev persistidos para owner: propiedades asignadas, contratos, reservas, tareas y documentos.
+- API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad y rutas owner protegidas.
+- Prisma configurado con migraciones versionadas y seed IAM/dev owner.
 - PostgreSQL y Redis corren en Docker Compose.
 - Web y API dev corren localmente con `npm run dev`, fuera de Docker por ahora.
 
@@ -19,6 +20,7 @@ Ultima actualizacion: 2026-08-22
 
 - `npm run prisma:generate`
 - `npm run prisma:deploy`
+- `npm run prisma:seed`
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
@@ -26,6 +28,7 @@ Ultima actualizacion: 2026-08-22
 - `GET /stay/search?destination=Atitlan&guests=6`
 - `GET /stay/properties/atitlan-villa-luz`
 - `POST /api/public/stay-proposal-requests`
+- `GET /api/owner/portal`
 - `GET /owner/home`
 
 ## Incremento publico implementado
@@ -44,33 +47,34 @@ Alcance entregado:
 
 ## Incremento propietario implementado
 
-Se agrego una experiencia autenticada para el propietario, reutilizando la sesion dev verificada contra API y mostrando solo datos conceptuales.
+Se agrego una experiencia autenticada para el propietario, reutilizando la sesion dev verificada contra API y mostrando datos persistidos sin condiciones financieras definitivas.
 
 Alcance entregado:
 
-- Ruta `/owner/home` reemplazada por un portal especifico de propietario.
+- Ruta `/owner/home` con portal especifico de propietario.
 - Hook compartido `useDevPortalSession` para validar sesion y cerrar sesion dev.
-- Dataset tipado de portfolio propietario en `apps/web/src/data/owner-portal.ts`.
-- Vista de propiedades asignadas, proximas estancias, pendientes, documentos y gobernanza.
+- Modelos Prisma `OwnerTask` y `OwnerDocument` con migracion `20260822000400_owner_portal`.
+- Seed dev de propietario, propiedades, unidades, contratos de asignacion, reservas, tareas y documentos.
+- Endpoint protegido `GET /api/owner/portal` con sesion owner, permisos y auditoria.
+- UI owner conectada a API; no renderiza datos operativos sin sesion owner vigente.
 - Copia explicita para no prometer montos, rentabilidad ni reglas financieras definitivas.
 
 ## Siguiente incremento recomendado
 
-Conectar el portal propietario con datos persistidos y preparar el enfoque publico de captacion para propietarios.
+Construir el enfoque publico de captacion para propietarios y persistir leads iniciales sin mezclarlo con el portal autenticado.
 
 Alcance propuesto:
 
-- Definir modelo minimo de propiedades asignadas, tareas y documentos para lectura owner.
-- Crear endpoints `GET /api/owner/...` protegidos por sesion y permisos.
-- Crear experiencia `/owner/evaluate` o seccion publica de captacion para propietarios.
-- Agregar formulario de lead de propietario con propiedad, ubicacion, contacto y estado operativo.
-- Persistir `OwnerLead` solo con modelo minimo y sin reglas financieras definitivas.
-- Mantener separado el portal autenticado `/owner` del flujo publico de captacion.
+- Crear experiencia `/owner/evaluate` o seccion publica de evaluacion inicial para propietarios.
+- Agregar formulario de lead con propiedad, ubicacion, contacto y estado operativo.
+- Persistir `OwnerLead` con modelo minimo y auditoria sin datos sensibles innecesarios.
+- Mantener separado `/owner` y `/owner/home` del flujo publico de captacion.
+- No prometer porcentajes, rentabilidad ni condiciones comerciales definitivas.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- El portal owner no renderiza datos operativos sin sesion owner vigente.
-- Endpoints owner validan audiencia, permiso y recurso asignado.
 - El flujo publico de propietarios no requiere autenticacion.
-- No promete porcentajes, rentabilidad ni condiciones comerciales definitivas.
+- El formulario valida contacto, ubicacion y estado de propiedad.
+- El endpoint publico persiste lead con correlacion y auditoria.
+- La UI conserva consistencia con la experiencia publica de estancias y marca KUQUBA.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.
