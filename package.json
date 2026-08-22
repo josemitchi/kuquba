@@ -1,0 +1,40 @@
+{
+  "name": "kuquba",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KUQUBA hospitality and property management platform.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,green \"npm run dev --workspace @kuquba/web\" \"npm run dev --workspace @kuquba/api\"",
+    "dev:web": "npm run dev --workspace @kuquba/web",
+    "dev:api": "npm run dev --workspace @kuquba/api",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier --write .",
+    "prisma:generate": "npm run prisma:generate --workspace @kuquba/api",
+    "prisma:migrate": "npm run prisma:migrate --workspace @kuquba/api",
+    "prisma:deploy": "npm run prisma:deploy --workspace @kuquba/api",
+    "prisma:seed": "npm run prisma:seed --workspace @kuquba/api"
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "npm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.3.2",
+    "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "concurrently": "^10.0.5",
+    "eslint": "^10.9.0",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}

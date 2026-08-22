@@ -1,0 +1,334 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PropertyVisibility {
+  PUBLIC
+  SEGMENTED
+  PRIVATE
+}
+
+enum ReservationStatus {
+  HOLD
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum LedgerEntryType {
+  ACCOMMODATION
+  TAX
+  OTA_FEE
+  PAYMENT_PROCESSING_FEE
+  CLEANING
+  KUQUBA_SERVICE_FEE
+  OWNER_SHARE
+  KUQUBA_SHARE
+  MAINTENANCE_FUND
+  OWNER_EXPENSE
+  REFUND
+  ADJUSTMENT
+  SETTLEMENT
+}
+
+enum IdentityProvider {
+  EMAIL_OTP
+  PHONE_OTP
+  OIDC
+  PASSKEY
+}
+
+enum IdentityStatus {
+  PENDING
+  VERIFIED
+  DISABLED
+}
+
+enum RoleScope {
+  PLATFORM
+  ORGANIZATION
+  PROPERTY
+  RESERVATION
+}
+
+model Organization {
+  id        String     @id @default(uuid())
+  name      String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  users     User[]
+  owners    Owner[]
+  properties Property[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  organizationId String
+  email          String
+  displayName    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  identities     Identity[]
+  roles          UserRole[]
+  devSessions    DevSession[]
+  auditEvents    AuditEvent[]
+  ownerProfile   Owner?       @relation("OwnerUser")
+  guestProfile   Guest?       @relation("GuestUser")
+
+  @@unique([organizationId, email])
+}
+
+model Identity {
+  id          String           @id @default(uuid())
+  userId      String
+  provider    IdentityProvider
+  subject     String
+  status      IdentityStatus   @default(PENDING)
+  verifiedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id])
+  challenges  AuthChallenge[]
+
+  @@unique([provider, subject])
+  @@index([userId, status])
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  name        String
+  description String?
+  createdAt   DateTime         @default(now())
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  key         String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime   @default(now())
+  role          Role       @relation(fields: [roleId], references: [id])
+  permission    Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model UserRole {
+  id               String    @id @default(uuid())
+  userId           String
+  roleId           String
+  scope            RoleScope
+  resourceId       String?
+  assignedByUserId String?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id])
+  role             Role      @relation(fields: [roleId], references: [id])
+
+  @@index([userId, scope, resourceId])
+  @@index([roleId])
+  @@unique([userId, roleId, scope, resourceId])
+}
+
+model AuthChallenge {
+  id              String     @id @default(uuid())
+  identityId      String?
+  channel         String
+  destinationHash String
+  purpose         String
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  attempts        Int        @default(0)
+  correlationId   String
+  createdAt       DateTime   @default(now())
+  identity        Identity?  @relation(fields: [identityId], references: [id])
+
+  @@index([destinationHash, purpose, createdAt])
+  @@index([correlationId])
+}
+
+model DevSession {
+  id               String    @id @default(uuid())
+  userId           String
+  audience         String
+  sessionTokenHash String    @unique
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastSeenAt       DateTime?
+  correlationId    String
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id])
+
+  @@index([userId, audience, expiresAt])
+  @@index([correlationId])
+}
+
+model Owner {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String?      @unique
+  displayName    String
+  email          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User?        @relation("OwnerUser", fields: [userId], references: [id])
+  contracts      Contract[]
+}
+
+model Property {
+  id             String             @id @default(uuid())
+  organizationId String
+  name           String
+  destination    String
+  visibility     PropertyVisibility @default(PUBLIC)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  units          Unit[]
+  stayCodes      StayCode[]
+  contracts      Contract[]
+  reservations   Reservation[]
+
+  @@index([organizationId, destination])
+}
+
+model Unit {
+  id          String        @id @default(uuid())
+  propertyId  String
+  name        String
+  maxGuests   Int
+  bedrooms    Int
+  bathrooms   Decimal      @db.Decimal(5, 2)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  property    Property     @relation(fields: [propertyId], references: [id])
+  reservations Reservation[]
+}
+
+model StayCode {
+  id          String   @id @default(uuid())
+  propertyId  String
+  code        String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  property    Property @relation(fields: [propertyId], references: [id])
+
+  @@unique([code])
+}
+
+model Contract {
+  id             String   @id @default(uuid())
+  propertyId      String
+  ownerId         String
+  startsOn        DateTime
+  endsOn          DateTime?
+  ownerShareBps   Int
+  kuqubaShareBps  Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  property        Property @relation(fields: [propertyId], references: [id])
+  owner           Owner    @relation(fields: [ownerId], references: [id])
+
+  @@index([propertyId, ownerId])
+}
+
+model Guest {
+  id           String        @id @default(uuid())
+  userId       String?       @unique
+  email        String
+  fullName     String
+  phone        String?
+  countryCode  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  user         User?         @relation("GuestUser", fields: [userId], references: [id])
+  reservations Reservation[]
+}
+
+model Reservation {
+  id          String            @id @default(uuid())
+  guestId     String
+  propertyId  String
+  unitId      String
+  status      ReservationStatus @default(HOLD)
+  arrivalDate DateTime
+  departureDate DateTime
+  privateCode String            @unique
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  guest       Guest             @relation(fields: [guestId], references: [id])
+  property    Property          @relation(fields: [propertyId], references: [id])
+  unit        Unit              @relation(fields: [unitId], references: [id])
+  payments    Payment[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([propertyId, arrivalDate, departureDate])
+}
+
+model Payment {
+  id            String      @id @default(uuid())
+  reservationId String
+  provider      String
+  providerRef   String
+  amount        Decimal     @db.Decimal(12, 2)
+  currency      String
+  createdAt     DateTime    @default(now())
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+}
+
+model LedgerAccount {
+  id        String        @id @default(uuid())
+  name      String
+  currency  String
+  createdAt DateTime      @default(now())
+  entries   LedgerEntry[]
+}
+
+model LedgerEntry {
+  id              String          @id @default(uuid())
+  reservationId   String?
+  ledgerAccountId String
+  type            LedgerEntryType
+  amount          Decimal         @db.Decimal(12, 2)
+  currency        String
+  memo            String?
+  createdAt       DateTime        @default(now())
+  reservation     Reservation?    @relation(fields: [reservationId], references: [id])
+  ledgerAccount   LedgerAccount   @relation(fields: [ledgerAccountId], references: [id])
+
+  @@index([reservationId, type])
+}
+
+model AuditEvent {
+  id             String   @id @default(uuid())
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String?
+  previousValue  Json?
+  nextValue      Json?
+  ipAddress      String?
+  correlationId  String
+  result         String
+  reason         String?
+  createdAt      DateTime @default(now())
+  actor          User?    @relation(fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([correlationId])
+}

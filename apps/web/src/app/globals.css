@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --kuquba-midnight: #0d2233;
+  --kuquba-green: #14685a;
+  --kuquba-terracotta: #c46a3a;
+  --kuquba-beige: #e6c9a6;
+  --kuquba-ivory: #f7f3eb;
+  --kuquba-ink: #101828;
+  --kuquba-line: #d9e1e7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--kuquba-ivory);
+  color: var(--kuquba-ink);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+summary {
+  list-style: none;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+::selection {
+  background: rgba(20, 104, 90, 0.22);
+}
+
+.container-shell {
+  margin-inline: auto;
+  max-width: 1440px;
+  padding-inline: clamp(1rem, 3vw, 4rem);
+}
+
+.focus-ring {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus-ring:focus-visible {
+  outline-color: var(--kuquba-beige);
+}
