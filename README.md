@@ -52,6 +52,10 @@ npm run format
 - Docker Compose para PostgreSQL y Redis.
 - Documentos iniciales de fase y modelo lógico.
 
+## Estado y siguiente paso
+
+El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-status.md).
+
 ## Rutas locales
 
 - Web publica: `GET /`
