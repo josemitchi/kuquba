@@ -25,6 +25,8 @@ export type OpsCaseWorkbenchItem = {
 
 type CaseStatus = "OPEN" | "QUALIFYING" | "ACTION_PENDING" | "CLOSED";
 type TaskStatus = "OPEN" | "DONE";
+type PropertyOnboardingStatus = "DRAFT" | "QUALIFICATION" | "DOCUMENTS" | "OPERATIONS_READY" | "CLOSED";
+type StayProposalStatus = "DRAFT" | "READY_TO_SEND" | "SENT" | "ACCEPTED" | "DECLINED" | "VOID";
 type Priority = "high" | "normal" | "medium" | "low";
 type LoadState = "idle" | "loading" | "ready" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -52,10 +54,10 @@ type OpsCaseConversion =
       kind: "propertyOnboarding";
       id: string;
       label: string;
-      status: string;
+      status: PropertyOnboardingStatus;
       statusLabel: string;
       nextMilestone: string;
-      checklist: Array<{ key: string; label: string; status: string }>;
+      checklist: Array<{ key: string; label: string; status: TaskStatus }>;
       createdAt: string;
       updatedAt: string;
     }
@@ -63,7 +65,7 @@ type OpsCaseConversion =
       kind: "stayProposal";
       id: string;
       label: string;
-      status: string;
+      status: StayProposalStatus;
       statusLabel: string;
       currentVersion: number;
       stayName: string;
@@ -146,6 +148,23 @@ const priorityClasses: Record<string, string> = {
   low: "border-green/24 bg-green/10 text-green"
 };
 
+const propertyOnboardingStatusOptions: Array<CaseOption<PropertyOnboardingStatus>> = [
+  { label: "Borrador", value: "DRAFT" },
+  { label: "Calificacion", value: "QUALIFICATION" },
+  { label: "Documentos", value: "DOCUMENTS" },
+  { label: "Listo ops", value: "OPERATIONS_READY" },
+  { label: "Cerrado", value: "CLOSED" }
+];
+
+const stayProposalStatusOptions: Array<CaseOption<StayProposalStatus>> = [
+  { label: "Borrador", value: "DRAFT" },
+  { label: "Lista para enviar", value: "READY_TO_SEND" },
+  { label: "Enviada", value: "SENT" },
+  { label: "Aceptada", value: "ACCEPTED" },
+  { label: "Rechazada", value: "DECLINED" },
+  { label: "Anulada", value: "VOID" }
+];
+
 export function OpsCasePanel({
   selectedItem,
   sessionToken
@@ -160,6 +179,10 @@ export function OpsCasePanel({
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDueLabel, setTaskDueLabel] = useState("");
   const [taskPriority, setTaskPriority] = useState<Priority>("normal");
+  const [conversionMilestone, setConversionMilestone] = useState("");
+  const [proposalSummary, setProposalSummary] = useState("");
+  const [proposalTermsLabel, setProposalTermsLabel] = useState("Borrador interno sujeto a disponibilidad final");
+  const [proposalInternalNotes, setProposalInternalNotes] = useState("");
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -168,6 +191,10 @@ export function OpsCasePanel({
       setCaseDetail(null);
       setLoadState("idle");
       setNextStep("");
+      setConversionMilestone("");
+      setProposalSummary("");
+      setProposalTermsLabel("Borrador interno sujeto a disponibilidad final");
+      setProposalInternalNotes("");
       setNotice(null);
       return;
     }
@@ -197,6 +224,10 @@ export function OpsCasePanel({
   function applyCaseDetail(detail: OpsCaseDetail) {
     setCaseDetail(detail);
     setNextStep(detail.nextStep ?? "");
+
+    if (detail.conversion?.kind === "propertyOnboarding") {
+      setConversionMilestone(detail.conversion.nextMilestone);
+    }
   }
 
   async function handleCaseUpdate(patch: Partial<{ nextStep: string | null; priority: Priority; status: CaseStatus }>) {
@@ -296,7 +327,6 @@ export function OpsCasePanel({
     }
   }
 
-
   async function handleConvertCase() {
     if (!sessionToken || !caseDetail) {
       return;
@@ -315,6 +345,112 @@ export function OpsCasePanel({
       setUpdatingKey(null);
     }
   }
+
+  async function handleConversionStatusChange(status: PropertyOnboardingStatus | StayProposalStatus) {
+    if (!sessionToken || !caseDetail || !caseDetail.conversion) {
+      return;
+    }
+
+    setUpdatingKey("conversion:status");
+    setNotice(null);
+
+    try {
+      const response = await patchCaseConversion(caseDetail.source.item, { status }, sessionToken);
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: "Flujo formal actualizado." });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo actualizar el flujo formal." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
+
+  async function handleConversionMilestoneSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!sessionToken || !caseDetail || caseDetail.conversion?.kind !== "propertyOnboarding") {
+      return;
+    }
+
+    const nextMilestone = conversionMilestone.trim();
+
+    if (!nextMilestone) {
+      return;
+    }
+
+    setUpdatingKey("conversion:milestone");
+    setNotice(null);
+
+    try {
+      const response = await patchCaseConversion(caseDetail.source.item, { nextMilestone }, sessionToken);
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: "Hito de onboarding actualizado." });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo actualizar el hito." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
+
+  async function handleChecklistStatusChange(item: { key: string; label: string; status: TaskStatus }) {
+    if (!sessionToken || !caseDetail || caseDetail.conversion?.kind !== "propertyOnboarding") {
+      return;
+    }
+
+    const nextStatus: TaskStatus = item.status === "DONE" ? "OPEN" : "DONE";
+    setUpdatingKey(`conversion:checklist:${item.key}`);
+    setNotice(null);
+
+    try {
+      const response = await patchConversionChecklist(caseDetail.source.item, item.key, nextStatus, sessionToken);
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: "Checklist actualizado." });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo actualizar el checklist." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
+
+  async function handleProposalVersionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!sessionToken || !caseDetail || caseDetail.conversion?.kind !== "stayProposal") {
+      return;
+    }
+
+    const summary = proposalSummary.trim();
+    const termsLabel = proposalTermsLabel.trim();
+
+    if (summary.length < 8 || termsLabel.length < 4) {
+      return;
+    }
+
+    setUpdatingKey("conversion:version");
+    setNotice(null);
+
+    try {
+      const response = await postProposalVersion(
+        caseDetail.source.item,
+        {
+          internalNotes: proposalInternalNotes.trim() || undefined,
+          summary,
+          termsLabel
+        },
+        sessionToken
+      );
+      applyCaseDetail(response.caseDetail);
+      setProposalSummary("");
+      setProposalTermsLabel("Borrador interno sujeto a disponibilidad final");
+      setProposalInternalNotes("");
+      setNotice({ kind: "success", text: "Version de propuesta creada." });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo crear la version." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
+
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
       <div className="flex items-center gap-3">
@@ -372,8 +508,20 @@ export function OpsCasePanel({
 
           <ConversionSection
             caseDetail={caseDetail}
+            conversionMilestone={conversionMilestone}
+            onChecklistStatusChange={handleChecklistStatusChange}
+            onConversionMilestoneChange={setConversionMilestone}
+            onConversionMilestoneSubmit={handleConversionMilestoneSubmit}
+            onConversionStatusChange={handleConversionStatusChange}
             onConvert={handleConvertCase}
-            updating={updatingKey === "conversion"}
+            onProposalInternalNotesChange={setProposalInternalNotes}
+            onProposalSummaryChange={setProposalSummary}
+            onProposalTermsLabelChange={setProposalTermsLabel}
+            onProposalVersionSubmit={handleProposalVersionSubmit}
+            proposalInternalNotes={proposalInternalNotes}
+            proposalSummary={proposalSummary}
+            proposalTermsLabel={proposalTermsLabel}
+            updatingKey={updatingKey}
           />
 
           <div>
@@ -559,12 +707,36 @@ export function OpsCasePanel({
 
 function ConversionSection({
   caseDetail,
+  conversionMilestone,
+  onChecklistStatusChange,
+  onConversionMilestoneChange,
+  onConversionMilestoneSubmit,
+  onConversionStatusChange,
   onConvert,
-  updating
+  onProposalInternalNotesChange,
+  onProposalSummaryChange,
+  onProposalTermsLabelChange,
+  onProposalVersionSubmit,
+  proposalInternalNotes,
+  proposalSummary,
+  proposalTermsLabel,
+  updatingKey
 }: {
   caseDetail: OpsCaseDetail;
+  conversionMilestone: string;
+  onChecklistStatusChange: (item: { key: string; label: string; status: TaskStatus }) => void;
+  onConversionMilestoneChange: (value: string) => void;
+  onConversionMilestoneSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onConversionStatusChange: (status: PropertyOnboardingStatus | StayProposalStatus) => void;
   onConvert: () => void;
-  updating: boolean;
+  onProposalInternalNotesChange: (value: string) => void;
+  onProposalSummaryChange: (value: string) => void;
+  onProposalTermsLabelChange: (value: string) => void;
+  onProposalVersionSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  proposalInternalNotes: string;
+  proposalSummary: string;
+  proposalTermsLabel: string;
+  updatingKey: string | null;
 }) {
   const conversionLabel = caseDetail.source.item.kind === "ownerLead" ? "Convertir a onboarding" : "Convertir a propuesta";
 
@@ -577,7 +749,7 @@ function ConversionSection({
         </div>
         <button
           className="focus-ring mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
-          disabled={updating}
+          disabled={updatingKey === "conversion"}
           onClick={onConvert}
           type="button"
         >
@@ -589,51 +761,172 @@ function ConversionSection({
   }
 
   if (caseDetail.conversion.kind === "propertyOnboarding") {
+    const conversion = caseDetail.conversion;
+
     return (
       <div className="rounded-[6px] border border-green/24 bg-green/10 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase text-green">{caseDetail.conversion.label}</p>
-            <h3 className="mt-1 text-base font-semibold text-midnight">{caseDetail.conversion.statusLabel}</h3>
+            <p className="text-xs font-semibold uppercase text-green">{conversion.label}</p>
+            <h3 className="mt-1 text-base font-semibold text-midnight">{conversion.statusLabel}</h3>
           </div>
           <GitBranch aria-hidden className="h-5 w-5 shrink-0 text-green" />
         </div>
-        <p className="mt-3 text-sm leading-6 text-ink/70">{caseDetail.conversion.nextMilestone}</p>
-        <div className="mt-3 space-y-2">
-          {caseDetail.conversion.checklist.map((item) => (
-            <div className="flex items-center justify-between gap-3 text-xs" key={item.key}>
-              <span className="font-semibold text-midnight">{item.label}</span>
-              <span className="rounded-full border border-line bg-white px-2 py-1 text-ink/58">{item.status}</span>
-            </div>
-          ))}
+
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase text-ink/48">Estado onboarding</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {propertyOnboardingStatusOptions.map((option) => (
+              <button
+                className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                  conversion.status === option.value
+                    ? "border-green bg-green text-white"
+                    : "border-line bg-white text-midnight hover:border-green hover:text-green"
+                }`}
+                disabled={updatingKey === "conversion:status" || conversion.status === option.value}
+                key={option.value}
+                onClick={() => onConversionStatusChange(option.value)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form className="mt-4 space-y-3" onSubmit={onConversionMilestoneSubmit}>
+          <label className="block text-xs font-semibold uppercase text-ink/48" htmlFor="conversion-next-milestone">
+            Hito siguiente
+          </label>
+          <textarea
+            className="focus-ring min-h-20 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
+            id="conversion-next-milestone"
+            maxLength={180}
+            onChange={(event) => onConversionMilestoneChange(event.target.value)}
+            value={conversionMilestone}
+          />
+          <button
+            className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-midnight px-4 text-sm font-semibold text-white transition hover:bg-midnight/90 disabled:cursor-not-allowed disabled:opacity-55"
+            disabled={updatingKey === "conversion:milestone" || conversionMilestone.trim().length === 0}
+            type="submit"
+          >
+            <Save aria-hidden className="h-4 w-4" />
+            Guardar hito
+          </button>
+        </form>
+
+        <div className="mt-4 space-y-2">
+          <p className="text-xs font-semibold uppercase text-ink/48">Checklist onboarding</p>
+          {conversion.checklist.map((item) => {
+            const isDone = item.status === "DONE";
+
+            return (
+              <button
+                className="focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-[6px] border border-line bg-white px-3 py-2 text-left text-xs transition hover:border-green disabled:cursor-not-allowed disabled:opacity-55"
+                disabled={updatingKey === `conversion:checklist:${item.key}`}
+                key={item.key}
+                onClick={() => onChecklistStatusChange(item)}
+                type="button"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  {isDone ? (
+                    <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-green" />
+                  ) : (
+                    <Circle aria-hidden className="h-4 w-4 shrink-0 text-terracotta" />
+                  )}
+                  <span className="font-semibold text-midnight">{item.label}</span>
+                </span>
+                <span className="shrink-0 text-ink/58">{isDone ? "Completada" : "Pendiente"}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     );
   }
 
-  const latestVersion = caseDetail.conversion.versions[0];
+  const conversion = caseDetail.conversion;
+  const latestVersion = conversion.versions[0];
 
   return (
     <div className="rounded-[6px] border border-green/24 bg-green/10 p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase text-green">{caseDetail.conversion.label}</p>
+          <p className="text-xs font-semibold uppercase text-green">{conversion.label}</p>
           <h3 className="mt-1 text-base font-semibold text-midnight">
-            Version {caseDetail.conversion.currentVersion} - {caseDetail.conversion.statusLabel}
+            Version {conversion.currentVersion} - {conversion.statusLabel}
           </h3>
         </div>
         <GitBranch aria-hidden className="h-5 w-5 shrink-0 text-green" />
       </div>
+
+      <div className="mt-4">
+        <p className="text-xs font-semibold uppercase text-ink/48">Estado propuesta</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {stayProposalStatusOptions.map((option) => (
+            <button
+              className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                conversion.status === option.value
+                  ? "border-green bg-green text-white"
+                  : "border-line bg-white text-midnight hover:border-green hover:text-green"
+              }`}
+              disabled={updatingKey === "conversion:status" || conversion.status === option.value}
+              key={option.value}
+              onClick={() => onConversionStatusChange(option.value)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {latestVersion ? (
-        <div className="mt-3 text-sm leading-6 text-ink/70">
+        <div className="mt-4 border-y border-green/20 py-3 text-sm leading-6 text-ink/70">
           <p className="font-semibold text-midnight">{latestVersion.title}</p>
           <p className="mt-1">{latestVersion.summary}</p>
           <p className="mt-1 text-xs text-ink/52">{latestVersion.termsLabel}</p>
         </div>
       ) : null}
+
+      <form className="mt-4 grid gap-3" onSubmit={onProposalVersionSubmit}>
+        <textarea
+          aria-label="Resumen de nueva version"
+          className="focus-ring min-h-24 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
+          maxLength={700}
+          onChange={(event) => onProposalSummaryChange(event.target.value)}
+          placeholder="Resumen de nueva version"
+          value={proposalSummary}
+        />
+        <input
+          aria-label="Terminos comerciales"
+          className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm text-ink outline-none"
+          maxLength={160}
+          onChange={(event) => onProposalTermsLabelChange(event.target.value)}
+          placeholder="Terminos comerciales"
+          value={proposalTermsLabel}
+        />
+        <textarea
+          aria-label="Notas internas"
+          className="focus-ring min-h-20 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
+          maxLength={500}
+          onChange={(event) => onProposalInternalNotesChange(event.target.value)}
+          placeholder="Notas internas"
+          value={proposalInternalNotes}
+        />
+        <button
+          className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-midnight px-4 text-sm font-semibold text-white transition hover:bg-midnight/90 disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={updatingKey === "conversion:version" || proposalSummary.trim().length < 8 || proposalTermsLabel.trim().length < 4}
+          type="submit"
+        >
+          <Plus aria-hidden className="h-4 w-4" />
+          Crear version
+        </button>
+      </form>
     </div>
   );
 }
+
 function CaseMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -710,6 +1003,83 @@ async function postCaseConversion(item: OpsCaseWorkbenchItem, sessionToken: stri
 
   return payload;
 }
+
+async function patchCaseConversion(
+  item: OpsCaseWorkbenchItem,
+  patch: Partial<{ nextMilestone: string; status: PropertyOnboardingStatus | StayProposalStatus }>,
+  sessionToken: string
+): Promise<CaseConversionResponse> {
+  const response = await fetch(`${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/conversion`, {
+    body: JSON.stringify(patch),
+    headers: {
+      "content-type": "application/json",
+      "x-kuquba-dev-session": sessionToken
+    },
+    method: "PATCH"
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as CaseConversionResponse & { error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "case_conversion_update_failed");
+  }
+
+  return payload;
+}
+
+async function patchConversionChecklist(
+  item: OpsCaseWorkbenchItem,
+  key: string,
+  status: TaskStatus,
+  sessionToken: string
+): Promise<CaseConversionResponse> {
+  const response = await fetch(
+    `${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/conversion/checklist/${key}`,
+    {
+      body: JSON.stringify({ status }),
+      headers: {
+        "content-type": "application/json",
+        "x-kuquba-dev-session": sessionToken
+      },
+      method: "PATCH"
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as CaseConversionResponse & { error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "case_conversion_checklist_failed");
+  }
+
+  return payload;
+}
+
+async function postProposalVersion(
+  item: OpsCaseWorkbenchItem,
+  body: { internalNotes?: string; summary: string; termsLabel: string },
+  sessionToken: string
+): Promise<CaseConversionResponse> {
+  const response = await fetch(
+    `${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/conversion/versions`,
+    {
+      body: JSON.stringify(body),
+      headers: {
+        "content-type": "application/json",
+        "x-kuquba-dev-session": sessionToken
+      },
+      method: "POST"
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as CaseConversionResponse & { error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "case_conversion_version_failed");
+  }
+
+  return payload;
+}
+
 async function postCaseNote(item: OpsCaseWorkbenchItem, body: string, sessionToken: string): Promise<CaseDetailResponse> {
   const response = await fetch(`${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/notes`, {
     body: JSON.stringify({ body }),

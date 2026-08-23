@@ -11,6 +11,8 @@ const opsUpdatePermissions = ["operation:task:update"];
 const reviewStatusSchema = z.enum(["NEW", "REVIEWING", "CONTACTED", "CLOSED"]);
 const caseStatusSchema = z.enum(["OPEN", "QUALIFYING", "ACTION_PENDING", "CLOSED"]);
 const taskStatusSchema = z.enum(["OPEN", "DONE"]);
+const propertyOnboardingStatusSchema = z.enum(["DRAFT", "QUALIFICATION", "DOCUMENTS", "OPERATIONS_READY", "CLOSED"]);
+const stayProposalStatusSchema = z.enum(["DRAFT", "READY_TO_SEND", "SENT", "ACCEPTED", "DECLINED", "VOID"]);
 const prioritySchema = z.enum(["high", "normal", "medium", "low"]);
 const workbenchParamsSchema = z.object({
   id: z.string().uuid(),
@@ -18,6 +20,9 @@ const workbenchParamsSchema = z.object({
 });
 const caseTaskParamsSchema = workbenchParamsSchema.extend({
   taskId: z.string().uuid()
+});
+const caseChecklistParamsSchema = workbenchParamsSchema.extend({
+  key: z.string().trim().min(2).max(80).regex(/^[a-z0-9_:-]+$/)
 });
 const statusUpdateSchema = z.object({
   status: reviewStatusSchema
@@ -37,6 +42,18 @@ const taskCreateSchema = z.object({
 });
 const taskUpdateSchema = z.object({
   status: taskStatusSchema
+});
+const conversionUpdateSchema = z.object({
+  nextMilestone: z.string().trim().max(180).optional(),
+  status: z.string().trim().optional()
+});
+const checklistUpdateSchema = z.object({
+  status: taskStatusSchema
+});
+const proposalVersionCreateSchema = z.object({
+  internalNotes: z.string().trim().max(500).optional(),
+  summary: z.string().trim().min(8).max(700),
+  termsLabel: z.string().trim().min(4).max(160)
 });
 
 const statusLabels: Record<ReviewStatus, string> = {
@@ -303,6 +320,122 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
       correlationId: request.id
     });
   });
+
+  app.patch("/workbench/:itemType/:id/case/conversion", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.update",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = conversionUpdateSchema.parse(request.body);
+    const updateResult = await updateCaseConversion({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!updateResult) {
+      return reply.code(404).send({
+        error: "case_conversion_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: updateResult.caseDetail,
+      conversion: updateResult.conversion,
+      correlationId: request.id
+    });
+  });
+
+  app.patch("/workbench/:itemType/:id/case/conversion/checklist/:key", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.checklist.update",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = caseChecklistParamsSchema.parse(request.params);
+    const body = checklistUpdateSchema.parse(request.body);
+    const updateResult = await updateOnboardingChecklistItem({
+      actor: authorization.session,
+      id: params.id,
+      itemType: params.itemType,
+      key: params.key,
+      request,
+      status: body.status
+    });
+
+    if (!updateResult) {
+      return reply.code(404).send({
+        error: "checklist_item_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: updateResult.caseDetail,
+      conversion: updateResult.conversion,
+      correlationId: request.id
+    });
+  });
+
+  app.post("/workbench/:itemType/:id/case/conversion/versions", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.version.create",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = proposalVersionCreateSchema.parse(request.body);
+    const createResult = await createStayProposalVersion({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!createResult) {
+      return reply.code(404).send({
+        error: "stay_proposal_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.code(201).send({
+      caseDetail: createResult.caseDetail,
+      conversion: createResult.conversion,
+      correlationId: request.id
+    });
+  });
+
   app.post("/workbench/:itemType/:id/case/notes", async (request, reply) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.note.create",
@@ -1338,6 +1471,379 @@ async function updateOpsCaseTask(input: {
   return {
     caseDetail
   };
+}
+
+async function updateCaseConversion(input: {
+  actor: AuthorizedDevPortalSession;
+  body: z.infer<typeof conversionUpdateSchema>;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.conversion.update",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+
+  if (source.sourceType === "OWNER_LEAD") {
+    const previous = await prisma.propertyOnboarding.findUnique({
+      where: {
+        ownerLeadId: source.sourceId
+      }
+    });
+
+    if (!previous) {
+      await writeMissingConversionAudit({
+        action: "ops.case.conversion.update",
+        actor: input.actor,
+        entityType: "PropertyOnboarding",
+        opsCaseId: opsCase.id,
+        request: input.request
+      });
+      return null;
+    }
+
+    const data: Prisma.PropertyOnboardingUpdateInput = {};
+
+    if (input.body.status) {
+      data.status = propertyOnboardingStatusSchema.parse(input.body.status);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(input.body, "nextMilestone")) {
+      data.nextMilestone = normalizeRequiredText(input.body.nextMilestone, previous.nextMilestone);
+    }
+
+    const updated = Object.keys(data).length
+      ? await prisma.propertyOnboarding.update({
+          data,
+          where: {
+            id: previous.id
+          }
+        })
+      : previous;
+    const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+    await writeOpsAudit({
+      action: "ops.case.conversion.update",
+      actorUserId: input.actor.user.id,
+      entityId: updated.id,
+      entityType: "PropertyOnboarding",
+      previousValue: {
+        nextMilestone: previous.nextMilestone,
+        status: previous.status
+      },
+      nextValue: {
+        nextMilestone: updated.nextMilestone,
+        status: updated.status
+      },
+      reason: "property_onboarding_updated",
+      request: input.request,
+      result: "SUCCESS"
+    });
+
+    return {
+      caseDetail,
+      conversion: caseDetail.conversion
+    };
+  }
+
+  const previous = await prisma.stayProposal.findUnique({
+    where: {
+      proposalRequestId: source.sourceId
+    }
+  });
+
+  if (!previous) {
+    await writeMissingConversionAudit({
+      action: "ops.case.conversion.update",
+      actor: input.actor,
+      entityType: "StayProposal",
+      opsCaseId: opsCase.id,
+      request: input.request
+    });
+    return null;
+  }
+
+  const status = input.body.status ? stayProposalStatusSchema.parse(input.body.status) : previous.status;
+  const updated = await prisma.stayProposal.update({
+    data: {
+      status
+    },
+    where: {
+      id: previous.id
+    }
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.conversion.update",
+    actorUserId: input.actor.user.id,
+    entityId: updated.id,
+    entityType: "StayProposal",
+    previousValue: {
+      status: previous.status
+    },
+    nextValue: {
+      status: updated.status
+    },
+    reason: "stay_proposal_updated",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail,
+    conversion: caseDetail.conversion
+  };
+}
+
+async function updateOnboardingChecklistItem(input: {
+  actor: AuthorizedDevPortalSession;
+  id: string;
+  itemType: WorkbenchItemType;
+  key: string;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  status: TaskStatus;
+}) {
+  if (input.itemType !== "owner-lead") {
+    return null;
+  }
+
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.conversion.checklist.update",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const onboarding = await prisma.propertyOnboarding.findUnique({
+    where: {
+      ownerLeadId: source.sourceId
+    }
+  });
+
+  if (!onboarding) {
+    await writeMissingConversionAudit({
+      action: "ops.case.conversion.checklist.update",
+      actor: input.actor,
+      entityType: "PropertyOnboarding",
+      opsCaseId: opsCase.id,
+      request: input.request
+    });
+    return null;
+  }
+
+  const checklist = parseOnboardingChecklist(onboarding.checklist);
+  const nextChecklist = checklist.map((item) => (item.key === input.key ? { ...item, status: input.status } : item));
+  const previousItem = checklist.find((item) => item.key === input.key);
+
+  if (!previousItem) {
+    await writeOpsAudit({
+      action: "ops.case.conversion.checklist.update",
+      actorUserId: input.actor.user.id,
+      entityId: onboarding.id,
+      entityType: "PropertyOnboarding",
+      nextValue: {
+        attemptedKey: input.key,
+        status: input.status
+      },
+      reason: "checklist_item_not_found",
+      request: input.request,
+      result: "DENIED"
+    });
+    return null;
+  }
+
+  const updated = await prisma.propertyOnboarding.update({
+    data: {
+      checklist: nextChecklist
+    },
+    where: {
+      id: onboarding.id
+    }
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.conversion.checklist.update",
+    actorUserId: input.actor.user.id,
+    entityId: updated.id,
+    entityType: "PropertyOnboarding",
+    previousValue: {
+      key: input.key,
+      status: previousItem.status
+    },
+    nextValue: {
+      key: input.key,
+      status: input.status
+    },
+    reason: "property_onboarding_checklist_updated",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail,
+    conversion: caseDetail.conversion
+  };
+}
+
+async function createStayProposalVersion(input: {
+  actor: AuthorizedDevPortalSession;
+  body: z.infer<typeof proposalVersionCreateSchema>;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  if (input.itemType !== "stay-proposal-request") {
+    return null;
+  }
+
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.conversion.version.create",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const proposal = await prisma.stayProposal.findUnique({
+    where: {
+      proposalRequestId: source.sourceId
+    }
+  });
+
+  if (!proposal) {
+    await writeMissingConversionAudit({
+      action: "ops.case.conversion.version.create",
+      actor: input.actor,
+      entityType: "StayProposal",
+      opsCaseId: opsCase.id,
+      request: input.request
+    });
+    return null;
+  }
+
+  const nextVersion = proposal.currentVersion + 1;
+  const version = await prisma.$transaction(async (tx) => {
+    const createdVersion = await tx.stayProposalVersion.create({
+      data: {
+        internalNotes: normalizeNullableText(input.body.internalNotes),
+        stayProposalId: proposal.id,
+        summary: input.body.summary,
+        termsLabel: input.body.termsLabel,
+        title: `Propuesta v${nextVersion} - ${proposal.stayName}`,
+        version: nextVersion
+      }
+    });
+
+    await tx.stayProposal.update({
+      data: {
+        currentVersion: nextVersion,
+        status: "DRAFT"
+      },
+      where: {
+        id: proposal.id
+      }
+    });
+
+    return createdVersion;
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.conversion.version.create",
+    actorUserId: input.actor.user.id,
+    entityId: version.id,
+    entityType: "StayProposalVersion",
+    nextValue: {
+      stayProposalId: proposal.id,
+      version: nextVersion
+    },
+    reason: "stay_proposal_version_created",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail,
+    conversion: caseDetail.conversion
+  };
+}
+
+async function writeMissingConversionAudit(input: {
+  action: string;
+  actor: AuthorizedDevPortalSession;
+  entityType: "PropertyOnboarding" | "StayProposal";
+  opsCaseId: string;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  await writeOpsAudit({
+    action: input.action,
+    actorUserId: input.actor.user.id,
+    entityId: input.opsCaseId,
+    entityType: input.entityType,
+    reason: "case_conversion_not_found",
+    request: input.request,
+    result: "DENIED"
+  });
+}
+
+function parseOnboardingChecklist(value: Prisma.JsonValue) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return [];
+    }
+
+    const candidate = item as Record<string, unknown>;
+
+    if (typeof candidate.key !== "string" || typeof candidate.label !== "string") {
+      return [];
+    }
+
+    const status = candidate.status === "DONE" ? "DONE" : "OPEN";
+
+    return [
+      {
+        key: candidate.key,
+        label: candidate.label,
+        status
+      }
+    ];
+  });
+}
+
+function normalizeRequiredText(value: string | undefined, fallback: string) {
+  const normalized = value?.trim();
+
+  return normalized ? normalized : fallback;
 }
 
 async function writeMissingCaseSourceAudit(input: {

@@ -76,6 +76,9 @@ El checkpoint activo del proyecto vive en [docs/project-status.md](docs/project-
 - API estados ops: `PATCH /api/ops/workbench/:itemType/:id/status`
 - API detalle caso ops: `GET/PATCH /api/ops/workbench/:itemType/:id/case`
 - API conversion caso ops: `POST /api/ops/workbench/:itemType/:id/case/convert`
+- API gestion conversion ops: `PATCH /api/ops/workbench/:itemType/:id/case/conversion`
+- API checklist onboarding ops: `PATCH /api/ops/workbench/:itemType/:id/case/conversion/checklist/:key`
+- API versiones propuesta ops: `POST /api/ops/workbench/:itemType/:id/case/conversion/versions`
 - API notas caso ops: `POST /api/ops/workbench/:itemType/:id/case/notes`
 - API tareas caso ops: `POST /api/ops/workbench/:itemType/:id/case/tasks`
 - API estado tarea ops: `PATCH /api/ops/workbench/:itemType/:id/case/tasks/:taskId`

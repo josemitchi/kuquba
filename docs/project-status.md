@@ -1,6 +1,6 @@
 # Estado del proyecto KUQUBA
 
-Ultima actualizacion: 2026-08-22
+Ultima actualizacion: 2026-08-23
 
 ## Estado actual
 
@@ -17,6 +17,7 @@ Ultima actualizacion: 2026-08-22
 - Expediente ops autenticado disponible por item con `GET/PATCH /api/ops/workbench/:itemType/:id/case`.
 - Notas y tareas internas ops persistidas por endpoints protegidos de caso.
 - Conversion formal ops disponible por `POST /api/ops/workbench/:itemType/:id/case/convert`.
+- Gestion de conversion formal ops disponible por endpoints protegidos para estado, checklist y versiones.
 - Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
 - Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
@@ -40,6 +41,9 @@ Ultima actualizacion: 2026-08-22
 - `GET /api/ops/workbench`
 - `PATCH /api/ops/workbench/:itemType/:id/status`
 - `GET /ops/home`
+- `PATCH /api/ops/workbench/:itemType/:id/case/conversion`
+- `PATCH /api/ops/workbench/:itemType/:id/case/conversion/checklist/:key`
+- `POST /api/ops/workbench/:itemType/:id/case/conversion/versions`
 
 ## Incremento publico implementado
 
@@ -121,20 +125,33 @@ Alcance entregado:
 - Auditoria por conversion sin guardar datos de contacto dentro del evento.
 - Seed dev de onboarding y propuesta versionada para casos demo.
 
+## Incremento gestion flujo formal ops implementado
+
+Se agrego gestion operativa sobre el flujo formal ya convertido, sin enviar comunicaciones reales todavia.
+
+Alcance entregado:
+
+- Endpoint protegido `PATCH /api/ops/workbench/:itemType/:id/case/conversion` para cambiar estado formal y hito de onboarding.
+- Endpoint protegido `PATCH /api/ops/workbench/:itemType/:id/case/conversion/checklist/:key` para completar o reabrir items de checklist de onboarding.
+- Endpoint protegido `POST /api/ops/workbench/:itemType/:id/case/conversion/versions` para crear nuevas versiones de propuesta.
+- Panel ops permite gestionar estados, hito, checklist y versiones desde el expediente.
+- Auditoria por cada actualizacion de flujo formal.
+- Seed dev vuelve deterministica la propuesta demo y limpia versiones extra al reseed.
+
 ## Siguiente incremento recomendado
 
-Construir gestion del flujo formal ya convertido.
+Construir asignacion operativa y preparacion de entrega del flujo formal.
 
 Alcance propuesto:
 
-- Cambiar estados de onboarding y propuesta desde ops.
-- Marcar checklist de onboarding como completado por item.
-- Crear nuevas versiones de propuesta y preparar estado `READY_TO_SEND`.
-- Asociar responsable ops y fecha objetivo real por flujo formal.
+- Asociar responsable ops y fecha objetivo por onboarding o propuesta formal.
+- Mostrar timeline de actividad formal junto al expediente.
+- Preparar preview interno de propuesta lista para enviar sin ejecutar envio real.
+- Definir permisos separados para edicion formal y aprobacion/envio.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- Cada cambio requiere sesion interna valida.
-- Los cambios de flujo formal persisten en Prisma y generan auditoria.
-- La UI distingue borrador, listo para enviar y enviado/aceptado sin enviar comunicaciones reales.
+- Cada cambio requiere sesion interna valida y permiso especifico.
+- Responsable, fecha objetivo y actividad formal persisten en Prisma y generan auditoria.
+- La UI permite distinguir borrador, listo para aprobacion y aprobado sin enviar comunicaciones reales.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.

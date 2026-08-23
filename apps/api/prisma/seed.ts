@@ -1078,6 +1078,15 @@ async function seedStayProposal(
     }
   });
 
+  await prismaClient.stayProposalVersion.deleteMany({
+    where: {
+      stayProposalId: proposal.id,
+      version: {
+        not: input.version
+      }
+    }
+  });
+
   await prismaClient.stayProposalVersion.upsert({
     where: {
       stayProposalId_version: {
