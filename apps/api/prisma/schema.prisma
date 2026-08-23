@@ -104,6 +104,13 @@ enum StayProposalStatus {
   VOID
 }
 
+enum FormalApprovalStatus {
+  DRAFT
+  READY_FOR_APPROVAL
+  APPROVED
+  SENT
+}
+
 model Organization {
   id         String     @id @default(uuid())
   name       String
@@ -129,7 +136,11 @@ model User {
   opsCaseNotes                OpsCaseNote[]
   formalActivities            OpsFormalActivity[]
   assignedPropertyOnboardings PropertyOnboarding[] @relation("PropertyOnboardingAssignee")
+  approvedPropertyOnboardings PropertyOnboarding[] @relation("PropertyOnboardingApprover")
+  sentPropertyOnboardings     PropertyOnboarding[] @relation("PropertyOnboardingSender")
   assignedStayProposals       StayProposal[]       @relation("StayProposalAssignee")
+  approvedStayProposals       StayProposal[]       @relation("StayProposalApprover")
+  sentStayProposals           StayProposal[]       @relation("StayProposalSender")
   ownerProfile                Owner?               @relation("OwnerUser")
   guestProfile                Guest?               @relation("GuestUser")
 
@@ -502,14 +513,25 @@ model PropertyOnboarding {
   assignedUserId        String?
   targetDate            DateTime?
   handoffNotes          String?
+  approvalStatus        FormalApprovalStatus     @default(DRAFT)
+  approvedAt            DateTime?
+  approvedByUserId      String?
+  sentAt                DateTime?
+  sentByUserId          String?
+  deliveryNotes         String?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   opsCase               OpsCase                  @relation(fields: [opsCaseId], references: [id])
   ownerLead             OwnerLead                @relation(fields: [ownerLeadId], references: [id])
   assignedUser          User?                    @relation("PropertyOnboardingAssignee", fields: [assignedUserId], references: [id])
+  approvedBy            User?                    @relation("PropertyOnboardingApprover", fields: [approvedByUserId], references: [id])
+  sentBy                User?                    @relation("PropertyOnboardingSender", fields: [sentByUserId], references: [id])
 
   @@index([status, updatedAt])
+  @@index([approvalStatus, updatedAt])
   @@index([assignedUserId])
+  @@index([approvedByUserId])
+  @@index([sentByUserId])
   @@index([targetDate])
   @@index([propertyLocation])
 }
@@ -532,15 +554,26 @@ model StayProposal {
   assignedUserId    String?
   targetDate        DateTime?
   handoffNotes      String?
+  approvalStatus    FormalApprovalStatus  @default(DRAFT)
+  approvedAt        DateTime?
+  approvedByUserId  String?
+  sentAt            DateTime?
+  sentByUserId      String?
+  deliveryNotes     String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   opsCase           OpsCase               @relation(fields: [opsCaseId], references: [id])
   proposalRequest   StayProposalRequest   @relation(fields: [proposalRequestId], references: [id])
   assignedUser      User?                 @relation("StayProposalAssignee", fields: [assignedUserId], references: [id])
+  approvedBy        User?                 @relation("StayProposalApprover", fields: [approvedByUserId], references: [id])
+  sentBy            User?                 @relation("StayProposalSender", fields: [sentByUserId], references: [id])
   versions          StayProposalVersion[]
 
   @@index([status, updatedAt])
+  @@index([approvalStatus, updatedAt])
   @@index([assignedUserId])
+  @@index([approvedByUserId])
+  @@index([sentByUserId])
   @@index([targetDate])
   @@index([stayId, status])
 }

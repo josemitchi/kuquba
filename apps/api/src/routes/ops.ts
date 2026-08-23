@@ -12,6 +12,7 @@ import {
 const opsReadPermissions = ["operation:calendar:read", "audit:event:read"];
 const opsUpdatePermissions = ["operation:task:update"];
 const opsFormalUpdatePermissions = ["operation:formal:update"];
+const opsFormalApprovePermissions = ["operation:formal:approve"];
 const reviewStatusSchema = z.enum(["NEW", "REVIEWING", "CONTACTED", "CLOSED"]);
 const caseStatusSchema = z.enum(["OPEN", "QUALIFYING", "ACTION_PENDING", "CLOSED"]);
 const taskStatusSchema = z.enum(["OPEN", "DONE"]);
@@ -87,6 +88,9 @@ const proposalVersionCreateSchema = z.object({
 const formalActivityCreateSchema = z.object({
   body: z.string().trim().min(3).max(1000)
 });
+const formalTransitionSchema = z.object({
+  note: z.string().trim().max(700).nullable().optional()
+});
 
 const statusLabels: Record<ReviewStatus, string> = {
   NEW: "Nuevo",
@@ -131,6 +135,13 @@ const stayProposalStatusLabels = {
   VOID: "Anulada"
 } as const;
 
+const formalApprovalStatusLabels = {
+  DRAFT: "Borrador interno",
+  READY_FOR_APPROVAL: "Lista para aprobacion",
+  APPROVED: "Aprobada",
+  SENT: "Enviada"
+} as const;
+
 const sourceTypeByItemType: Record<WorkbenchItemType, OpsCaseSourceType> = {
   "owner-lead": "OWNER_LEAD",
   "stay-proposal-request": "STAY_PROPOSAL_REQUEST"
@@ -147,6 +158,7 @@ type WorkbenchItem =
 type WorkbenchItemType = "owner-lead" | "stay-proposal-request";
 type OpsCaseSourceType = "OWNER_LEAD" | "STAY_PROPOSAL_REQUEST";
 type OpsCaseEntityType = "OwnerLead" | "StayProposalRequest";
+type FormalTransition = "REQUEST_APPROVAL" | "APPROVE" | "SEND";
 type OpsCaseSource = {
   contactEmail: string;
   contactName: string;
@@ -192,11 +204,39 @@ type OpsCaseWithRelations = Prisma.OpsCaseGetPayload<{
             id: true;
           };
         };
+        approvedBy: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+        sentBy: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
       };
     };
     stayProposal: {
       include: {
         assignedUser: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+        approvedBy: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+        sentBy: {
           select: {
             displayName: true;
             email: true;
@@ -530,6 +570,123 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     return reply.code(201).send({
       caseDetail: createResult.caseDetail,
       conversion: createResult.conversion,
+      correlationId: request.id
+    });
+  });
+
+  app.post("/workbench/:itemType/:id/case/conversion/approval-request", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.approval.request",
+      request,
+      requiredPermissions: opsFormalUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = formalTransitionSchema.parse(request.body);
+    const transitionResult = await updateFormalTransition({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request,
+      transition: "REQUEST_APPROVAL"
+    });
+
+    if (!transitionResult.ok) {
+      return reply.code(transitionResult.statusCode).send({
+        error: transitionResult.error,
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: transitionResult.caseDetail,
+      conversion: transitionResult.conversion,
+      correlationId: request.id
+    });
+  });
+
+  app.post("/workbench/:itemType/:id/case/conversion/approve", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.approve",
+      request,
+      requiredPermissions: opsFormalApprovePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = formalTransitionSchema.parse(request.body);
+    const transitionResult = await updateFormalTransition({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request,
+      transition: "APPROVE"
+    });
+
+    if (!transitionResult.ok) {
+      return reply.code(transitionResult.statusCode).send({
+        error: transitionResult.error,
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: transitionResult.caseDetail,
+      conversion: transitionResult.conversion,
+      correlationId: request.id
+    });
+  });
+
+  app.post("/workbench/:itemType/:id/case/conversion/send", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.send",
+      request,
+      requiredPermissions: opsFormalApprovePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = formalTransitionSchema.parse(request.body);
+    const transitionResult = await updateFormalTransition({
+      actor: authorization.session,
+      body,
+      id: params.id,
+      itemType: params.itemType,
+      request,
+      transition: "SEND"
+    });
+
+    if (!transitionResult.ok) {
+      return reply.code(transitionResult.statusCode).send({
+        error: transitionResult.error,
+        correlationId: request.id
+      });
+    }
+
+    return reply.send({
+      caseDetail: transitionResult.caseDetail,
+      conversion: transitionResult.conversion,
       correlationId: request.id
     });
   });
@@ -1033,12 +1190,40 @@ async function loadOpsCaseById(id: string) {
               email: true,
               id: true
             }
+          },
+          approvedBy: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          },
+          sentBy: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
           }
         }
       },
       stayProposal: {
         include: {
           assignedUser: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          },
+          approvedBy: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          },
+          sentBy: {
             select: {
               displayName: true,
               email: true,
@@ -1834,6 +2019,367 @@ async function createFormalActivity(input: {
     conversion: caseDetail.conversion
   };
 }
+async function updateFormalTransition(input: {
+  actor: AuthorizedDevPortalSession;
+  body: z.infer<typeof formalTransitionSchema>;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  transition: FormalTransition;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+  const action = buildFormalTransitionAuditAction(input.transition);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action,
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return {
+      ok: false as const,
+      statusCode: 404,
+      error: "workbench_item_not_found"
+    };
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const formalEntity = resolveFormalEntity(opsCase);
+
+  if (!formalEntity) {
+    await writeMissingConversionAudit({
+      action,
+      actor: input.actor,
+      entityType: source.sourceType === "OWNER_LEAD" ? "PropertyOnboarding" : "StayProposal",
+      opsCaseId: opsCase.id,
+      request: input.request
+    });
+    return {
+      ok: false as const,
+      statusCode: 404,
+      error: "case_conversion_not_found"
+    };
+  }
+
+  const note = normalizeNullableText(input.body.note);
+
+  if (formalEntity.entityType === "PropertyOnboarding") {
+    const previous = opsCase.propertyOnboarding;
+
+    if (!previous) {
+      return {
+        ok: false as const,
+        statusCode: 404,
+        error: "case_conversion_not_found"
+      };
+    }
+
+    const conflict = getFormalTransitionConflict(previous.approvalStatus, input.transition);
+
+    if (conflict) {
+      await writeFormalTransitionDeniedAudit({
+        action,
+        actor: input.actor,
+        entityId: previous.id,
+        entityType: "PropertyOnboarding",
+        error: conflict,
+        request: input.request,
+        status: previous.approvalStatus,
+        transition: input.transition
+      });
+      return {
+        ok: false as const,
+        statusCode: 409,
+        error: conflict
+      };
+    }
+
+    const data: Prisma.PropertyOnboardingUpdateInput = {};
+    applyFormalTransitionData(data, {
+      actor: input.actor,
+      entityType: "PropertyOnboarding",
+      note,
+      transition: input.transition
+    });
+
+    const updated = await prisma.propertyOnboarding.update({
+      data,
+      where: {
+        id: previous.id
+      }
+    });
+
+    await createFormalTransitionActivity({
+      actor: input.actor,
+      entityId: updated.id,
+      entityType: "PropertyOnboarding",
+      note,
+      opsCaseId: opsCase.id,
+      transition: input.transition
+    });
+
+    const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+    await writeOpsAudit({
+      action,
+      actorUserId: input.actor.user.id,
+      entityId: updated.id,
+      entityType: "PropertyOnboarding",
+      previousValue: buildFormalTransitionAuditValue(previous),
+      nextValue: buildFormalTransitionAuditValue(updated),
+      reason: buildFormalTransitionReason(input.transition),
+      request: input.request,
+      result: "SUCCESS"
+    });
+
+    return {
+      ok: true as const,
+      caseDetail,
+      conversion: caseDetail.conversion
+    };
+  }
+
+  const previous = opsCase.stayProposal;
+
+  if (!previous) {
+    return {
+      ok: false as const,
+      statusCode: 404,
+      error: "case_conversion_not_found"
+    };
+  }
+
+  const conflict = getFormalTransitionConflict(previous.approvalStatus, input.transition);
+
+  if (conflict) {
+    await writeFormalTransitionDeniedAudit({
+      action,
+      actor: input.actor,
+      entityId: previous.id,
+      entityType: "StayProposal",
+      error: conflict,
+      request: input.request,
+      status: previous.approvalStatus,
+      transition: input.transition
+    });
+    return {
+      ok: false as const,
+      statusCode: 409,
+      error: conflict
+    };
+  }
+
+  const data: Prisma.StayProposalUpdateInput = {};
+  applyFormalTransitionData(data, {
+    actor: input.actor,
+    entityType: "StayProposal",
+    note,
+    transition: input.transition
+  });
+
+  const updated = await prisma.stayProposal.update({
+    data,
+    where: {
+      id: previous.id
+    }
+  });
+
+  await createFormalTransitionActivity({
+    actor: input.actor,
+    entityId: updated.id,
+    entityType: "StayProposal",
+    note,
+    opsCaseId: opsCase.id,
+    transition: input.transition
+  });
+
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action,
+    actorUserId: input.actor.user.id,
+    entityId: updated.id,
+    entityType: "StayProposal",
+    previousValue: buildFormalTransitionAuditValue(previous),
+    nextValue: buildFormalTransitionAuditValue(updated),
+    reason: buildFormalTransitionReason(input.transition),
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    ok: true as const,
+    caseDetail,
+    conversion: caseDetail.conversion
+  };
+}
+
+async function writeFormalTransitionDeniedAudit(input: {
+  action: string;
+  actor: AuthorizedDevPortalSession;
+  entityId: string;
+  entityType: "PropertyOnboarding" | "StayProposal";
+  error: string;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  status: string;
+  transition: FormalTransition;
+}) {
+  await writeOpsAudit({
+    action: input.action,
+    actorUserId: input.actor.user.id,
+    entityId: input.entityId,
+    entityType: input.entityType,
+    nextValue: {
+      error: input.error,
+      status: input.status,
+      transition: input.transition
+    },
+    reason: "formal_transition_denied",
+    request: input.request,
+    result: "DENIED"
+  });
+}
+
+async function createFormalTransitionActivity(input: {
+  actor: AuthorizedDevPortalSession;
+  entityId: string;
+  entityType: "PropertyOnboarding" | "StayProposal";
+  note: string | null;
+  opsCaseId: string;
+  transition: FormalTransition;
+}) {
+  await prisma.opsFormalActivity.create({
+    data: {
+      actorUserId: input.actor.user.id,
+      body: buildFormalTransitionActivityBody(input.transition, input.entityType, input.note),
+      entityId: input.entityId,
+      entityType: input.entityType,
+      opsCaseId: input.opsCaseId
+    }
+  });
+}
+
+function applyFormalTransitionData(
+  data: Prisma.PropertyOnboardingUpdateInput | Prisma.StayProposalUpdateInput,
+  input: {
+    actor: AuthorizedDevPortalSession;
+    entityType: "PropertyOnboarding" | "StayProposal";
+    note: string | null;
+    transition: FormalTransition;
+  }
+) {
+  const target = data as Record<string, unknown>;
+  const now = new Date();
+
+  if (input.transition === "REQUEST_APPROVAL") {
+    target.approvalStatus = "READY_FOR_APPROVAL";
+  }
+
+  if (input.transition === "APPROVE") {
+    target.approvalStatus = "APPROVED";
+    target.approvedAt = now;
+    target.approvedBy = {
+      connect: {
+        id: input.actor.user.id
+      }
+    };
+    target.status = input.entityType === "StayProposal" ? "READY_TO_SEND" : "OPERATIONS_READY";
+  }
+
+  if (input.transition === "SEND") {
+    target.approvalStatus = "SENT";
+    target.sentAt = now;
+    target.sentBy = {
+      connect: {
+        id: input.actor.user.id
+      }
+    };
+    target.status = input.entityType === "StayProposal" ? "SENT" : "OPERATIONS_READY";
+  }
+
+  if (input.note) {
+    target.deliveryNotes = input.note;
+  }
+}
+
+function getFormalTransitionConflict(status: string, transition: FormalTransition) {
+  if (status === "SENT") {
+    return "formal_already_sent";
+  }
+
+  if (transition === "REQUEST_APPROVAL" && status === "APPROVED") {
+    return "formal_already_approved";
+  }
+
+  if (transition === "SEND" && status !== "APPROVED") {
+    return "formal_approval_required";
+  }
+
+  return null;
+}
+
+function buildFormalTransitionAuditAction(transition: FormalTransition) {
+  if (transition === "REQUEST_APPROVAL") {
+    return "ops.case.conversion.approval.request";
+  }
+
+  if (transition === "APPROVE") {
+    return "ops.case.conversion.approve";
+  }
+
+  return "ops.case.conversion.send";
+}
+
+function buildFormalTransitionReason(transition: FormalTransition) {
+  if (transition === "REQUEST_APPROVAL") {
+    return "formal_approval_requested";
+  }
+
+  if (transition === "APPROVE") {
+    return "formal_approved";
+  }
+
+  return "formal_send_recorded";
+}
+
+function buildFormalTransitionActivityBody(
+  transition: FormalTransition,
+  entityType: "PropertyOnboarding" | "StayProposal",
+  note: string | null
+) {
+  const base =
+    transition === "REQUEST_APPROVAL"
+      ? "Solicitud de aprobacion formal registrada."
+      : transition === "APPROVE"
+        ? "Aprobacion interna registrada."
+        : entityType === "StayProposal"
+          ? "Envio controlado registrado sin proveedor externo."
+          : "Entrega controlada registrada sin proveedor externo.";
+
+  return note ? `${base} Nota: ${note}` : base;
+}
+
+function buildFormalTransitionAuditValue(input: {
+  approvalStatus: string;
+  approvedAt?: Date | null;
+  approvedByUserId?: string | null;
+  sentAt?: Date | null;
+  sentByUserId?: string | null;
+  deliveryNotes?: string | null;
+  status: string;
+}) {
+  return {
+    approvalStatus: input.approvalStatus,
+    approvedAt: input.approvedAt?.toISOString() ?? null,
+    approvedByUserId: input.approvedByUserId ?? null,
+    deliveryNotes: input.deliveryNotes ?? null,
+    sentAt: input.sentAt?.toISOString() ?? null,
+    sentByUserId: input.sentByUserId ?? null,
+    status: input.status
+  };
+}
 async function updateOnboardingChecklistItem(input: {
   actor: AuthorizedDevPortalSession;
   id: string;
@@ -2230,6 +2776,7 @@ function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
       assignee: buildUserSummary(opsCase.propertyOnboarding.assignedUser),
       targetDate: formatDateOnly(opsCase.propertyOnboarding.targetDate),
       handoffNotes: opsCase.propertyOnboarding.handoffNotes,
+      formalState: buildFormalApprovalState(opsCase.propertyOnboarding),
       activities: buildFormalActivities(opsCase, entityType, entityId),
       createdAt: opsCase.propertyOnboarding.createdAt.toISOString(),
       updatedAt: opsCase.propertyOnboarding.updatedAt.toISOString()
@@ -2251,6 +2798,7 @@ function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
       assignee: buildUserSummary(opsCase.stayProposal.assignedUser),
       targetDate: formatDateOnly(opsCase.stayProposal.targetDate),
       handoffNotes: opsCase.stayProposal.handoffNotes,
+      formalState: buildFormalApprovalState(opsCase.stayProposal),
       activities: buildFormalActivities(opsCase, entityType, entityId),
       preview: buildStayProposalPreview(opsCase.stayProposal),
       versions: opsCase.stayProposal.versions.map((version) => ({
@@ -2270,6 +2818,25 @@ function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
   return null;
 }
 
+function buildFormalApprovalState(input: {
+  approvalStatus: keyof typeof formalApprovalStatusLabels;
+  approvedAt: Date | null;
+  approvedBy?: { displayName: string; email: string; id: string } | null;
+  deliveryNotes: string | null;
+  sentAt: Date | null;
+  sentBy?: { displayName: string; email: string; id: string } | null;
+}) {
+  return {
+    status: input.approvalStatus,
+    statusLabel: formalApprovalStatusLabels[input.approvalStatus],
+    approvedAt: input.approvedAt?.toISOString() ?? null,
+    approvedBy: buildUserSummary(input.approvedBy),
+    canSend: input.approvalStatus === "APPROVED",
+    deliveryNotes: input.deliveryNotes,
+    sentAt: input.sentAt?.toISOString() ?? null,
+    sentBy: buildUserSummary(input.sentBy)
+  };
+}
 function buildFormalActivities(
   opsCase: OpsCaseWithRelations,
   entityType: string,

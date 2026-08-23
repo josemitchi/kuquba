@@ -13,6 +13,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Send,
   ShieldCheck,
   UserCheck,
   UserX,
@@ -33,6 +34,8 @@ type TaskStatus = "OPEN" | "DONE";
 type PropertyOnboardingStatus =
   "DRAFT" | "QUALIFICATION" | "DOCUMENTS" | "OPERATIONS_READY" | "CLOSED";
 type StayProposalStatus = "DRAFT" | "READY_TO_SEND" | "SENT" | "ACCEPTED" | "DECLINED" | "VOID";
+type FormalApprovalStatus = "DRAFT" | "READY_FOR_APPROVAL" | "APPROVED" | "SENT";
+type FormalTransitionAction = "approval-request" | "approve" | "send";
 type Priority = "high" | "normal" | "medium" | "low";
 type LoadState = "idle" | "loading" | "ready" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -76,6 +79,17 @@ type StayProposalPreview = {
   subject: string;
 };
 
+type OpsFormalState = {
+  approvedAt?: string | null;
+  approvedBy: OpsCaseAssignee;
+  canSend: boolean;
+  deliveryNotes?: string | null;
+  sentAt?: string | null;
+  sentBy: OpsCaseAssignee;
+  status: FormalApprovalStatus;
+  statusLabel: string;
+};
+
 type FormalAssigneeAction = "ASSIGN_SELF" | "CLEAR";
 
 type CurrentOpsUser = {
@@ -96,6 +110,7 @@ type OpsCaseConversion =
       assignee: OpsCaseAssignee;
       targetDate?: string | null;
       handoffNotes?: string | null;
+      formalState: OpsFormalState;
       activities: OpsFormalActivity[];
       createdAt: string;
       updatedAt: string;
@@ -111,6 +126,7 @@ type OpsCaseConversion =
       assignee: OpsCaseAssignee;
       targetDate?: string | null;
       handoffNotes?: string | null;
+      formalState: OpsFormalState;
       activities: OpsFormalActivity[];
       preview: StayProposalPreview;
       versions: Array<{
@@ -213,10 +229,12 @@ const stayProposalStatusOptions: Array<CaseOption<StayProposalStatus>> = [
 ];
 
 export function OpsCasePanel({
+  canApproveFormal,
   currentUser,
   selectedItem,
   sessionToken
 }: {
+  canApproveFormal: boolean;
   currentUser: CurrentOpsUser | null;
   selectedItem: OpsCaseWorkbenchItem | null;
   sessionToken: string | null;
@@ -557,6 +575,29 @@ export function OpsCasePanel({
     }
   }
 
+  async function handleFormalTransition(action: FormalTransitionAction) {
+    if (!sessionToken || !caseDetail || !caseDetail.conversion) {
+      return;
+    }
+
+    setUpdatingKey(`conversion:${action}`);
+    setNotice(null);
+
+    try {
+      const response = await postFormalTransition(
+        caseDetail.source.item,
+        action,
+        { note: formalHandoffNotes.trim() || undefined },
+        sessionToken
+      );
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: buildFormalTransitionNotice(action) });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo actualizar la aprobacion formal." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
   async function handleChecklistStatusChange(item: {
     key: string;
     label: string;
@@ -696,6 +737,7 @@ export function OpsCasePanel({
           </div>
 
           <ConversionSection
+            canApproveFormal={canApproveFormal}
             caseDetail={caseDetail}
             conversionMilestone={conversionMilestone}
             currentUser={currentUser}
@@ -712,6 +754,7 @@ export function OpsCasePanel({
             onFormalAssignmentChange={handleFormalAssignmentChange}
             onFormalHandoffNotesChange={setFormalHandoffNotes}
             onFormalPlanSubmit={handleFormalPlanSubmit}
+            onFormalTransition={handleFormalTransition}
             onFormalTargetDateChange={setFormalTargetDate}
             onProposalInternalNotesChange={setProposalInternalNotes}
             onProposalSummaryChange={setProposalSummary}
@@ -915,6 +958,7 @@ export function OpsCasePanel({
 }
 
 function ConversionSection({
+  canApproveFormal,
   caseDetail,
   conversionMilestone,
   currentUser,
@@ -931,6 +975,7 @@ function ConversionSection({
   onFormalAssignmentChange,
   onFormalHandoffNotesChange,
   onFormalPlanSubmit,
+  onFormalTransition,
   onFormalTargetDateChange,
   onProposalInternalNotesChange,
   onProposalSummaryChange,
@@ -941,6 +986,7 @@ function ConversionSection({
   proposalTermsLabel,
   updatingKey
 }: {
+  canApproveFormal: boolean;
   caseDetail: OpsCaseDetail;
   conversionMilestone: string;
   currentUser: CurrentOpsUser | null;
@@ -957,6 +1003,7 @@ function ConversionSection({
   onFormalAssignmentChange: (action: FormalAssigneeAction) => void;
   onFormalHandoffNotesChange: (value: string) => void;
   onFormalPlanSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onFormalTransition: (action: FormalTransitionAction) => void;
   onFormalTargetDateChange: (value: string) => void;
   onProposalInternalNotesChange: (value: string) => void;
   onProposalSummaryChange: (value: string) => void;
@@ -1027,6 +1074,7 @@ function ConversionSection({
         </div>
 
         <FormalOpsControls
+          canApproveFormal={canApproveFormal}
           conversion={conversion}
           currentUser={currentUser}
           formalActivityBody={formalActivityBody}
@@ -1037,6 +1085,7 @@ function ConversionSection({
           onFormalAssignmentChange={onFormalAssignmentChange}
           onFormalHandoffNotesChange={onFormalHandoffNotesChange}
           onFormalPlanSubmit={onFormalPlanSubmit}
+          onFormalTransition={onFormalTransition}
           onFormalTargetDateChange={onFormalTargetDateChange}
           updatingKey={updatingKey}
         />
@@ -1134,6 +1183,7 @@ function ConversionSection({
       </div>
 
       <FormalOpsControls
+        canApproveFormal={canApproveFormal}
         conversion={conversion}
         currentUser={currentUser}
         formalActivityBody={formalActivityBody}
@@ -1144,6 +1194,7 @@ function ConversionSection({
         onFormalAssignmentChange={onFormalAssignmentChange}
         onFormalHandoffNotesChange={onFormalHandoffNotesChange}
         onFormalPlanSubmit={onFormalPlanSubmit}
+        onFormalTransition={onFormalTransition}
         onFormalTargetDateChange={onFormalTargetDateChange}
         updatingKey={updatingKey}
       />
@@ -1201,6 +1252,7 @@ function ConversionSection({
 }
 
 function FormalOpsControls({
+  canApproveFormal,
   conversion,
   currentUser,
   formalActivityBody,
@@ -1211,9 +1263,11 @@ function FormalOpsControls({
   onFormalAssignmentChange,
   onFormalHandoffNotesChange,
   onFormalPlanSubmit,
+  onFormalTransition,
   onFormalTargetDateChange,
   updatingKey
 }: {
+  canApproveFormal: boolean;
   conversion: OpsFormalConversion;
   currentUser: CurrentOpsUser | null;
   formalActivityBody: string;
@@ -1224,12 +1278,13 @@ function FormalOpsControls({
   onFormalAssignmentChange: (action: FormalAssigneeAction) => void;
   onFormalHandoffNotesChange: (value: string) => void;
   onFormalPlanSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onFormalTransition: (action: FormalTransitionAction) => void;
   onFormalTargetDateChange: (value: string) => void;
   updatingKey: string | null;
 }) {
   return (
     <div className="mt-4 border-y border-green/20 py-4">
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <FormalSummaryItem
           detail={conversion.assignee?.email ?? "Pendiente"}
           icon={UserCheck}
@@ -1242,7 +1297,19 @@ function FormalOpsControls({
           label="Objetivo"
           value={formatDateOnlyLabel(conversion.targetDate)}
         />
+        <FormalSummaryItem
+          detail={buildFormalStateDetail(conversion.formalState)}
+          icon={ShieldCheck}
+          label="Aprobacion"
+          value={conversion.formalState.statusLabel}
+        />
       </div>
+
+      {conversion.formalState.deliveryNotes ? (
+        <p className="mt-3 rounded-[6px] border border-line bg-white px-3 py-2 text-xs leading-5 text-ink/68">
+          {conversion.formalState.deliveryNotes}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
@@ -1266,6 +1333,47 @@ function FormalOpsControls({
         >
           <UserX aria-hidden className="h-4 w-4" />
           Liberar
+        </button>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={
+            updatingKey === "conversion:approval-request" ||
+            conversion.formalState.status !== "DRAFT"
+          }
+          onClick={() => onFormalTransition("approval-request")}
+          type="button"
+        >
+          <ShieldCheck aria-hidden className="h-4 w-4" />
+          Solicitar aprobacion
+        </button>
+        <button
+          className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={
+            !canApproveFormal ||
+            updatingKey === "conversion:approve" ||
+            conversion.formalState.status !== "READY_FOR_APPROVAL"
+          }
+          onClick={() => onFormalTransition("approve")}
+          type="button"
+        >
+          <ShieldCheck aria-hidden className="h-4 w-4" />
+          Aprobar
+        </button>
+        <button
+          className="focus-ring inline-flex min-h-9 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={
+            !canApproveFormal ||
+            updatingKey === "conversion:send" ||
+            !conversion.formalState.canSend
+          }
+          onClick={() => onFormalTransition("send")}
+          type="button"
+        >
+          <Send aria-hidden className="h-4 w-4" />
+          {conversion.kind === "stayProposal" ? "Registrar envio" : "Registrar entrega"}
         </button>
       </div>
 
@@ -1610,6 +1718,35 @@ async function postFormalActivity(
   return payload;
 }
 
+async function postFormalTransition(
+  item: OpsCaseWorkbenchItem,
+  action: FormalTransitionAction,
+  body: { note?: string },
+  sessionToken: string
+): Promise<CaseConversionResponse> {
+  const response = await fetch(
+    `${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/conversion/${action}`,
+    {
+      body: JSON.stringify(body),
+      headers: {
+        "content-type": "application/json",
+        "x-kuquba-dev-session": sessionToken
+      },
+      method: "POST"
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as CaseConversionResponse & {
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "case_conversion_transition_failed");
+  }
+
+  return payload;
+}
+
 async function postCaseNote(
   item: OpsCaseWorkbenchItem,
   body: string,
@@ -1712,6 +1849,30 @@ function formatDateOnlyLabel(value?: string | null) {
     timeZone: "UTC"
   }).format(date);
 }
+function buildFormalStateDetail(state: OpsFormalState) {
+  if (state.sentAt) {
+    return `Enviado ${formatDateTime(state.sentAt)}`;
+  }
+
+  if (state.approvedAt) {
+    return `Aprobado ${formatDateTime(state.approvedAt)}`;
+  }
+
+  return "Pendiente";
+}
+
+function buildFormalTransitionNotice(action: FormalTransitionAction) {
+  if (action === "approval-request") {
+    return "Solicitud de aprobacion formal registrada.";
+  }
+
+  if (action === "approve") {
+    return "Aprobacion interna registrada.";
+  }
+
+  return "Envio formal registrado sin proveedor externo.";
+}
+
 function formatDateTime(value: string) {
   const date = new Date(value);
 

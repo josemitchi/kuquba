@@ -45,7 +45,8 @@ const devIds = {
   stayProposalAtitlanFormal: "00000000-0000-4000-8000-000000000981",
   stayProposalAtitlanVersionOne: "00000000-0000-4000-8000-000000000982",
   formalActivityOnboardingAtitlan: "00000000-0000-4000-8000-000000000991",
-  formalActivityProposalAtitlan: "00000000-0000-4000-8000-000000000992"
+  formalActivityProposalAtitlan: "00000000-0000-4000-8000-000000000992",
+  formalActivityProposalApprovalAtitlan: "00000000-0000-4000-8000-000000000993"
 } as const;
 
 async function main() {
@@ -861,6 +862,12 @@ async function seedOpsWorkbench(prismaClient: PrismaClient, input: { opsUserId: 
     targetDate: "2026-08-30",
     handoffNotes:
       "Coordinar visita tecnica, documentos iniciales y reglas de acceso antes de marcar listo ops.",
+    approvalStatus: "DRAFT",
+    approvedAt: null,
+    approvedByUserId: null,
+    sentAt: null,
+    sentByUserId: null,
+    deliveryNotes: null,
     activities: [
       {
         id: devIds.formalActivityOnboardingAtitlan,
@@ -895,12 +902,24 @@ async function seedOpsWorkbench(prismaClient: PrismaClient, input: { opsUserId: 
     targetDate: "2026-08-24",
     handoffNotes:
       "Validar disponibilidad, ajustar terminos y dejar propuesta lista para aprobacion interna.",
+    approvalStatus: "READY_FOR_APPROVAL",
+    approvedAt: null,
+    approvedByUserId: null,
+    sentAt: null,
+    sentByUserId: null,
+    deliveryNotes: "Lista para revision interna; no hay envio real registrado.",
     activities: [
       {
         id: devIds.formalActivityProposalAtitlan,
         actorUserId: input.opsUserId,
         body: "Propuesta formal abierta con version inicial y pendiente de validacion operativa.",
         createdAt: "2026-08-23T10:10:00.000Z"
+      },
+      {
+        id: devIds.formalActivityProposalApprovalAtitlan,
+        actorUserId: input.opsUserId,
+        body: "Solicitud de aprobacion formal registrada para propuesta demo.",
+        createdAt: "2026-08-23T10:20:00.000Z"
       }
     ]
   });
@@ -1020,6 +1039,12 @@ async function seedPropertyOnboarding(
     assignedUserId: string | null;
     targetDate: string | null;
     handoffNotes: string | null;
+    approvalStatus: "DRAFT" | "READY_FOR_APPROVAL" | "APPROVED" | "SENT";
+    approvedAt: string | null;
+    approvedByUserId: string | null;
+    sentAt: string | null;
+    sentByUserId: string | null;
+    deliveryNotes: string | null;
     activities: Array<{ id: string; actorUserId: string; body: string; createdAt: string }>;
   }
 ) {
@@ -1042,7 +1067,13 @@ async function seedPropertyOnboarding(
       checklist: input.checklist,
       assignedUserId: input.assignedUserId,
       targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
-      handoffNotes: input.handoffNotes
+      handoffNotes: input.handoffNotes,
+      approvalStatus: input.approvalStatus,
+      approvedAt: input.approvedAt ? new Date(input.approvedAt) : null,
+      approvedByUserId: input.approvedByUserId,
+      sentAt: input.sentAt ? new Date(input.sentAt) : null,
+      sentByUserId: input.sentByUserId,
+      deliveryNotes: input.deliveryNotes
     },
     update: {
       opsCaseId: input.opsCaseId,
@@ -1057,7 +1088,13 @@ async function seedPropertyOnboarding(
       checklist: input.checklist,
       assignedUserId: input.assignedUserId,
       targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
-      handoffNotes: input.handoffNotes
+      handoffNotes: input.handoffNotes,
+      approvalStatus: input.approvalStatus,
+      approvedAt: input.approvedAt ? new Date(input.approvedAt) : null,
+      approvedByUserId: input.approvedByUserId,
+      sentAt: input.sentAt ? new Date(input.sentAt) : null,
+      sentByUserId: input.sentByUserId,
+      deliveryNotes: input.deliveryNotes
     }
   });
 
@@ -1094,6 +1131,12 @@ async function seedStayProposal(
     assignedUserId: string | null;
     targetDate: string | null;
     handoffNotes: string | null;
+    approvalStatus: "DRAFT" | "READY_FOR_APPROVAL" | "APPROVED" | "SENT";
+    approvedAt: string | null;
+    approvedByUserId: string | null;
+    sentAt: string | null;
+    sentByUserId: string | null;
+    deliveryNotes: string | null;
     activities: Array<{ id: string; actorUserId: string; body: string; createdAt: string }>;
   }
 ) {
@@ -1118,7 +1161,13 @@ async function seedStayProposal(
       currentVersion: input.version,
       assignedUserId: input.assignedUserId,
       targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
-      handoffNotes: input.handoffNotes
+      handoffNotes: input.handoffNotes,
+      approvalStatus: input.approvalStatus,
+      approvedAt: input.approvedAt ? new Date(input.approvedAt) : null,
+      approvedByUserId: input.approvedByUserId,
+      sentAt: input.sentAt ? new Date(input.sentAt) : null,
+      sentByUserId: input.sentByUserId,
+      deliveryNotes: input.deliveryNotes
     },
     update: {
       opsCaseId: input.opsCaseId,
@@ -1135,7 +1184,13 @@ async function seedStayProposal(
       currentVersion: input.version,
       assignedUserId: input.assignedUserId,
       targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
-      handoffNotes: input.handoffNotes
+      handoffNotes: input.handoffNotes,
+      approvalStatus: input.approvalStatus,
+      approvedAt: input.approvedAt ? new Date(input.approvedAt) : null,
+      approvedByUserId: input.approvedByUserId,
+      sentAt: input.sentAt ? new Date(input.sentAt) : null,
+      sentByUserId: input.sentByUserId,
+      deliveryNotes: input.deliveryNotes
     }
   });
 

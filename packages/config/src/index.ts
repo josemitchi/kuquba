@@ -96,6 +96,7 @@ export const roleProfiles = [
       "operation:calendar:read",
       "operation:task:update",
       "operation:formal:update",
+      "operation:formal:approve",
       "finance:ledger:read",
       "audit:event:read",
       "identity:user:manage"

@@ -19,6 +19,7 @@ Ultima actualizacion: 2026-08-23
 - Conversion formal ops disponible por `POST /api/ops/workbench/:itemType/:id/case/convert`.
 - Gestion de conversion formal ops disponible por endpoints protegidos para estado, checklist y versiones.
 - Asignacion formal ops disponible con responsable, fecha objetivo, notas de entrega, actividad y preview interno de propuesta.
+- Aprobacion interna y envio controlado formal disponibles con estados `DRAFT`, `READY_FOR_APPROVAL`, `APPROVED` y `SENT`.
 - Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
 - Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
@@ -46,6 +47,9 @@ Ultima actualizacion: 2026-08-23
 - `PATCH /api/ops/workbench/:itemType/:id/case/conversion/checklist/:key`
 - `POST /api/ops/workbench/:itemType/:id/case/conversion/versions`
 - `POST /api/ops/workbench/:itemType/:id/case/conversion/activity`
+- `POST /api/ops/workbench/:itemType/:id/case/conversion/approval-request`
+- `POST /api/ops/workbench/:itemType/:id/case/conversion/approve`
+- `POST /api/ops/workbench/:itemType/:id/case/conversion/send`
 
 ## Incremento publico implementado
 
@@ -151,22 +155,35 @@ Alcance entregado:
 - `PATCH /api/ops/workbench/:itemType/:id/case/conversion` ahora permite asignarse, liberar responsable, guardar fecha objetivo y notas de entrega.
 - Panel ops muestra responsable, fecha objetivo, notas de entrega, timeline formal y preview interno de propuesta.
 - Seed dev incluye responsable ops, fechas objetivo, notas y actividad formal deterministica.
-- Permiso `operation:formal:update` queda asignado a ops admin; `operation:formal:approve` queda definido pero sin conceder todavia.
+- Permiso `operation:formal:update` queda asignado a ops admin para edicion del flujo formal.
+
+## Incremento aprobacion formal ops implementado
+
+Se agrego control interno para pasar un flujo formal de borrador a solicitud de aprobacion, aprobacion y envio registrado sin proveedor externo.
+
+Alcance entregado:
+
+- Enum Prisma `FormalApprovalStatus` y campos de aprobacion, envio, responsables y notas de entrega en onboarding/propuesta formal.
+- Endpoints protegidos `POST /api/ops/workbench/:itemType/:id/case/conversion/approval-request`, `POST /api/ops/workbench/:itemType/:id/case/conversion/approve` y `POST /api/ops/workbench/:itemType/:id/case/conversion/send`.
+- Permiso `operation:formal:approve` asignado a ops admin dev y requerido para aprobar o registrar envio.
+- El envio queda bloqueado si no hay aprobacion interna registrada; no ejecuta envio real ni acopla proveedor externo.
+- Panel ops muestra estado de aprobacion, notas de entrega, acciones controladas y timeline formal diferenciado.
+- Seed dev incluye propuesta lista para aprobacion y actividad demo deterministica.
 
 ## Siguiente incremento recomendado
 
-Construir aprobacion interna y envio controlado del flujo formal.
+Integrar adaptador transaccional real y plantillas de comunicacion, manteniendo el gate de aprobacion interna.
 
 Alcance propuesto:
 
-- Separar estados de borrador, listo para aprobacion, aprobado y enviado.
-- Activar `operation:formal:approve` solo para un rol autorizado.
-- Registrar aprobacion interna antes de cualquier envio real.
-- Preparar adaptador de envio transaccional sin acoplar proveedor definitivo.
+- Definir adaptador de envio para email/WhatsApp sin filtrar credenciales al frontend.
+- Crear plantillas versionadas para propuesta de estancia y entrega de onboarding.
+- Persistir `providerMessageId`, estado de entrega y errores recuperables.
+- Mantener `operation:formal:approve` como requisito antes de cualquier envio real.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- Ningun envio real ocurre sin aprobacion interna registrada.
-- La aprobacion requiere sesion interna valida y permiso `operation:formal:approve`.
-- El timeline formal distingue edicion, aprobacion y envio.
+- Ningun proveedor externo recibe payload si `approvalStatus` no es `APPROVED`.
+- La respuesta del proveedor queda auditada sin guardar secretos ni contacto en claro dentro del evento.
+- El timeline formal distingue aprobado, enviado, entregado y fallido.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.

@@ -381,21 +381,28 @@ export function OpsWorkbenchPage() {
             <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
               <BadgeCheck aria-hidden className="h-9 w-9 text-green" />
               <h2 className="mt-4 text-lg font-semibold text-midnight">
-                {isValidating ? "Validando acceso" : session ? "Sesion ops activa" : "Acceso pendiente"}
+                {isValidating
+                  ? "Validando acceso"
+                  : session
+                    ? "Sesion ops activa"
+                    : "Acceso pendiente"}
               </h2>
               {session ? (
                 <div className="mt-4 space-y-3 text-sm text-ink/70">
                   <p>
-                    <span className="font-semibold text-midnight">Usuario:</span> {session.user.displayName}
+                    <span className="font-semibold text-midnight">Usuario:</span>{" "}
+                    {session.user.displayName}
                   </p>
                   <p>
-                    <span className="font-semibold text-midnight">Correo:</span> {session.user.emailMasked}
+                    <span className="font-semibold text-midnight">Correo:</span>{" "}
+                    {session.user.emailMasked}
                   </p>
                   <p>
                     <span className="font-semibold text-midnight">Rol:</span> {session.role.name}
                   </p>
                   <p>
-                    <span className="font-semibold text-midnight">Permisos:</span> {session.permissions.length}
+                    <span className="font-semibold text-midnight">Permisos:</span>{" "}
+                    {session.permissions.length}
                   </p>
                 </div>
               ) : isValidating ? (
@@ -416,7 +423,12 @@ export function OpsWorkbenchPage() {
               )}
             </section>
 
-            <OpsCasePanel currentUser={session?.user ?? null} selectedItem={selectedItem} sessionToken={session?.sessionToken ?? null} />
+            <OpsCasePanel
+              canApproveFormal={session?.permissions.includes("operation:formal:approve") ?? false}
+              currentUser={session?.user ?? null}
+              selectedItem={selectedItem}
+              sessionToken={session?.sessionToken ?? null}
+            />
 
             <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
               <div className="flex items-center gap-3">
@@ -431,7 +443,10 @@ export function OpsWorkbenchPage() {
 
               <div className="mt-5 space-y-3">
                 {(workbench?.recentAuditEvents ?? []).map((event) => (
-                  <div className="border-b border-line pb-3 text-sm last:border-b-0 last:pb-0" key={event.id}>
+                  <div
+                    className="border-b border-line pb-3 text-sm last:border-b-0 last:pb-0"
+                    key={event.id}
+                  >
                     <p className="font-semibold text-midnight">{event.action}</p>
                     <p className="mt-1 text-xs text-ink/58">
                       {event.entityType} - {event.result} - {formatDateTime(event.createdAt)}
@@ -439,7 +454,9 @@ export function OpsWorkbenchPage() {
                   </div>
                 ))}
                 {session && workbench?.recentAuditEvents.length === 0 ? (
-                  <p className="text-sm leading-6 text-ink/62">Sin eventos recientes para esta bandeja.</p>
+                  <p className="text-sm leading-6 text-ink/62">
+                    Sin eventos recientes para esta bandeja.
+                  </p>
                 ) : null}
               </div>
             </section>
@@ -472,11 +489,19 @@ function renderWorkbenchContent({
   updatingKey: string | null;
 }) {
   if (isValidating || loadState === "loading") {
-    return <StatePanel icon={RefreshCw} title="Cargando bandeja" body="Sincronizando datos con API." />;
+    return (
+      <StatePanel icon={RefreshCw} title="Cargando bandeja" body="Sincronizando datos con API." />
+    );
   }
 
   if (loadState === "error") {
-    return <StatePanel icon={ShieldCheck} title="No se pudo cargar" body="La API no devolvio la bandeja ops." />;
+    return (
+      <StatePanel
+        icon={ShieldCheck}
+        title="No se pudo cargar"
+        body="La API no devolvio la bandeja ops."
+      />
+    );
   }
 
   if (items.length === 0) {
@@ -484,7 +509,11 @@ function renderWorkbenchContent({
       <StatePanel
         icon={Inbox}
         title="Sin elementos en este filtro"
-        body={activeQueue === "ownerLeads" ? "No hay leads con este estado." : "No hay solicitudes con este estado."}
+        body={
+          activeQueue === "ownerLeads"
+            ? "No hay leads con este estado."
+            : "No hay solicitudes con este estado."
+        }
       />
     );
   }
@@ -528,7 +557,9 @@ function WorkbenchItemCard({
   updating: boolean;
 }) {
   return (
-    <article className={`rounded-[8px] border bg-white p-5 shadow-soft ${selected ? "border-green" : "border-line"}`}>
+    <article
+      className={`rounded-[8px] border bg-white p-5 shadow-soft ${selected ? "border-green" : "border-line"}`}
+    >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase text-green">
@@ -559,8 +590,14 @@ function WorkbenchItemCard({
       ) : (
         <div className="mt-4 grid gap-3 text-sm text-ink/72 md:grid-cols-3">
           <TextBadge label="Huespedes" value={`${item.guests}`} />
-          <TextBadge label="Llegada" value={item.arrivalDate ? formatDate(item.arrivalDate) : "Flexible"} />
-          <TextBadge label="Salida" value={item.departureDate ? formatDate(item.departureDate) : "Flexible"} />
+          <TextBadge
+            label="Llegada"
+            value={item.arrivalDate ? formatDate(item.arrivalDate) : "Flexible"}
+          />
+          <TextBadge
+            label="Salida"
+            value={item.departureDate ? formatDate(item.departureDate) : "Flexible"}
+          />
         </div>
       )}
 
@@ -602,7 +639,15 @@ function WorkbenchItemCard({
   );
 }
 
-function InfoLine({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function InfoLine({
+  icon: Icon,
+  label,
+  value
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex min-h-11 items-center gap-3 rounded-[6px] border border-line px-3">
       <Icon aria-hidden className="h-4 w-4 shrink-0 text-green" />
@@ -622,7 +667,15 @@ function TextBadge({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StatePanel({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
+function StatePanel({
+  icon: Icon,
+  title,
+  body
+}: {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+}) {
   return (
     <div className="rounded-[8px] border border-line bg-white p-8 text-center shadow-soft 2xl:col-span-2">
       <Icon aria-hidden className="mx-auto h-9 w-9 text-green" />
@@ -639,7 +692,9 @@ async function fetchWorkbench(sessionToken: string): Promise<WorkbenchResponse> 
     }
   });
 
-  const payload = (await response.json().catch(() => ({}))) as WorkbenchResponse & { error?: string };
+  const payload = (await response.json().catch(() => ({}))) as WorkbenchResponse & {
+    error?: string;
+  };
 
   if (!response.ok) {
     throw new Error(payload.error ?? "workbench_request_failed");
@@ -648,18 +703,27 @@ async function fetchWorkbench(sessionToken: string): Promise<WorkbenchResponse> 
   return payload;
 }
 
-async function patchStatus(item: WorkbenchItem, status: ReviewStatus, sessionToken: string): Promise<StatusUpdateResponse> {
+async function patchStatus(
+  item: WorkbenchItem,
+  status: ReviewStatus,
+  sessionToken: string
+): Promise<StatusUpdateResponse> {
   const itemType = item.kind === "ownerLead" ? "owner-lead" : "stay-proposal-request";
-  const response = await fetch(`${getDevPortalApiBaseUrl()}/api/ops/workbench/${itemType}/${item.id}/status`, {
-    body: JSON.stringify({ status }),
-    headers: {
-      "content-type": "application/json",
-      "x-kuquba-dev-session": sessionToken
-    },
-    method: "PATCH"
-  });
+  const response = await fetch(
+    `${getDevPortalApiBaseUrl()}/api/ops/workbench/${itemType}/${item.id}/status`,
+    {
+      body: JSON.stringify({ status }),
+      headers: {
+        "content-type": "application/json",
+        "x-kuquba-dev-session": sessionToken
+      },
+      method: "PATCH"
+    }
+  );
 
-  const payload = (await response.json().catch(() => ({}))) as StatusUpdateResponse & { error?: string };
+  const payload = (await response.json().catch(() => ({}))) as StatusUpdateResponse & {
+    error?: string;
+  };
 
   if (!response.ok) {
     throw new Error(payload.error ?? "status_update_failed");
