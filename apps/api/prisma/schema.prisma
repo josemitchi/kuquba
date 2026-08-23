@@ -87,6 +87,23 @@ enum OpsTaskStatus {
   DONE
 }
 
+enum PropertyOnboardingStatus {
+  DRAFT
+  QUALIFICATION
+  DOCUMENTS
+  OPERATIONS_READY
+  CLOSED
+}
+
+enum StayProposalStatus {
+  DRAFT
+  READY_TO_SEND
+  SENT
+  ACCEPTED
+  DECLINED
+  VOID
+}
+
 model Organization {
   id         String     @id @default(uuid())
   name       String
@@ -368,6 +385,7 @@ model StayProposalRequest {
   ipAddress     String?
   createdAt     DateTime                  @default(now())
   updatedAt     DateTime                  @updatedAt
+  stayProposal  StayProposal?
 
   @@index([stayId, status, createdAt])
   @@index([email, createdAt])
@@ -375,21 +393,22 @@ model StayProposalRequest {
 }
 
 model OwnerLead {
-  id               String          @id @default(uuid())
-  ownerName        String
-  email            String
-  phone            String?
-  propertyName     String?
-  propertyType     String
-  propertyLocation String
-  operatingStatus  String
-  message          String?
-  status           OwnerLeadStatus @default(NEW)
-  source           String          @default("public_owner_evaluate")
-  correlationId    String
-  ipAddress        String?
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  id                 String              @id @default(uuid())
+  ownerName          String
+  email              String
+  phone              String?
+  propertyName       String?
+  propertyType       String
+  propertyLocation   String
+  operatingStatus    String
+  message            String?
+  status             OwnerLeadStatus     @default(NEW)
+  source             String              @default("public_owner_evaluate")
+  correlationId      String
+  ipAddress          String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  propertyOnboarding PropertyOnboarding?
 
   @@index([email, createdAt])
   @@index([status, createdAt])
@@ -397,20 +416,22 @@ model OwnerLead {
 }
 
 model OpsCase {
-  id           String            @id @default(uuid())
-  sourceType   OpsCaseSourceType
-  sourceId     String
-  title        String
-  contactName  String
-  contactEmail String
-  contactPhone String?
-  status       OpsCaseStatus     @default(OPEN)
-  priority     String            @default("normal")
-  nextStep     String?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
-  notes        OpsCaseNote[]
-  tasks        OpsCaseTask[]
+  id                 String              @id @default(uuid())
+  sourceType         OpsCaseSourceType
+  sourceId           String
+  title              String
+  contactName        String
+  contactEmail       String
+  contactPhone       String?
+  status             OpsCaseStatus       @default(OPEN)
+  priority           String              @default("normal")
+  nextStep           String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  notes              OpsCaseNote[]
+  tasks              OpsCaseTask[]
+  propertyOnboarding PropertyOnboarding?
+  stayProposal       StayProposal?
 
   @@unique([sourceType, sourceId])
   @@index([status, updatedAt])
@@ -443,6 +464,68 @@ model OpsCaseTask {
   opsCase   OpsCase       @relation(fields: [opsCaseId], references: [id])
 
   @@index([opsCaseId, status, sortOrder])
+}
+
+model PropertyOnboarding {
+  id                    String                   @id @default(uuid())
+  opsCaseId             String                   @unique
+  ownerLeadId           String                   @unique
+  candidatePropertyName String
+  propertyType          String
+  propertyLocation      String
+  ownerName             String
+  ownerEmail            String
+  ownerPhone            String?
+  status                PropertyOnboardingStatus @default(DRAFT)
+  nextMilestone         String
+  checklist             Json
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  opsCase               OpsCase                  @relation(fields: [opsCaseId], references: [id])
+  ownerLead             OwnerLead                @relation(fields: [ownerLeadId], references: [id])
+
+  @@index([status, updatedAt])
+  @@index([propertyLocation])
+}
+
+model StayProposal {
+  id                String                @id @default(uuid())
+  opsCaseId         String                @unique
+  proposalRequestId String                @unique
+  stayId            String
+  stayName          String
+  destination       String
+  guestName         String
+  guestEmail        String
+  guestPhone        String?
+  arrivalDate       DateTime?
+  departureDate     DateTime?
+  guests            Int
+  status            StayProposalStatus    @default(DRAFT)
+  currentVersion    Int                   @default(1)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  opsCase           OpsCase               @relation(fields: [opsCaseId], references: [id])
+  proposalRequest   StayProposalRequest   @relation(fields: [proposalRequestId], references: [id])
+  versions          StayProposalVersion[]
+
+  @@index([status, updatedAt])
+  @@index([stayId, status])
+}
+
+model StayProposalVersion {
+  id             String       @id @default(uuid())
+  stayProposalId String
+  version        Int
+  title          String
+  summary        String
+  termsLabel     String
+  internalNotes  String?
+  createdAt      DateTime     @default(now())
+  stayProposal   StayProposal @relation(fields: [stayProposalId], references: [id])
+
+  @@unique([stayProposalId, version])
+  @@index([stayProposalId, createdAt])
 }
 
 model OwnerTask {

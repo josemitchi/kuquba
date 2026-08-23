@@ -5,6 +5,7 @@ import {
   Circle,
   ClipboardList,
   FileText,
+  GitBranch,
   MessageSquareText,
   Plus,
   RefreshCw,
@@ -46,6 +47,39 @@ type OpsCaseTask = {
   updatedAt: string;
 };
 
+type OpsCaseConversion =
+  | {
+      kind: "propertyOnboarding";
+      id: string;
+      label: string;
+      status: string;
+      statusLabel: string;
+      nextMilestone: string;
+      checklist: Array<{ key: string; label: string; status: string }>;
+      createdAt: string;
+      updatedAt: string;
+    }
+  | {
+      kind: "stayProposal";
+      id: string;
+      label: string;
+      status: string;
+      statusLabel: string;
+      currentVersion: number;
+      stayName: string;
+      versions: Array<{
+        createdAt: string;
+        id: string;
+        internalNotes?: string | null;
+        summary: string;
+        termsLabel: string;
+        title: string;
+        version: number;
+      }>;
+      createdAt: string;
+      updatedAt: string;
+    }
+  | null;
 type OpsCaseDetail = {
   id: string;
   source: {
@@ -64,6 +98,7 @@ type OpsCaseDetail = {
     name: string;
     phone?: string | null;
   };
+  conversion: OpsCaseConversion;
   metrics: {
     noteCount: number;
     openTaskCount: number;
@@ -91,6 +126,10 @@ type OpsCaseDetail = {
 
 type CaseDetailResponse = {
   caseDetail: OpsCaseDetail;
+};
+
+type CaseConversionResponse = CaseDetailResponse & {
+  conversion: OpsCaseConversion;
 };
 
 const caseStatusClasses: Record<CaseStatus, string> = {
@@ -257,6 +296,25 @@ export function OpsCasePanel({
     }
   }
 
+
+  async function handleConvertCase() {
+    if (!sessionToken || !caseDetail) {
+      return;
+    }
+
+    setUpdatingKey("conversion");
+    setNotice(null);
+
+    try {
+      const response = await postCaseConversion(caseDetail.source.item, sessionToken);
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: "Flujo formal creado." });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo convertir el expediente." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
       <div className="flex items-center gap-3">
@@ -311,6 +369,12 @@ export function OpsCasePanel({
             <CaseMetric label="Notas" value={`${caseDetail.metrics.noteCount}`} />
             <CaseMetric label="Estado" value={caseDetail.statusLabel} />
           </div>
+
+          <ConversionSection
+            caseDetail={caseDetail}
+            onConvert={handleConvertCase}
+            updating={updatingKey === "conversion"}
+          />
 
           <div>
             <p className="text-xs font-semibold uppercase text-ink/48">Estado caso</p>
@@ -493,6 +557,83 @@ export function OpsCasePanel({
   );
 }
 
+function ConversionSection({
+  caseDetail,
+  onConvert,
+  updating
+}: {
+  caseDetail: OpsCaseDetail;
+  onConvert: () => void;
+  updating: boolean;
+}) {
+  const conversionLabel = caseDetail.source.item.kind === "ownerLead" ? "Convertir a onboarding" : "Convertir a propuesta";
+
+  if (!caseDetail.conversion) {
+    return (
+      <div className="rounded-[6px] border border-line bg-ivory p-4">
+        <div className="flex items-center gap-2">
+          <GitBranch aria-hidden className="h-4 w-4 text-green" />
+          <p className="text-sm font-semibold text-midnight">Flujo formal pendiente</p>
+        </div>
+        <button
+          className="focus-ring mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={updating}
+          onClick={onConvert}
+          type="button"
+        >
+          <Plus aria-hidden className="h-4 w-4" />
+          {conversionLabel}
+        </button>
+      </div>
+    );
+  }
+
+  if (caseDetail.conversion.kind === "propertyOnboarding") {
+    return (
+      <div className="rounded-[6px] border border-green/24 bg-green/10 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-green">{caseDetail.conversion.label}</p>
+            <h3 className="mt-1 text-base font-semibold text-midnight">{caseDetail.conversion.statusLabel}</h3>
+          </div>
+          <GitBranch aria-hidden className="h-5 w-5 shrink-0 text-green" />
+        </div>
+        <p className="mt-3 text-sm leading-6 text-ink/70">{caseDetail.conversion.nextMilestone}</p>
+        <div className="mt-3 space-y-2">
+          {caseDetail.conversion.checklist.map((item) => (
+            <div className="flex items-center justify-between gap-3 text-xs" key={item.key}>
+              <span className="font-semibold text-midnight">{item.label}</span>
+              <span className="rounded-full border border-line bg-white px-2 py-1 text-ink/58">{item.status}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const latestVersion = caseDetail.conversion.versions[0];
+
+  return (
+    <div className="rounded-[6px] border border-green/24 bg-green/10 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase text-green">{caseDetail.conversion.label}</p>
+          <h3 className="mt-1 text-base font-semibold text-midnight">
+            Version {caseDetail.conversion.currentVersion} - {caseDetail.conversion.statusLabel}
+          </h3>
+        </div>
+        <GitBranch aria-hidden className="h-5 w-5 shrink-0 text-green" />
+      </div>
+      {latestVersion ? (
+        <div className="mt-3 text-sm leading-6 text-ink/70">
+          <p className="font-semibold text-midnight">{latestVersion.title}</p>
+          <p className="mt-1">{latestVersion.summary}</p>
+          <p className="mt-1 text-xs text-ink/52">{latestVersion.termsLabel}</p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 function CaseMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
@@ -551,6 +692,24 @@ async function patchCaseDetail(
   return payload;
 }
 
+async function postCaseConversion(item: OpsCaseWorkbenchItem, sessionToken: string): Promise<CaseConversionResponse> {
+  const response = await fetch(`${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/convert`, {
+    body: JSON.stringify({}),
+    headers: {
+      "content-type": "application/json",
+      "x-kuquba-dev-session": sessionToken
+    },
+    method: "POST"
+  });
+
+  const payload = (await response.json().catch(() => ({}))) as CaseConversionResponse & { error?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "case_conversion_failed");
+  }
+
+  return payload;
+}
 async function postCaseNote(item: OpsCaseWorkbenchItem, body: string, sessionToken: string): Promise<CaseDetailResponse> {
   const response = await fetch(`${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/notes`, {
     body: JSON.stringify({ body }),

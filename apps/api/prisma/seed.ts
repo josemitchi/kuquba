@@ -40,7 +40,10 @@ const devIds = {
   opsTaskOwnerLeadPhotos: "00000000-0000-4000-8000-000000000952",
   opsTaskOwnerLeadAntiguaCalendar: "00000000-0000-4000-8000-000000000953",
   opsTaskProposalQuote: "00000000-0000-4000-8000-000000000961",
-  opsTaskProposalAvailability: "00000000-0000-4000-8000-000000000962"
+  opsTaskProposalAvailability: "00000000-0000-4000-8000-000000000962",
+  propertyOnboardingAtitlan: "00000000-0000-4000-8000-000000000971",
+  stayProposalAtitlanFormal: "00000000-0000-4000-8000-000000000981",
+  stayProposalAtitlanVersionOne: "00000000-0000-4000-8000-000000000982"
 } as const;
 
 async function main() {
@@ -832,6 +835,46 @@ async function seedOpsWorkbench(prismaClient: PrismaClient) {
       }
     ]
   });
+  await seedPropertyOnboarding(prismaClient, {
+    id: devIds.propertyOnboardingAtitlan,
+    opsCaseId: devIds.opsCaseOwnerLeadAtitlan,
+    ownerLeadId: devIds.ownerLeadAtitlan,
+    candidatePropertyName: "Casa Brisa Atitlan",
+    propertyType: "Casa completa",
+    propertyLocation: "San Marcos La Laguna",
+    ownerName: "Mariana Castillo",
+    ownerEmail: "mariana.castillo@example.com",
+    ownerPhone: "+50255551111",
+    status: "QUALIFICATION",
+    nextMilestone: "Visita tecnica y checklist documental inicial",
+    checklist: [
+      { key: "technical_visit", label: "Visita tecnica", status: "OPEN" },
+      { key: "ownership_docs", label: "Documentos de propiedad", status: "OPEN" },
+      { key: "access_rules", label: "Reglas de acceso", status: "OPEN" }
+    ]
+  });
+
+  await seedStayProposal(prismaClient, {
+    id: devIds.stayProposalAtitlanFormal,
+    versionId: devIds.stayProposalAtitlanVersionOne,
+    opsCaseId: devIds.opsCaseProposalAtitlan,
+    proposalRequestId: devIds.proposalRequestAtitlan,
+    stayId: "atitlan-villa-luz",
+    stayName: "Villa Luz de Atitlan",
+    destination: "Lago de Atitlan",
+    guestName: "Laura Mendoza",
+    guestEmail: "laura.mendoza@example.com",
+    guestPhone: "+50255553333",
+    arrivalDate: "2026-09-12",
+    departureDate: "2026-09-15",
+    guests: 4,
+    status: "DRAFT",
+    version: 1,
+    title: "Propuesta inicial Villa Luz de Atitlan",
+    summary: "Estancia familiar para cuatro personas con llegada flexible y cocina equipada.",
+    termsLabel: "Borrador interno sujeto a disponibilidad final",
+    internalNotes: "No enviar hasta validar disponibilidad operativa y condiciones de llegada."
+  });
 }
 
 async function seedOpsCase(
@@ -925,6 +968,140 @@ async function seedOpsCase(
 
 }
 
+async function seedPropertyOnboarding(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    opsCaseId: string;
+    ownerLeadId: string;
+    candidatePropertyName: string;
+    propertyType: string;
+    propertyLocation: string;
+    ownerName: string;
+    ownerEmail: string;
+    ownerPhone: string | null;
+    status: "DRAFT" | "QUALIFICATION" | "DOCUMENTS" | "OPERATIONS_READY" | "CLOSED";
+    nextMilestone: string;
+    checklist: Array<{ key: string; label: string; status: "OPEN" | "DONE" }>;
+  }
+) {
+  await prismaClient.propertyOnboarding.upsert({
+    where: {
+      ownerLeadId: input.ownerLeadId
+    },
+    create: {
+      id: input.id,
+      opsCaseId: input.opsCaseId,
+      ownerLeadId: input.ownerLeadId,
+      candidatePropertyName: input.candidatePropertyName,
+      propertyType: input.propertyType,
+      propertyLocation: input.propertyLocation,
+      ownerName: input.ownerName,
+      ownerEmail: input.ownerEmail,
+      ownerPhone: input.ownerPhone,
+      status: input.status,
+      nextMilestone: input.nextMilestone,
+      checklist: input.checklist
+    },
+    update: {
+      opsCaseId: input.opsCaseId,
+      candidatePropertyName: input.candidatePropertyName,
+      propertyType: input.propertyType,
+      propertyLocation: input.propertyLocation,
+      ownerName: input.ownerName,
+      ownerEmail: input.ownerEmail,
+      ownerPhone: input.ownerPhone,
+      status: input.status,
+      nextMilestone: input.nextMilestone,
+      checklist: input.checklist
+    }
+  });
+}
+
+async function seedStayProposal(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    versionId: string;
+    opsCaseId: string;
+    proposalRequestId: string;
+    stayId: string;
+    stayName: string;
+    destination: string;
+    guestName: string;
+    guestEmail: string;
+    guestPhone: string | null;
+    arrivalDate: string | null;
+    departureDate: string | null;
+    guests: number;
+    status: "DRAFT" | "READY_TO_SEND" | "SENT" | "ACCEPTED" | "DECLINED" | "VOID";
+    version: number;
+    title: string;
+    summary: string;
+    termsLabel: string;
+    internalNotes: string | null;
+  }
+) {
+  const proposal = await prismaClient.stayProposal.upsert({
+    where: {
+      proposalRequestId: input.proposalRequestId
+    },
+    create: {
+      id: input.id,
+      opsCaseId: input.opsCaseId,
+      proposalRequestId: input.proposalRequestId,
+      stayId: input.stayId,
+      stayName: input.stayName,
+      destination: input.destination,
+      guestName: input.guestName,
+      guestEmail: input.guestEmail,
+      guestPhone: input.guestPhone,
+      arrivalDate: input.arrivalDate ? parseDateOnly(input.arrivalDate) : null,
+      departureDate: input.departureDate ? parseDateOnly(input.departureDate) : null,
+      guests: input.guests,
+      status: input.status,
+      currentVersion: input.version
+    },
+    update: {
+      opsCaseId: input.opsCaseId,
+      stayId: input.stayId,
+      stayName: input.stayName,
+      destination: input.destination,
+      guestName: input.guestName,
+      guestEmail: input.guestEmail,
+      guestPhone: input.guestPhone,
+      arrivalDate: input.arrivalDate ? parseDateOnly(input.arrivalDate) : null,
+      departureDate: input.departureDate ? parseDateOnly(input.departureDate) : null,
+      guests: input.guests,
+      status: input.status,
+      currentVersion: input.version
+    }
+  });
+
+  await prismaClient.stayProposalVersion.upsert({
+    where: {
+      stayProposalId_version: {
+        stayProposalId: proposal.id,
+        version: input.version
+      }
+    },
+    create: {
+      id: input.versionId,
+      stayProposalId: proposal.id,
+      version: input.version,
+      title: input.title,
+      summary: input.summary,
+      termsLabel: input.termsLabel,
+      internalNotes: input.internalNotes
+    },
+    update: {
+      title: input.title,
+      summary: input.summary,
+      termsLabel: input.termsLabel,
+      internalNotes: input.internalNotes
+    }
+  });
+}
 function parseDateOnly(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }

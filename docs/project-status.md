@@ -16,6 +16,7 @@ Ultima actualizacion: 2026-08-22
 - Cambios de estado ops persistidos por `PATCH /api/ops/workbench/:itemType/:id/status`.
 - Expediente ops autenticado disponible por item con `GET/PATCH /api/ops/workbench/:itemType/:id/case`.
 - Notas y tareas internas ops persistidas por endpoints protegidos de caso.
+- Conversion formal ops disponible por `POST /api/ops/workbench/:itemType/:id/case/convert`.
 - Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
 - Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
@@ -106,21 +107,34 @@ Alcance entregado:
 - Auditoria por lectura, actualizacion de expediente, nota creada, tarea creada y tarea actualizada.
 - Seed dev de expedientes, notas y tareas para leads/solicitudes demo.
 
+## Incremento conversion formal ops implementado
+
+Se agrego la transicion desde expediente ops hacia flujo formal persistido.
+
+Alcance entregado:
+
+- Modelos Prisma `PropertyOnboarding`, `StayProposal` y `StayProposalVersion` con migracion `20260823000100_case_conversion`.
+- Endpoint protegido `POST /api/ops/workbench/:itemType/:id/case/convert`.
+- Conversion de `OwnerLead` en checklist de onboarding de propiedad.
+- Conversion de `StayProposalRequest` en propuesta formal con version 1.
+- Panel ops muestra conversion existente y permite crearla desde el expediente.
+- Auditoria por conversion sin guardar datos de contacto dentro del evento.
+- Seed dev de onboarding y propuesta versionada para casos demo.
+
 ## Siguiente incremento recomendado
 
-Construir la transicion desde expediente ops hacia flujo formal.
+Construir gestion del flujo formal ya convertido.
 
 Alcance propuesto:
 
-- Convertir caso de propietario en checklist de onboarding de propiedad.
-- Convertir solicitud de estancia en propuesta formal versionada.
-- Asociar responsable ops y fechas objetivo reales por tarea.
-- Preparar estados de aprobacion antes de publicar propiedad o enviar propuesta.
+- Cambiar estados de onboarding y propuesta desde ops.
+- Marcar checklist de onboarding como completado por item.
+- Crear nuevas versiones de propuesta y preparar estado `READY_TO_SEND`.
+- Asociar responsable ops y fecha objetivo real por flujo formal.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- La conversion requiere sesion interna valida.
-- El caso conserva historial y referencia al item publico original.
-- La transicion crea entidades persistidas y auditadas, no solo cambios visuales.
-- La UI muestra claramente si el caso ya fue convertido.
+- Cada cambio requiere sesion interna valida.
+- Los cambios de flujo formal persisten en Prisma y generan auditoria.
+- La UI distingue borrador, listo para enviar y enviado/aceptado sin enviar comunicaciones reales.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.

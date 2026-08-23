@@ -65,6 +65,23 @@ const priorityLabels: Record<Priority, string> = {
   low: "Baja"
 };
 
+const propertyOnboardingStatusLabels = {
+  DRAFT: "Borrador",
+  QUALIFICATION: "Calificacion",
+  DOCUMENTS: "Documentos",
+  OPERATIONS_READY: "Listo ops",
+  CLOSED: "Cerrado"
+} as const;
+
+const stayProposalStatusLabels = {
+  DRAFT: "Borrador",
+  READY_TO_SEND: "Lista para enviar",
+  SENT: "Enviada",
+  ACCEPTED: "Aceptada",
+  DECLINED: "Rechazada",
+  VOID: "Anulada"
+} as const;
+
 const sourceTypeByItemType: Record<WorkbenchItemType, OpsCaseSourceType> = {
   "owner-lead": "OWNER_LEAD",
   "stay-proposal-request": "STAY_PROPOSAL_REQUEST"
@@ -105,6 +122,12 @@ type OpsCaseWithRelations = Prisma.OpsCaseGetPayload<{
       };
     };
     tasks: true;
+    propertyOnboarding: true;
+    stayProposal: {
+      include: {
+        versions: true;
+      };
+    };
   };
 }>;
 
@@ -244,6 +267,42 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+
+  app.post("/workbench/:itemType/:id/case/convert", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.convert",
+      request,
+      requiredPermissions: opsUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const conversionResult = await convertOpsCase({
+      actor: authorization.session,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!conversionResult) {
+      return reply.code(404).send({
+        error: "workbench_item_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.code(conversionResult.created ? 201 : 200).send({
+      caseDetail: conversionResult.caseDetail,
+      conversion: conversionResult.conversion,
+      correlationId: request.id
+    });
+  });
   app.post("/workbench/:itemType/:id/case/notes", async (request, reply) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.note.create",
@@ -456,7 +515,17 @@ async function loadOpsWorkbench() {
       take: 10,
       where: {
         entityType: {
-          in: ["OwnerLead", "StayProposalRequest", "OpsWorkbench", "OpsCase", "OpsCaseNote", "OpsCaseTask"]
+          in: [
+            "OwnerLead",
+            "StayProposalRequest",
+            "OpsWorkbench",
+            "OpsCase",
+            "OpsCaseNote",
+            "OpsCaseTask",
+            "PropertyOnboarding",
+            "StayProposal",
+            "StayProposalVersion"
+          ]
         }
       }
     })
@@ -707,6 +776,16 @@ async function ensureOpsCaseForSource(source: OpsCaseSource) {
 async function loadOpsCaseById(id: string) {
   return prisma.opsCase.findUniqueOrThrow({
     include: {
+      propertyOnboarding: true,
+      stayProposal: {
+        include: {
+          versions: {
+            orderBy: {
+              version: "desc"
+            }
+          }
+        }
+      },
       notes: {
         include: {
           author: {
@@ -811,6 +890,270 @@ async function updateOpsCase(input: {
   };
 }
 
+async function convertOpsCase(input: {
+  actor: AuthorizedDevPortalSession;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.convert",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+
+  if (source.sourceType === "OWNER_LEAD") {
+    return convertOwnerLeadCase({
+      actor: input.actor,
+      opsCase,
+      request: input.request,
+      source
+    });
+  }
+
+  return convertStayProposalCase({
+    actor: input.actor,
+    opsCase,
+    request: input.request,
+    source
+  });
+}
+
+async function convertOwnerLeadCase(input: {
+  actor: AuthorizedDevPortalSession;
+  opsCase: OpsCaseWithRelations;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  source: OpsCaseSource;
+}) {
+  if (input.source.item.kind !== "ownerLead") {
+    throw new Error("invalid_owner_lead_conversion_source");
+  }
+
+  const previous = await prisma.propertyOnboarding.findUnique({
+    select: {
+      id: true
+    },
+    where: {
+      ownerLeadId: input.source.sourceId
+    }
+  });
+
+  const onboarding = await prisma.propertyOnboarding.upsert({
+    where: {
+      ownerLeadId: input.source.sourceId
+    },
+    create: {
+      candidatePropertyName: input.source.item.title,
+      checklist: buildDefaultOnboardingChecklist(),
+      nextMilestone: "Completar calificacion y checklist documental inicial.",
+      opsCaseId: input.opsCase.id,
+      ownerEmail: input.source.item.email,
+      ownerLeadId: input.source.sourceId,
+      ownerName: input.source.item.primaryName,
+      ownerPhone: input.source.item.phone,
+      propertyLocation: input.source.item.location,
+      propertyType: input.source.item.propertyType,
+      status: "QUALIFICATION"
+    },
+    update: {
+      candidatePropertyName: input.source.item.title,
+      nextMilestone: "Completar calificacion y checklist documental inicial.",
+      opsCaseId: input.opsCase.id,
+      ownerEmail: input.source.item.email,
+      ownerName: input.source.item.primaryName,
+      ownerPhone: input.source.item.phone,
+      propertyLocation: input.source.item.location,
+      propertyType: input.source.item.propertyType
+    }
+  });
+
+  await prisma.opsCase.update({
+    data: {
+      nextStep: "Completar onboarding de propiedad y preparar aprobacion operativa.",
+      status: "ACTION_PENDING"
+    },
+    where: {
+      id: input.opsCase.id
+    }
+  });
+
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(input.opsCase.id), input.source);
+
+  await writeOpsAudit({
+    action: "ops.case.convert",
+    actorUserId: input.actor.user.id,
+    entityId: onboarding.id,
+    entityType: "PropertyOnboarding",
+    previousValue: {
+      conversionExists: Boolean(previous)
+    },
+    nextValue: {
+      conversionKind: "property_onboarding",
+      opsCaseId: input.opsCase.id,
+      ownerLeadId: input.source.sourceId,
+      status: onboarding.status
+    },
+    reason: previous ? "ops_case_conversion_loaded" : "ops_case_converted",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail,
+    conversion: caseDetail.conversion,
+    created: !previous
+  };
+}
+
+async function convertStayProposalCase(input: {
+  actor: AuthorizedDevPortalSession;
+  opsCase: OpsCaseWithRelations;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  source: OpsCaseSource;
+}) {
+  if (input.source.item.kind !== "proposalRequest") {
+    throw new Error("invalid_stay_proposal_conversion_source");
+  }
+
+  const previous = await prisma.stayProposal.findUnique({
+    select: {
+      id: true
+    },
+    where: {
+      proposalRequestId: input.source.sourceId
+    }
+  });
+
+  const proposal = await prisma.stayProposal.upsert({
+    where: {
+      proposalRequestId: input.source.sourceId
+    },
+    create: {
+      arrivalDate: input.source.item.arrivalDate ? new Date(input.source.item.arrivalDate) : null,
+      currentVersion: 1,
+      departureDate: input.source.item.departureDate ? new Date(input.source.item.departureDate) : null,
+      destination: input.source.item.location,
+      guestEmail: input.source.item.email,
+      guestName: input.source.item.primaryName,
+      guestPhone: input.source.item.phone,
+      guests: input.source.item.guests,
+      opsCaseId: input.opsCase.id,
+      proposalRequestId: input.source.sourceId,
+      status: "DRAFT",
+      stayId: input.source.item.stayId,
+      stayName: input.source.item.title
+    },
+    update: {
+      arrivalDate: input.source.item.arrivalDate ? new Date(input.source.item.arrivalDate) : null,
+      departureDate: input.source.item.departureDate ? new Date(input.source.item.departureDate) : null,
+      destination: input.source.item.location,
+      guestEmail: input.source.item.email,
+      guestName: input.source.item.primaryName,
+      guestPhone: input.source.item.phone,
+      guests: input.source.item.guests,
+      opsCaseId: input.opsCase.id,
+      stayId: input.source.item.stayId,
+      stayName: input.source.item.title
+    }
+  });
+
+  const versionNumber = proposal.currentVersion;
+  await prisma.stayProposalVersion.upsert({
+    where: {
+      stayProposalId_version: {
+        stayProposalId: proposal.id,
+        version: versionNumber
+      }
+    },
+    create: {
+      internalNotes: "Borrador creado desde expediente ops. Validar disponibilidad antes de enviar.",
+      stayProposalId: proposal.id,
+      summary: buildStayProposalSummary(input.source.item),
+      termsLabel: "Borrador interno sujeto a disponibilidad final",
+      title: `Propuesta v${versionNumber} - ${input.source.item.title}`,
+      version: versionNumber
+    },
+    update: {
+      summary: buildStayProposalSummary(input.source.item),
+      termsLabel: "Borrador interno sujeto a disponibilidad final",
+      title: `Propuesta v${versionNumber} - ${input.source.item.title}`
+    }
+  });
+
+  await prisma.opsCase.update({
+    data: {
+      nextStep: "Revisar propuesta versionada y preparar envio al huesped.",
+      status: "ACTION_PENDING"
+    },
+    where: {
+      id: input.opsCase.id
+    }
+  });
+
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(input.opsCase.id), input.source);
+
+  await writeOpsAudit({
+    action: "ops.case.convert",
+    actorUserId: input.actor.user.id,
+    entityId: proposal.id,
+    entityType: "StayProposal",
+    previousValue: {
+      conversionExists: Boolean(previous)
+    },
+    nextValue: {
+      conversionKind: "stay_proposal",
+      opsCaseId: input.opsCase.id,
+      proposalRequestId: input.source.sourceId,
+      status: proposal.status,
+      version: versionNumber
+    },
+    reason: previous ? "ops_case_conversion_loaded" : "ops_case_converted",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail,
+    conversion: caseDetail.conversion,
+    created: !previous
+  };
+}
+
+function buildDefaultOnboardingChecklist(): Prisma.InputJsonValue {
+  return [
+    {
+      key: "technical_visit",
+      label: "Visita tecnica",
+      status: "OPEN"
+    },
+    {
+      key: "ownership_docs",
+      label: "Documentos de propiedad",
+      status: "OPEN"
+    },
+    {
+      key: "access_rules",
+      label: "Reglas de acceso",
+      status: "OPEN"
+    }
+  ];
+}
+
+function buildStayProposalSummary(item: Extract<WorkbenchItem, { kind: "proposalRequest" }>) {
+  const arrival = item.arrivalDate ? item.arrivalDate.slice(0, 10) : "fecha flexible";
+  const departure = item.departureDate ? item.departureDate.slice(0, 10) : "salida flexible";
+
+  return `${item.guests} huesped(es) en ${item.title}, ${item.location}. Ventana: ${arrival} a ${departure}.`;
+}
 async function createOpsCaseNote(input: {
   actor: AuthorizedDevPortalSession;
   body: string;
@@ -1083,6 +1426,7 @@ function buildOpsCaseDetail(opsCase: OpsCaseWithRelations, source: OpsCaseSource
       name: opsCase.contactName,
       phone: opsCase.contactPhone
     },
+    conversion: buildOpsCaseConversion(opsCase),
     metrics: {
       noteCount: opsCase.notes.length,
       openTaskCount: openTasks,
@@ -1131,6 +1475,46 @@ function buildOpsCaseDetail(opsCase: OpsCaseWithRelations, source: OpsCaseSource
   };
 }
 
+function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
+  if (opsCase.propertyOnboarding) {
+    return {
+      kind: "propertyOnboarding" as const,
+      id: opsCase.propertyOnboarding.id,
+      label: "Onboarding propiedad",
+      status: opsCase.propertyOnboarding.status,
+      statusLabel: propertyOnboardingStatusLabels[opsCase.propertyOnboarding.status],
+      nextMilestone: opsCase.propertyOnboarding.nextMilestone,
+      checklist: opsCase.propertyOnboarding.checklist as Array<{ key: string; label: string; status: string }>,
+      createdAt: opsCase.propertyOnboarding.createdAt.toISOString(),
+      updatedAt: opsCase.propertyOnboarding.updatedAt.toISOString()
+    };
+  }
+
+  if (opsCase.stayProposal) {
+    return {
+      kind: "stayProposal" as const,
+      id: opsCase.stayProposal.id,
+      label: "Propuesta estancia",
+      status: opsCase.stayProposal.status,
+      statusLabel: stayProposalStatusLabels[opsCase.stayProposal.status],
+      currentVersion: opsCase.stayProposal.currentVersion,
+      stayName: opsCase.stayProposal.stayName,
+      versions: opsCase.stayProposal.versions.map((version) => ({
+        createdAt: version.createdAt.toISOString(),
+        id: version.id,
+        internalNotes: version.internalNotes,
+        summary: version.summary,
+        termsLabel: version.termsLabel,
+        title: version.title,
+        version: version.version
+      })),
+      createdAt: opsCase.stayProposal.createdAt.toISOString(),
+      updatedAt: opsCase.stayProposal.updatedAt.toISOString()
+    };
+  }
+
+  return null;
+}
 function resolveEntityType(itemType: WorkbenchItemType): OpsCaseEntityType {
   return itemType === "owner-lead" ? "OwnerLead" : "StayProposalRequest";
 }
