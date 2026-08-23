@@ -1,8 +1,11 @@
+import { createHash } from "node:crypto";
+
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import { prisma } from "../lib/prisma";
+import { sendFormalTransactionalMessage } from "../modules/delivery/formal-delivery-adapter";
 import { createAuditEventEnvelope } from "../modules/audit/audit-event";
 import {
   authorizeDevPortalSession,
@@ -142,6 +145,13 @@ const formalApprovalStatusLabels = {
   SENT: "Enviada"
 } as const;
 
+const formalDeliveryStatusLabels = {
+  PENDING: "Pendiente",
+  SENT: "Enviada",
+  DELIVERED: "Entregada",
+  FAILED: "Fallida"
+} as const;
+
 const sourceTypeByItemType: Record<WorkbenchItemType, OpsCaseSourceType> = {
   "owner-lead": "OWNER_LEAD",
   "stay-proposal-request": "STAY_PROPOSAL_REQUEST"
@@ -159,6 +169,33 @@ type WorkbenchItemType = "owner-lead" | "stay-proposal-request";
 type OpsCaseSourceType = "OWNER_LEAD" | "STAY_PROPOSAL_REQUEST";
 type OpsCaseEntityType = "OwnerLead" | "StayProposalRequest";
 type FormalTransition = "REQUEST_APPROVAL" | "APPROVE" | "SEND";
+type FormalDeliveryChannel = "EMAIL" | "WHATSAPP";
+type FormalDeliveryStatus = keyof typeof formalDeliveryStatusLabels;
+type PreparedFormalDelivery = {
+  channel: FormalDeliveryChannel;
+  deliveredAt: Date | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  failedAt: Date | null;
+  provider: string;
+  providerMessageId: string | null;
+  recipientHash: string;
+  recipientMasked: string;
+  sentAt: Date | null;
+  status: FormalDeliveryStatus;
+  subject: string;
+  templateKey: string;
+  templateVersion: number;
+};
+type FormalDeliveryTemplate = {
+  body: string[];
+  channel: FormalDeliveryChannel;
+  recipient: string;
+  recipientName: string;
+  subject: string;
+  templateKey: string;
+  templateVersion: number;
+};
 type OpsCaseSource = {
   contactEmail: string;
   contactName: string;
@@ -173,6 +210,17 @@ type OpsCaseSource = {
 type OpsCaseWithRelations = Prisma.OpsCaseGetPayload<{
   include: {
     formalActivities: {
+      include: {
+        actor: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+      };
+    };
+    formalDeliveries: {
       include: {
         actor: {
           select: {
@@ -1182,6 +1230,21 @@ async function loadOpsCaseById(id: string) {
         },
         take: 20
       },
+      formalDeliveries: {
+        include: {
+          actor: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 20
+      },
       propertyOnboarding: {
         include: {
           assignedUser: {
@@ -2096,9 +2159,18 @@ async function updateFormalTransition(input: {
       };
     }
 
+    const delivery =
+      input.transition === "SEND"
+        ? await prepareFormalDelivery({
+            entity: previous,
+            entityType: "PropertyOnboarding",
+            note
+          })
+        : null;
     const data: Prisma.PropertyOnboardingUpdateInput = {};
     applyFormalTransitionData(data, {
       actor: input.actor,
+      delivery,
       entityType: "PropertyOnboarding",
       note,
       transition: input.transition
@@ -2111,8 +2183,19 @@ async function updateFormalTransition(input: {
       }
     });
 
+    if (delivery) {
+      await createFormalDeliveryRecord({
+        actor: input.actor,
+        delivery,
+        entityId: updated.id,
+        entityType: "PropertyOnboarding",
+        opsCaseId: opsCase.id
+      });
+    }
+
     await createFormalTransitionActivity({
       actor: input.actor,
+      delivery,
       entityId: updated.id,
       entityType: "PropertyOnboarding",
       note,
@@ -2171,9 +2254,18 @@ async function updateFormalTransition(input: {
     };
   }
 
+  const delivery =
+    input.transition === "SEND"
+      ? await prepareFormalDelivery({
+          entity: previous,
+          entityType: "StayProposal",
+          note
+        })
+      : null;
   const data: Prisma.StayProposalUpdateInput = {};
   applyFormalTransitionData(data, {
     actor: input.actor,
+    delivery,
     entityType: "StayProposal",
     note,
     transition: input.transition
@@ -2186,8 +2278,19 @@ async function updateFormalTransition(input: {
     }
   });
 
+  if (delivery) {
+    await createFormalDeliveryRecord({
+      actor: input.actor,
+      delivery,
+      entityId: updated.id,
+      entityType: "StayProposal",
+      opsCaseId: opsCase.id
+    });
+  }
+
   await createFormalTransitionActivity({
     actor: input.actor,
+    delivery,
     entityId: updated.id,
     entityType: "StayProposal",
     note,
@@ -2244,6 +2347,7 @@ async function writeFormalTransitionDeniedAudit(input: {
 
 async function createFormalTransitionActivity(input: {
   actor: AuthorizedDevPortalSession;
+  delivery?: PreparedFormalDelivery | null;
   entityId: string;
   entityType: "PropertyOnboarding" | "StayProposal";
   note: string | null;
@@ -2253,7 +2357,12 @@ async function createFormalTransitionActivity(input: {
   await prisma.opsFormalActivity.create({
     data: {
       actorUserId: input.actor.user.id,
-      body: buildFormalTransitionActivityBody(input.transition, input.entityType, input.note),
+      body: buildFormalTransitionActivityBody(
+        input.transition,
+        input.entityType,
+        input.note,
+        input.delivery
+      ),
       entityId: input.entityId,
       entityType: input.entityType,
       opsCaseId: input.opsCaseId
@@ -2261,10 +2370,120 @@ async function createFormalTransitionActivity(input: {
   });
 }
 
+async function createFormalDeliveryRecord(input: {
+  actor: AuthorizedDevPortalSession;
+  delivery: PreparedFormalDelivery;
+  entityId: string;
+  entityType: "PropertyOnboarding" | "StayProposal";
+  opsCaseId: string;
+}) {
+  await prisma.opsFormalDelivery.create({
+    data: {
+      actorUserId: input.actor.user.id,
+      channel: input.delivery.channel,
+      deliveredAt: input.delivery.deliveredAt,
+      entityId: input.entityId,
+      entityType: input.entityType,
+      errorCode: input.delivery.errorCode,
+      errorMessage: input.delivery.errorMessage,
+      failedAt: input.delivery.failedAt,
+      opsCaseId: input.opsCaseId,
+      provider: input.delivery.provider,
+      providerMessageId: input.delivery.providerMessageId,
+      recipientHash: input.delivery.recipientHash,
+      recipientMasked: input.delivery.recipientMasked,
+      sentAt: input.delivery.sentAt,
+      status: input.delivery.status,
+      subject: input.delivery.subject,
+      templateKey: input.delivery.templateKey,
+      templateVersion: input.delivery.templateVersion
+    }
+  });
+}
+
+async function prepareFormalDelivery(input: {
+  entity:
+    | NonNullable<OpsCaseWithRelations["propertyOnboarding"]>
+    | NonNullable<OpsCaseWithRelations["stayProposal"]>;
+  entityType: "PropertyOnboarding" | "StayProposal";
+  note: string | null;
+}): Promise<PreparedFormalDelivery> {
+  const template = buildFormalDeliveryTemplate(input);
+  const adapterResult = await sendFormalTransactionalMessage(template);
+
+  return {
+    channel: template.channel,
+    deliveredAt: adapterResult.deliveredAt,
+    errorCode: adapterResult.errorCode,
+    errorMessage: adapterResult.errorMessage,
+    failedAt: adapterResult.failedAt,
+    provider: adapterResult.provider,
+    providerMessageId: adapterResult.providerMessageId,
+    recipientHash: hashDestination(template.recipient),
+    recipientMasked: maskDestination(template.recipient),
+    sentAt: adapterResult.sentAt,
+    status: adapterResult.status,
+    subject: template.subject,
+    templateKey: template.templateKey,
+    templateVersion: template.templateVersion
+  };
+}
+
+function buildFormalDeliveryTemplate(input: {
+  entity:
+    | NonNullable<OpsCaseWithRelations["propertyOnboarding"]>
+    | NonNullable<OpsCaseWithRelations["stayProposal"]>;
+  entityType: "PropertyOnboarding" | "StayProposal";
+  note: string | null;
+}): FormalDeliveryTemplate {
+  if (input.entityType === "PropertyOnboarding") {
+    const onboarding = input.entity as NonNullable<OpsCaseWithRelations["propertyOnboarding"]>;
+
+    return {
+      body: [
+        `Hola ${onboarding.ownerName},`,
+        `KUQUBA registro el siguiente paso para ${onboarding.candidatePropertyName}.`,
+        `Ubicacion: ${onboarding.propertyLocation}. Tipo: ${onboarding.propertyType}.`,
+        onboarding.handoffNotes ??
+          "El equipo operativo dara seguimiento con los detalles acordados.",
+        input.note ? `Nota interna aprobada: ${input.note}` : "Sin nota adicional aprobada."
+      ],
+      channel: "EMAIL",
+      recipient: onboarding.ownerEmail,
+      recipientName: onboarding.ownerName,
+      subject: `KUQUBA - Activacion de ${onboarding.candidatePropertyName}`,
+      templateKey: "property_onboarding_owner_v1",
+      templateVersion: 1
+    };
+  }
+
+  const proposal = input.entity as NonNullable<OpsCaseWithRelations["stayProposal"]>;
+  const latestVersion = proposal.versions[0];
+  const stayWindow = buildStayWindowLabel(proposal.arrivalDate, proposal.departureDate);
+
+  return {
+    body: [
+      `Hola ${proposal.guestName},`,
+      `Tenemos una propuesta KUQUBA para ${proposal.stayName} en ${proposal.destination}.`,
+      `Fechas: ${stayWindow}. Huespedes: ${proposal.guests}.`,
+      latestVersion?.summary ?? "Propuesta personalizada pendiente de resumen operativo.",
+      `Condiciones: ${latestVersion?.termsLabel ?? "Condiciones sujetas a validacion final"}.`,
+      input.note ? `Nota aprobada: ${input.note}` : "Sin nota adicional aprobada."
+    ],
+    channel: "EMAIL",
+    recipient: proposal.guestEmail,
+    recipientName: proposal.guestName,
+    subject: `Propuesta KUQUBA - ${proposal.stayName}`,
+    templateKey: "stay_proposal_guest_v1",
+    templateVersion: 1
+  };
+}
+
 function applyFormalTransitionData(
   data: Prisma.PropertyOnboardingUpdateInput | Prisma.StayProposalUpdateInput,
   input: {
     actor: AuthorizedDevPortalSession;
+    delivery?: PreparedFormalDelivery | null;
     entityType: "PropertyOnboarding" | "StayProposal";
     note: string | null;
     transition: FormalTransition;
@@ -2289,14 +2508,29 @@ function applyFormalTransitionData(
   }
 
   if (input.transition === "SEND") {
-    target.approvalStatus = "SENT";
-    target.sentAt = now;
-    target.sentBy = {
-      connect: {
-        id: input.actor.user.id
-      }
-    };
-    target.status = input.entityType === "StayProposal" ? "SENT" : "OPERATIONS_READY";
+    if (!input.delivery || input.delivery.status !== "FAILED") {
+      target.approvalStatus = "SENT";
+      target.sentAt = input.delivery?.sentAt ?? now;
+      target.sentBy = {
+        connect: {
+          id: input.actor.user.id
+        }
+      };
+      target.status = input.entityType === "StayProposal" ? "SENT" : "OPERATIONS_READY";
+    }
+
+    if (input.delivery) {
+      target.deliveryChannel = input.delivery.channel;
+      target.deliveryErrorCode = input.delivery.errorCode;
+      target.deliveryErrorMessage = input.delivery.errorMessage;
+      target.deliveryFailedAt = input.delivery.failedAt;
+      target.deliveredAt = input.delivery.deliveredAt;
+      target.deliveryProvider = input.delivery.provider;
+      target.deliveryStatus = input.delivery.status;
+      target.deliveryTemplateKey = input.delivery.templateKey;
+      target.deliveryTemplateVersion = input.delivery.templateVersion;
+      target.providerMessageId = input.delivery.providerMessageId;
+    }
   }
 
   if (input.note) {
@@ -2347,16 +2581,19 @@ function buildFormalTransitionReason(transition: FormalTransition) {
 function buildFormalTransitionActivityBody(
   transition: FormalTransition,
   entityType: "PropertyOnboarding" | "StayProposal",
-  note: string | null
+  note: string | null,
+  delivery?: PreparedFormalDelivery | null
 ) {
   const base =
     transition === "REQUEST_APPROVAL"
       ? "Solicitud de aprobacion formal registrada."
       : transition === "APPROVE"
         ? "Aprobacion interna registrada."
-        : entityType === "StayProposal"
-          ? "Envio controlado registrado sin proveedor externo."
-          : "Entrega controlada registrada sin proveedor externo.";
+        : delivery
+          ? `Envio transaccional registrado via ${delivery.provider} (${formalDeliveryStatusLabels[delivery.status]}). Plantilla ${delivery.templateKey} v${delivery.templateVersion}. Destino ${delivery.recipientMasked}.`
+          : entityType === "StayProposal"
+            ? "Envio controlado registrado."
+            : "Entrega controlada registrada.";
 
   return note ? `${base} Nota: ${note}` : base;
 }
@@ -2368,13 +2605,33 @@ function buildFormalTransitionAuditValue(input: {
   sentAt?: Date | null;
   sentByUserId?: string | null;
   deliveryNotes?: string | null;
+  deliveryStatus?: string | null;
+  deliveryProvider?: string | null;
+  providerMessageId?: string | null;
+  deliveryChannel?: string | null;
+  deliveryTemplateKey?: string | null;
+  deliveryTemplateVersion?: number | null;
+  deliveredAt?: Date | null;
+  deliveryFailedAt?: Date | null;
+  deliveryErrorCode?: string | null;
+  deliveryErrorMessage?: string | null;
   status: string;
 }) {
   return {
     approvalStatus: input.approvalStatus,
     approvedAt: input.approvedAt?.toISOString() ?? null,
     approvedByUserId: input.approvedByUserId ?? null,
+    deliveredAt: input.deliveredAt?.toISOString() ?? null,
+    deliveryChannel: input.deliveryChannel ?? null,
+    deliveryErrorCode: input.deliveryErrorCode ?? null,
+    deliveryErrorMessage: input.deliveryErrorMessage ?? null,
+    deliveryFailedAt: input.deliveryFailedAt?.toISOString() ?? null,
     deliveryNotes: input.deliveryNotes ?? null,
+    deliveryProvider: input.deliveryProvider ?? null,
+    deliveryStatus: input.deliveryStatus ?? null,
+    deliveryTemplateKey: input.deliveryTemplateKey ?? null,
+    deliveryTemplateVersion: input.deliveryTemplateVersion ?? null,
+    providerMessageId: input.providerMessageId ?? null,
     sentAt: input.sentAt?.toISOString() ?? null,
     sentByUserId: input.sentByUserId ?? null,
     status: input.status
@@ -2778,6 +3035,7 @@ function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
       handoffNotes: opsCase.propertyOnboarding.handoffNotes,
       formalState: buildFormalApprovalState(opsCase.propertyOnboarding),
       activities: buildFormalActivities(opsCase, entityType, entityId),
+      deliveries: buildFormalDeliveries(opsCase, entityType, entityId),
       createdAt: opsCase.propertyOnboarding.createdAt.toISOString(),
       updatedAt: opsCase.propertyOnboarding.updatedAt.toISOString()
     };
@@ -2800,6 +3058,7 @@ function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
       handoffNotes: opsCase.stayProposal.handoffNotes,
       formalState: buildFormalApprovalState(opsCase.stayProposal),
       activities: buildFormalActivities(opsCase, entityType, entityId),
+      deliveries: buildFormalDeliveries(opsCase, entityType, entityId),
       preview: buildStayProposalPreview(opsCase.stayProposal),
       versions: opsCase.stayProposal.versions.map((version) => ({
         createdAt: version.createdAt.toISOString(),
@@ -2822,7 +3081,16 @@ function buildFormalApprovalState(input: {
   approvalStatus: keyof typeof formalApprovalStatusLabels;
   approvedAt: Date | null;
   approvedBy?: { displayName: string; email: string; id: string } | null;
+  deliveredAt: Date | null;
+  deliveryChannel: string | null;
+  deliveryErrorMessage: string | null;
+  deliveryFailedAt: Date | null;
   deliveryNotes: string | null;
+  deliveryProvider: string | null;
+  deliveryStatus: keyof typeof formalDeliveryStatusLabels | null;
+  deliveryTemplateKey: string | null;
+  deliveryTemplateVersion: number | null;
+  providerMessageId: string | null;
   sentAt: Date | null;
   sentBy?: { displayName: string; email: string; id: string } | null;
 }) {
@@ -2832,10 +3100,50 @@ function buildFormalApprovalState(input: {
     approvedAt: input.approvedAt?.toISOString() ?? null,
     approvedBy: buildUserSummary(input.approvedBy),
     canSend: input.approvalStatus === "APPROVED",
+    delivery: input.deliveryStatus
+      ? {
+          channel: input.deliveryChannel,
+          deliveredAt: input.deliveredAt?.toISOString() ?? null,
+          errorMessage: input.deliveryErrorMessage,
+          failedAt: input.deliveryFailedAt?.toISOString() ?? null,
+          provider: input.deliveryProvider,
+          providerMessageId: input.providerMessageId,
+          status: input.deliveryStatus,
+          statusLabel: formalDeliveryStatusLabels[input.deliveryStatus],
+          templateKey: input.deliveryTemplateKey,
+          templateVersion: input.deliveryTemplateVersion
+        }
+      : null,
     deliveryNotes: input.deliveryNotes,
     sentAt: input.sentAt?.toISOString() ?? null,
     sentBy: buildUserSummary(input.sentBy)
   };
+}
+function buildFormalDeliveries(
+  opsCase: OpsCaseWithRelations,
+  entityType: string,
+  entityId: string
+) {
+  return opsCase.formalDeliveries
+    .filter((delivery) => delivery.entityType === entityType && delivery.entityId === entityId)
+    .map((delivery) => ({
+      actor: buildUserSummary(delivery.actor),
+      channel: delivery.channel,
+      createdAt: delivery.createdAt.toISOString(),
+      deliveredAt: delivery.deliveredAt?.toISOString() ?? null,
+      errorMessage: delivery.errorMessage,
+      failedAt: delivery.failedAt?.toISOString() ?? null,
+      id: delivery.id,
+      provider: delivery.provider,
+      providerMessageId: delivery.providerMessageId,
+      recipientMasked: delivery.recipientMasked,
+      sentAt: delivery.sentAt?.toISOString() ?? null,
+      status: delivery.status,
+      statusLabel: formalDeliveryStatusLabels[delivery.status],
+      subject: delivery.subject,
+      templateKey: delivery.templateKey,
+      templateVersion: delivery.templateVersion
+    }));
 }
 function buildFormalActivities(
   opsCase: OpsCaseWithRelations,
@@ -2873,6 +3181,21 @@ function buildStayProposalPreview(proposal: NonNullable<OpsCaseWithRelations["st
       "Preview interno: no se envia ninguna comunicacion real desde esta pantalla."
     ]
   };
+}
+
+function hashDestination(destination: string) {
+  return createHash("sha256").update(destination.trim().toLowerCase()).digest("hex");
+}
+
+function maskDestination(destination: string) {
+  const trimmed = destination.trim();
+
+  if (trimmed.includes("@")) {
+    const [name = "", domain = ""] = trimmed.split("@");
+    return `${name.slice(0, 2)}***@${domain}`;
+  }
+
+  return `${trimmed.slice(0, 4)}***${trimmed.slice(-2)}`;
 }
 
 function buildStayWindowLabel(arrivalDate: Date | null, departureDate: Date | null) {

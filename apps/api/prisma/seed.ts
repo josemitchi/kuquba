@@ -1073,7 +1073,17 @@ async function seedPropertyOnboarding(
       approvedByUserId: input.approvedByUserId,
       sentAt: input.sentAt ? new Date(input.sentAt) : null,
       sentByUserId: input.sentByUserId,
-      deliveryNotes: input.deliveryNotes
+      deliveryNotes: input.deliveryNotes,
+      deliveryStatus: null,
+      deliveryProvider: null,
+      providerMessageId: null,
+      deliveryChannel: null,
+      deliveryTemplateKey: null,
+      deliveryTemplateVersion: null,
+      deliveredAt: null,
+      deliveryFailedAt: null,
+      deliveryErrorCode: null,
+      deliveryErrorMessage: null
     },
     update: {
       opsCaseId: input.opsCaseId,
@@ -1094,7 +1104,17 @@ async function seedPropertyOnboarding(
       approvedByUserId: input.approvedByUserId,
       sentAt: input.sentAt ? new Date(input.sentAt) : null,
       sentByUserId: input.sentByUserId,
-      deliveryNotes: input.deliveryNotes
+      deliveryNotes: input.deliveryNotes,
+      deliveryStatus: null,
+      deliveryProvider: null,
+      providerMessageId: null,
+      deliveryChannel: null,
+      deliveryTemplateKey: null,
+      deliveryTemplateVersion: null,
+      deliveredAt: null,
+      deliveryFailedAt: null,
+      deliveryErrorCode: null,
+      deliveryErrorMessage: null
     }
   });
 
@@ -1167,7 +1187,17 @@ async function seedStayProposal(
       approvedByUserId: input.approvedByUserId,
       sentAt: input.sentAt ? new Date(input.sentAt) : null,
       sentByUserId: input.sentByUserId,
-      deliveryNotes: input.deliveryNotes
+      deliveryNotes: input.deliveryNotes,
+      deliveryStatus: null,
+      deliveryProvider: null,
+      providerMessageId: null,
+      deliveryChannel: null,
+      deliveryTemplateKey: null,
+      deliveryTemplateVersion: null,
+      deliveredAt: null,
+      deliveryFailedAt: null,
+      deliveryErrorCode: null,
+      deliveryErrorMessage: null
     },
     update: {
       opsCaseId: input.opsCaseId,
@@ -1190,7 +1220,17 @@ async function seedStayProposal(
       approvedByUserId: input.approvedByUserId,
       sentAt: input.sentAt ? new Date(input.sentAt) : null,
       sentByUserId: input.sentByUserId,
-      deliveryNotes: input.deliveryNotes
+      deliveryNotes: input.deliveryNotes,
+      deliveryStatus: null,
+      deliveryProvider: null,
+      providerMessageId: null,
+      deliveryChannel: null,
+      deliveryTemplateKey: null,
+      deliveryTemplateVersion: null,
+      deliveredAt: null,
+      deliveryFailedAt: null,
+      deliveryErrorCode: null,
+      deliveryErrorMessage: null
     }
   });
 
@@ -1244,6 +1284,12 @@ async function seedFormalActivities(
     activities: Array<{ id: string; actorUserId: string; body: string; createdAt: string }>;
   }
 ) {
+  await prismaClient.opsFormalDelivery.deleteMany({
+    where: {
+      opsCaseId: input.opsCaseId
+    }
+  });
+
   await prismaClient.opsFormalActivity.deleteMany({
     where: {
       opsCaseId: input.opsCaseId

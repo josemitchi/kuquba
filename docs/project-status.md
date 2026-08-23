@@ -20,6 +20,7 @@ Ultima actualizacion: 2026-08-23
 - Gestion de conversion formal ops disponible por endpoints protegidos para estado, checklist y versiones.
 - Asignacion formal ops disponible con responsable, fecha objetivo, notas de entrega, actividad y preview interno de propuesta.
 - Aprobacion interna y envio controlado formal disponibles con estados `DRAFT`, `READY_FOR_APPROVAL`, `APPROVED` y `SENT`.
+- Delivery formal preparado con adaptador transaccional dev, plantillas versionadas, `providerMessageId`, estado de entrega e historial sin contacto en claro.
 - Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
 - Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
@@ -170,20 +171,33 @@ Alcance entregado:
 - Panel ops muestra estado de aprobacion, notas de entrega, acciones controladas y timeline formal diferenciado.
 - Seed dev incluye propuesta lista para aprobacion y actividad demo deterministica.
 
+## Incremento delivery transaccional formal implementado
+
+Se agrego un adaptador transaccional dev para registrar entregas formales desde el flujo aprobado, sin exponer credenciales ni enviar a un proveedor externo real.
+
+Alcance entregado:
+
+- Enum Prisma `FormalDeliveryStatus`, modelo `OpsFormalDelivery` y campos de delivery actual en onboarding/propuesta formal.
+- `POST /api/ops/workbench/:itemType/:id/case/conversion/send` ahora usa plantillas versionadas `property_onboarding_owner_v1` y `stay_proposal_guest_v1`.
+- El adaptador dev persiste `providerMessageId`, proveedor, canal, plantilla, estado `DELIVERED` y timestamps de envio/entrega.
+- Auditoria y delivery guardan hash/mascara del destinatario, no contacto en claro dentro del evento.
+- Panel ops muestra estado de entrega, metadata del adaptador e historial de intentos.
+- Seed dev limpia intentos de entrega para mantener datos reproducibles.
+
 ## Siguiente incremento recomendado
 
-Integrar adaptador transaccional real y plantillas de comunicacion, manteniendo el gate de aprobacion interna.
+Agregar outbox, reintentos y proveedor externo real para delivery formal.
 
 Alcance propuesto:
 
-- Definir adaptador de envio para email/WhatsApp sin filtrar credenciales al frontend.
-- Crear plantillas versionadas para propuesta de estancia y entrega de onboarding.
-- Persistir `providerMessageId`, estado de entrega y errores recuperables.
-- Mantener `operation:formal:approve` como requisito antes de cualquier envio real.
+- Separar solicitud de envio y ejecucion en una cola/outbox idempotente.
+- Configurar proveedor real por entorno con secretos solo en backend.
+- Agregar reintentos controlados para estados `FAILED` y errores recuperables.
+- Exponer seguimiento de entregado/fallido desde el proveedor sin guardar contacto en claro en auditoria.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- Ningun proveedor externo recibe payload si `approvalStatus` no es `APPROVED`.
-- La respuesta del proveedor queda auditada sin guardar secretos ni contacto en claro dentro del evento.
-- El timeline formal distingue aprobado, enviado, entregado y fallido.
+- Un mismo envio aprobado no se duplica aunque el usuario reintente o la API reciba doble click.
+- Los errores recuperables generan reintento auditable y no cambian `approvalStatus` a `SENT` hasta aceptar el proveedor.
+- Secretos y payloads completos no salen del backend ni se serializan al frontend.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.

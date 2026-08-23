@@ -35,6 +35,7 @@ type PropertyOnboardingStatus =
   "DRAFT" | "QUALIFICATION" | "DOCUMENTS" | "OPERATIONS_READY" | "CLOSED";
 type StayProposalStatus = "DRAFT" | "READY_TO_SEND" | "SENT" | "ACCEPTED" | "DECLINED" | "VOID";
 type FormalApprovalStatus = "DRAFT" | "READY_FOR_APPROVAL" | "APPROVED" | "SENT";
+type FormalDeliveryStatus = "PENDING" | "SENT" | "DELIVERED" | "FAILED";
 type FormalTransitionAction = "approval-request" | "approve" | "send";
 type Priority = "high" | "normal" | "medium" | "low";
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -79,15 +80,48 @@ type StayProposalPreview = {
   subject: string;
 };
 
+type OpsFormalDeliveryState = {
+  channel?: string | null;
+  deliveredAt?: string | null;
+  errorMessage?: string | null;
+  failedAt?: string | null;
+  provider?: string | null;
+  providerMessageId?: string | null;
+  status: FormalDeliveryStatus;
+  statusLabel: string;
+  templateKey?: string | null;
+  templateVersion?: number | null;
+} | null;
+
 type OpsFormalState = {
   approvedAt?: string | null;
   approvedBy: OpsCaseAssignee;
   canSend: boolean;
+  delivery: OpsFormalDeliveryState;
   deliveryNotes?: string | null;
   sentAt?: string | null;
   sentBy: OpsCaseAssignee;
   status: FormalApprovalStatus;
   statusLabel: string;
+};
+
+type OpsFormalDelivery = {
+  actor: OpsCaseAssignee;
+  channel: string;
+  createdAt: string;
+  deliveredAt?: string | null;
+  errorMessage?: string | null;
+  failedAt?: string | null;
+  id: string;
+  provider: string;
+  providerMessageId?: string | null;
+  recipientMasked: string;
+  sentAt?: string | null;
+  status: FormalDeliveryStatus;
+  statusLabel: string;
+  subject: string;
+  templateKey: string;
+  templateVersion: number;
 };
 
 type FormalAssigneeAction = "ASSIGN_SELF" | "CLEAR";
@@ -112,6 +146,7 @@ type OpsCaseConversion =
       handoffNotes?: string | null;
       formalState: OpsFormalState;
       activities: OpsFormalActivity[];
+      deliveries: OpsFormalDelivery[];
       createdAt: string;
       updatedAt: string;
     }
@@ -128,6 +163,7 @@ type OpsCaseConversion =
       handoffNotes?: string | null;
       formalState: OpsFormalState;
       activities: OpsFormalActivity[];
+      deliveries: OpsFormalDelivery[];
       preview: StayProposalPreview;
       versions: Array<{
         createdAt: string;
@@ -1284,7 +1320,7 @@ function FormalOpsControls({
 }) {
   return (
     <div className="mt-4 border-y border-green/20 py-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-4">
         <FormalSummaryItem
           detail={conversion.assignee?.email ?? "Pendiente"}
           icon={UserCheck}
@@ -1303,7 +1339,29 @@ function FormalOpsControls({
           label="Aprobacion"
           value={conversion.formalState.statusLabel}
         />
+        <FormalSummaryItem
+          detail={buildDeliveryStateDetail(conversion.formalState.delivery)}
+          icon={Send}
+          label="Entrega"
+          value={conversion.formalState.delivery?.statusLabel ?? "Sin envio"}
+        />
       </div>
+
+      {conversion.formalState.delivery ? (
+        <div className="mt-3 rounded-[6px] border border-line bg-white px-3 py-2 text-xs leading-5 text-ink/68">
+          <p className="font-semibold text-midnight">
+            {conversion.formalState.delivery.provider ?? "Proveedor pendiente"} -{" "}
+            {conversion.formalState.delivery.templateKey ?? "plantilla"} v
+            {conversion.formalState.delivery.templateVersion ?? 1}
+          </p>
+          <p className="mt-1">
+            ID proveedor: {conversion.formalState.delivery.providerMessageId ?? "pendiente"}
+          </p>
+          {conversion.formalState.delivery.errorMessage ? (
+            <p className="mt-1 text-terracotta">{conversion.formalState.delivery.errorMessage}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       {conversion.formalState.deliveryNotes ? (
         <p className="mt-3 rounded-[6px] border border-line bg-white px-3 py-2 text-xs leading-5 text-ink/68">
@@ -1423,6 +1481,39 @@ function FormalOpsControls({
           Registrar actividad
         </button>
       </form>
+
+      <div className="mt-4">
+        <div className="flex items-center gap-2">
+          <Send aria-hidden className="h-4 w-4 text-green" />
+          <p className="text-xs font-semibold uppercase text-ink/48">Historial de entrega</p>
+        </div>
+        <div className="mt-3 space-y-3">
+          {conversion.deliveries.map((delivery) => (
+            <div
+              className="border-b border-green/20 pb-3 text-sm last:border-b-0 last:pb-0"
+              key={delivery.id}
+            >
+              <p className="font-semibold text-midnight">
+                {delivery.statusLabel} - {delivery.subject}
+              </p>
+              <p className="mt-1 text-xs text-ink/52">
+                {delivery.provider} - {delivery.templateKey} v{delivery.templateVersion} -{" "}
+                {delivery.recipientMasked}
+              </p>
+              <p className="mt-1 text-xs text-ink/52">
+                {delivery.providerMessageId ?? "sin id proveedor"} -{" "}
+                {formatDateTime(delivery.createdAt)}
+              </p>
+              {delivery.errorMessage ? (
+                <p className="mt-1 text-xs text-terracotta">{delivery.errorMessage}</p>
+              ) : null}
+            </div>
+          ))}
+          {conversion.deliveries.length === 0 ? (
+            <p className="text-sm leading-6 text-ink/62">Sin intentos de entrega.</p>
+          ) : null}
+        </div>
+      </div>
 
       <div className="mt-4">
         <div className="flex items-center gap-2">
@@ -1861,6 +1952,22 @@ function buildFormalStateDetail(state: OpsFormalState) {
   return "Pendiente";
 }
 
+function buildDeliveryStateDetail(delivery: OpsFormalDeliveryState) {
+  if (!delivery) {
+    return "Pendiente";
+  }
+
+  if (delivery.failedAt) {
+    return `Fallido ${formatDateTime(delivery.failedAt)}`;
+  }
+
+  if (delivery.deliveredAt) {
+    return `Entregado ${formatDateTime(delivery.deliveredAt)}`;
+  }
+
+  return delivery.provider ?? "Proveedor pendiente";
+}
+
 function buildFormalTransitionNotice(action: FormalTransitionAction) {
   if (action === "approval-request") {
     return "Solicitud de aprobacion formal registrada.";
@@ -1870,7 +1977,7 @@ function buildFormalTransitionNotice(action: FormalTransitionAction) {
     return "Aprobacion interna registrada.";
   }
 
-  return "Envio formal registrado sin proveedor externo.";
+  return "Envio transaccional registrado por adaptador dev.";
 }
 
 function formatDateTime(value: string) {

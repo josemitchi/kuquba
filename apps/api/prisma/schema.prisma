@@ -111,6 +111,13 @@ enum FormalApprovalStatus {
   SENT
 }
 
+enum FormalDeliveryStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
 model Organization {
   id         String     @id @default(uuid())
   name       String
@@ -135,6 +142,7 @@ model User {
   auditEvents                 AuditEvent[]
   opsCaseNotes                OpsCaseNote[]
   formalActivities            OpsFormalActivity[]
+  formalDeliveries            OpsFormalDelivery[]
   assignedPropertyOnboardings PropertyOnboarding[] @relation("PropertyOnboardingAssignee")
   approvedPropertyOnboardings PropertyOnboarding[] @relation("PropertyOnboardingApprover")
   sentPropertyOnboardings     PropertyOnboarding[] @relation("PropertyOnboardingSender")
@@ -445,6 +453,7 @@ model OpsCase {
   notes              OpsCaseNote[]
   tasks              OpsCaseTask[]
   formalActivities   OpsFormalActivity[]
+  formalDeliveries   OpsFormalDelivery[]
   propertyOnboarding PropertyOnboarding?
   stayProposal       StayProposal?
 
@@ -497,38 +506,81 @@ model OpsFormalActivity {
   @@index([actorUserId])
 }
 
+model OpsFormalDelivery {
+  id                String               @id @default(uuid())
+  opsCaseId         String
+  actorUserId       String?
+  entityType        String
+  entityId          String
+  channel           String
+  provider          String
+  providerMessageId String?
+  templateKey       String
+  templateVersion   Int
+  status            FormalDeliveryStatus @default(PENDING)
+  recipientHash     String
+  recipientMasked   String
+  subject           String
+  errorCode         String?
+  errorMessage      String?
+  createdAt         DateTime             @default(now())
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  failedAt          DateTime?
+  opsCase           OpsCase              @relation(fields: [opsCaseId], references: [id])
+  actor             User?                @relation(fields: [actorUserId], references: [id])
+
+  @@index([opsCaseId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([providerMessageId])
+  @@index([status, createdAt])
+  @@index([actorUserId])
+}
+
 model PropertyOnboarding {
-  id                    String                   @id @default(uuid())
-  opsCaseId             String                   @unique
-  ownerLeadId           String                   @unique
-  candidatePropertyName String
-  propertyType          String
-  propertyLocation      String
-  ownerName             String
-  ownerEmail            String
-  ownerPhone            String?
-  status                PropertyOnboardingStatus @default(DRAFT)
-  nextMilestone         String
-  checklist             Json
-  assignedUserId        String?
-  targetDate            DateTime?
-  handoffNotes          String?
-  approvalStatus        FormalApprovalStatus     @default(DRAFT)
-  approvedAt            DateTime?
-  approvedByUserId      String?
-  sentAt                DateTime?
-  sentByUserId          String?
-  deliveryNotes         String?
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
-  opsCase               OpsCase                  @relation(fields: [opsCaseId], references: [id])
-  ownerLead             OwnerLead                @relation(fields: [ownerLeadId], references: [id])
-  assignedUser          User?                    @relation("PropertyOnboardingAssignee", fields: [assignedUserId], references: [id])
-  approvedBy            User?                    @relation("PropertyOnboardingApprover", fields: [approvedByUserId], references: [id])
-  sentBy                User?                    @relation("PropertyOnboardingSender", fields: [sentByUserId], references: [id])
+  id                      String                   @id @default(uuid())
+  opsCaseId               String                   @unique
+  ownerLeadId             String                   @unique
+  candidatePropertyName   String
+  propertyType            String
+  propertyLocation        String
+  ownerName               String
+  ownerEmail              String
+  ownerPhone              String?
+  status                  PropertyOnboardingStatus @default(DRAFT)
+  nextMilestone           String
+  checklist               Json
+  assignedUserId          String?
+  targetDate              DateTime?
+  handoffNotes            String?
+  approvalStatus          FormalApprovalStatus     @default(DRAFT)
+  approvedAt              DateTime?
+  approvedByUserId        String?
+  sentAt                  DateTime?
+  sentByUserId            String?
+  deliveryNotes           String?
+  deliveryStatus          FormalDeliveryStatus?
+  deliveryProvider        String?
+  providerMessageId       String?
+  deliveryChannel         String?
+  deliveryTemplateKey     String?
+  deliveryTemplateVersion Int?
+  deliveredAt             DateTime?
+  deliveryFailedAt        DateTime?
+  deliveryErrorCode       String?
+  deliveryErrorMessage    String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  opsCase                 OpsCase                  @relation(fields: [opsCaseId], references: [id])
+  ownerLead               OwnerLead                @relation(fields: [ownerLeadId], references: [id])
+  assignedUser            User?                    @relation("PropertyOnboardingAssignee", fields: [assignedUserId], references: [id])
+  approvedBy              User?                    @relation("PropertyOnboardingApprover", fields: [approvedByUserId], references: [id])
+  sentBy                  User?                    @relation("PropertyOnboardingSender", fields: [sentByUserId], references: [id])
 
   @@index([status, updatedAt])
   @@index([approvalStatus, updatedAt])
+  @@index([deliveryStatus, updatedAt])
+  @@index([providerMessageId])
   @@index([assignedUserId])
   @@index([approvedByUserId])
   @@index([sentByUserId])
@@ -537,40 +589,52 @@ model PropertyOnboarding {
 }
 
 model StayProposal {
-  id                String                @id @default(uuid())
-  opsCaseId         String                @unique
-  proposalRequestId String                @unique
-  stayId            String
-  stayName          String
-  destination       String
-  guestName         String
-  guestEmail        String
-  guestPhone        String?
-  arrivalDate       DateTime?
-  departureDate     DateTime?
-  guests            Int
-  status            StayProposalStatus    @default(DRAFT)
-  currentVersion    Int                   @default(1)
-  assignedUserId    String?
-  targetDate        DateTime?
-  handoffNotes      String?
-  approvalStatus    FormalApprovalStatus  @default(DRAFT)
-  approvedAt        DateTime?
-  approvedByUserId  String?
-  sentAt            DateTime?
-  sentByUserId      String?
-  deliveryNotes     String?
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
-  opsCase           OpsCase               @relation(fields: [opsCaseId], references: [id])
-  proposalRequest   StayProposalRequest   @relation(fields: [proposalRequestId], references: [id])
-  assignedUser      User?                 @relation("StayProposalAssignee", fields: [assignedUserId], references: [id])
-  approvedBy        User?                 @relation("StayProposalApprover", fields: [approvedByUserId], references: [id])
-  sentBy            User?                 @relation("StayProposalSender", fields: [sentByUserId], references: [id])
-  versions          StayProposalVersion[]
+  id                      String                @id @default(uuid())
+  opsCaseId               String                @unique
+  proposalRequestId       String                @unique
+  stayId                  String
+  stayName                String
+  destination             String
+  guestName               String
+  guestEmail              String
+  guestPhone              String?
+  arrivalDate             DateTime?
+  departureDate           DateTime?
+  guests                  Int
+  status                  StayProposalStatus    @default(DRAFT)
+  currentVersion          Int                   @default(1)
+  assignedUserId          String?
+  targetDate              DateTime?
+  handoffNotes            String?
+  approvalStatus          FormalApprovalStatus  @default(DRAFT)
+  approvedAt              DateTime?
+  approvedByUserId        String?
+  sentAt                  DateTime?
+  sentByUserId            String?
+  deliveryNotes           String?
+  deliveryStatus          FormalDeliveryStatus?
+  deliveryProvider        String?
+  providerMessageId       String?
+  deliveryChannel         String?
+  deliveryTemplateKey     String?
+  deliveryTemplateVersion Int?
+  deliveredAt             DateTime?
+  deliveryFailedAt        DateTime?
+  deliveryErrorCode       String?
+  deliveryErrorMessage    String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  opsCase                 OpsCase               @relation(fields: [opsCaseId], references: [id])
+  proposalRequest         StayProposalRequest   @relation(fields: [proposalRequestId], references: [id])
+  assignedUser            User?                 @relation("StayProposalAssignee", fields: [assignedUserId], references: [id])
+  approvedBy              User?                 @relation("StayProposalApprover", fields: [approvedByUserId], references: [id])
+  sentBy                  User?                 @relation("StayProposalSender", fields: [sentByUserId], references: [id])
+  versions                StayProposalVersion[]
 
   @@index([status, updatedAt])
   @@index([approvalStatus, updatedAt])
+  @@index([deliveryStatus, updatedAt])
+  @@index([providerMessageId])
   @@index([assignedUserId])
   @@index([approvedByUserId])
   @@index([sentByUserId])
