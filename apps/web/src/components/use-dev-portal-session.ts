@@ -9,6 +9,7 @@ export type DevPortalSession = {
   sessionId: string;
   sessionToken: string;
   user: {
+    id: string;
     displayName: string;
     emailMasked: string;
   };
@@ -54,11 +55,14 @@ export function useDevPortalSession(audience: PortalAudience) {
           return;
         }
 
-        const response = await fetch(`${getDevPortalApiBaseUrl()}/api/identity/session?audience=${audience}`, {
-          headers: {
-            "x-kuquba-dev-session": storedSession.sessionToken
+        const response = await fetch(
+          `${getDevPortalApiBaseUrl()}/api/identity/session?audience=${audience}`,
+          {
+            headers: {
+              "x-kuquba-dev-session": storedSession.sessionToken
+            }
           }
-        });
+        );
 
         if (!response.ok) {
           window.localStorage.removeItem(devSessionStorageKey);

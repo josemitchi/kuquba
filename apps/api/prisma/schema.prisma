@@ -115,20 +115,23 @@ model Organization {
 }
 
 model User {
-  id             String        @id @default(uuid())
-  organizationId String
-  email          String
-  displayName    String
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  organization   Organization  @relation(fields: [organizationId], references: [id])
-  identities     Identity[]
-  roles          UserRole[]
-  devSessions    DevSession[]
-  auditEvents    AuditEvent[]
-  opsCaseNotes   OpsCaseNote[]
-  ownerProfile   Owner?        @relation("OwnerUser")
-  guestProfile   Guest?        @relation("GuestUser")
+  id                          String               @id @default(uuid())
+  organizationId              String
+  email                       String
+  displayName                 String
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+  organization                Organization         @relation(fields: [organizationId], references: [id])
+  identities                  Identity[]
+  roles                       UserRole[]
+  devSessions                 DevSession[]
+  auditEvents                 AuditEvent[]
+  opsCaseNotes                OpsCaseNote[]
+  formalActivities            OpsFormalActivity[]
+  assignedPropertyOnboardings PropertyOnboarding[] @relation("PropertyOnboardingAssignee")
+  assignedStayProposals       StayProposal[]       @relation("StayProposalAssignee")
+  ownerProfile                Owner?               @relation("OwnerUser")
+  guestProfile                Guest?               @relation("GuestUser")
 
   @@unique([organizationId, email])
 }
@@ -430,6 +433,7 @@ model OpsCase {
   updatedAt          DateTime            @updatedAt
   notes              OpsCaseNote[]
   tasks              OpsCaseTask[]
+  formalActivities   OpsFormalActivity[]
   propertyOnboarding PropertyOnboarding?
   stayProposal       StayProposal?
 
@@ -466,6 +470,22 @@ model OpsCaseTask {
   @@index([opsCaseId, status, sortOrder])
 }
 
+model OpsFormalActivity {
+  id          String   @id @default(uuid())
+  opsCaseId   String
+  actorUserId String?
+  entityType  String
+  entityId    String
+  body        String
+  createdAt   DateTime @default(now())
+  opsCase     OpsCase  @relation(fields: [opsCaseId], references: [id])
+  actor       User?    @relation(fields: [actorUserId], references: [id])
+
+  @@index([opsCaseId, createdAt])
+  @@index([entityType, entityId, createdAt])
+  @@index([actorUserId])
+}
+
 model PropertyOnboarding {
   id                    String                   @id @default(uuid())
   opsCaseId             String                   @unique
@@ -479,12 +499,18 @@ model PropertyOnboarding {
   status                PropertyOnboardingStatus @default(DRAFT)
   nextMilestone         String
   checklist             Json
+  assignedUserId        String?
+  targetDate            DateTime?
+  handoffNotes          String?
   createdAt             DateTime                 @default(now())
   updatedAt             DateTime                 @updatedAt
   opsCase               OpsCase                  @relation(fields: [opsCaseId], references: [id])
   ownerLead             OwnerLead                @relation(fields: [ownerLeadId], references: [id])
+  assignedUser          User?                    @relation("PropertyOnboardingAssignee", fields: [assignedUserId], references: [id])
 
   @@index([status, updatedAt])
+  @@index([assignedUserId])
+  @@index([targetDate])
   @@index([propertyLocation])
 }
 
@@ -503,13 +529,19 @@ model StayProposal {
   guests            Int
   status            StayProposalStatus    @default(DRAFT)
   currentVersion    Int                   @default(1)
+  assignedUserId    String?
+  targetDate        DateTime?
+  handoffNotes      String?
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
   opsCase           OpsCase               @relation(fields: [opsCaseId], references: [id])
   proposalRequest   StayProposalRequest   @relation(fields: [proposalRequestId], references: [id])
+  assignedUser      User?                 @relation("StayProposalAssignee", fields: [assignedUserId], references: [id])
   versions          StayProposalVersion[]
 
   @@index([status, updatedAt])
+  @@index([assignedUserId])
+  @@index([targetDate])
   @@index([stayId, status])
 }
 

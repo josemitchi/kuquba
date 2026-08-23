@@ -4,15 +4,36 @@ import { z } from "zod";
 
 import { prisma } from "../lib/prisma";
 import { createAuditEventEnvelope } from "../modules/audit/audit-event";
-import { authorizeDevPortalSession, type AuthorizedDevPortalSession } from "../modules/identity/dev-session";
+import {
+  authorizeDevPortalSession,
+  type AuthorizedDevPortalSession
+} from "../modules/identity/dev-session";
 
 const opsReadPermissions = ["operation:calendar:read", "audit:event:read"];
 const opsUpdatePermissions = ["operation:task:update"];
+const opsFormalUpdatePermissions = ["operation:formal:update"];
 const reviewStatusSchema = z.enum(["NEW", "REVIEWING", "CONTACTED", "CLOSED"]);
 const caseStatusSchema = z.enum(["OPEN", "QUALIFYING", "ACTION_PENDING", "CLOSED"]);
 const taskStatusSchema = z.enum(["OPEN", "DONE"]);
-const propertyOnboardingStatusSchema = z.enum(["DRAFT", "QUALIFICATION", "DOCUMENTS", "OPERATIONS_READY", "CLOSED"]);
-const stayProposalStatusSchema = z.enum(["DRAFT", "READY_TO_SEND", "SENT", "ACCEPTED", "DECLINED", "VOID"]);
+const dateOnlySchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/);
+const propertyOnboardingStatusSchema = z.enum([
+  "DRAFT",
+  "QUALIFICATION",
+  "DOCUMENTS",
+  "OPERATIONS_READY",
+  "CLOSED"
+]);
+const stayProposalStatusSchema = z.enum([
+  "DRAFT",
+  "READY_TO_SEND",
+  "SENT",
+  "ACCEPTED",
+  "DECLINED",
+  "VOID"
+]);
 const prioritySchema = z.enum(["high", "normal", "medium", "low"]);
 const workbenchParamsSchema = z.object({
   id: z.string().uuid(),
@@ -22,7 +43,12 @@ const caseTaskParamsSchema = workbenchParamsSchema.extend({
   taskId: z.string().uuid()
 });
 const caseChecklistParamsSchema = workbenchParamsSchema.extend({
-  key: z.string().trim().min(2).max(80).regex(/^[a-z0-9_:-]+$/)
+  key: z
+    .string()
+    .trim()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9_:-]+$/)
 });
 const statusUpdateSchema = z.object({
   status: reviewStatusSchema
@@ -44,8 +70,11 @@ const taskUpdateSchema = z.object({
   status: taskStatusSchema
 });
 const conversionUpdateSchema = z.object({
+  assigneeAction: z.enum(["ASSIGN_SELF", "CLEAR"]).optional(),
+  handoffNotes: z.string().trim().max(700).nullable().optional(),
   nextMilestone: z.string().trim().max(180).optional(),
-  status: z.string().trim().optional()
+  status: z.string().trim().optional(),
+  targetDate: dateOnlySchema.nullable().optional()
 });
 const checklistUpdateSchema = z.object({
   status: taskStatusSchema
@@ -54,6 +83,9 @@ const proposalVersionCreateSchema = z.object({
   internalNotes: z.string().trim().max(500).optional(),
   summary: z.string().trim().min(8).max(700),
   termsLabel: z.string().trim().min(4).max(160)
+});
+const formalActivityCreateSchema = z.object({
+  body: z.string().trim().min(3).max(1000)
 });
 
 const statusLabels: Record<ReviewStatus, string> = {
@@ -110,7 +142,8 @@ type TaskStatus = z.infer<typeof taskStatusSchema>;
 type Priority = z.infer<typeof prioritySchema>;
 type OwnerLeadRecord = Awaited<ReturnType<typeof loadOwnerLeads>>[number];
 type ProposalRequestRecord = Awaited<ReturnType<typeof loadProposalRequests>>[number];
-type WorkbenchItem = ReturnType<typeof buildOwnerLeadItem> | ReturnType<typeof buildProposalRequestItem>;
+type WorkbenchItem =
+  ReturnType<typeof buildOwnerLeadItem> | ReturnType<typeof buildProposalRequestItem>;
 type WorkbenchItemType = "owner-lead" | "stay-proposal-request";
 type OpsCaseSourceType = "OWNER_LEAD" | "STAY_PROPOSAL_REQUEST";
 type OpsCaseEntityType = "OwnerLead" | "StayProposalRequest";
@@ -127,6 +160,17 @@ type OpsCaseSource = {
 };
 type OpsCaseWithRelations = Prisma.OpsCaseGetPayload<{
   include: {
+    formalActivities: {
+      include: {
+        actor: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+      };
+    };
     notes: {
       include: {
         author: {
@@ -139,9 +183,26 @@ type OpsCaseWithRelations = Prisma.OpsCaseGetPayload<{
       };
     };
     tasks: true;
-    propertyOnboarding: true;
+    propertyOnboarding: {
+      include: {
+        assignedUser: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
+      };
+    };
     stayProposal: {
       include: {
+        assignedUser: {
+          select: {
+            displayName: true;
+            email: true;
+            id: true;
+          };
+        };
         versions: true;
       };
     };
@@ -284,7 +345,6 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
-
   app.post("/workbench/:itemType/:id/case/convert", async (request, reply) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.convert",
@@ -325,7 +385,7 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.conversion.update",
       request,
-      requiredPermissions: opsUpdatePermissions
+      requiredPermissions: opsFormalUpdatePermissions
     });
 
     if (!authorization.ok) {
@@ -363,7 +423,7 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.conversion.checklist.update",
       request,
-      requiredPermissions: opsUpdatePermissions
+      requiredPermissions: opsFormalUpdatePermissions
     });
 
     if (!authorization.ok) {
@@ -402,7 +462,7 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.conversion.version.create",
       request,
-      requiredPermissions: opsUpdatePermissions
+      requiredPermissions: opsFormalUpdatePermissions
     });
 
     if (!authorization.ok) {
@@ -436,6 +496,43 @@ export const registerOpsRoutes: FastifyPluginAsync = async (app) => {
     });
   });
 
+  app.post("/workbench/:itemType/:id/case/conversion/activity", async (request, reply) => {
+    const authorization = await authorizeOpsRequest({
+      action: "ops.case.conversion.activity.create",
+      request,
+      requiredPermissions: opsFormalUpdatePermissions
+    });
+
+    if (!authorization.ok) {
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const params = workbenchParamsSchema.parse(request.params);
+    const body = formalActivityCreateSchema.parse(request.body);
+    const createResult = await createFormalActivity({
+      actor: authorization.session,
+      body: body.body,
+      id: params.id,
+      itemType: params.itemType,
+      request
+    });
+
+    if (!createResult) {
+      return reply.code(404).send({
+        error: "case_conversion_not_found",
+        correlationId: request.id
+      });
+    }
+
+    return reply.code(201).send({
+      caseDetail: createResult.caseDetail,
+      conversion: createResult.conversion,
+      correlationId: request.id
+    });
+  });
   app.post("/workbench/:itemType/:id/case/notes", async (request, reply) => {
     const authorization = await authorizeOpsRequest({
       action: "ops.case.note.create",
@@ -657,7 +754,8 @@ async function loadOpsWorkbench() {
             "OpsCaseTask",
             "PropertyOnboarding",
             "StayProposal",
-            "StayProposalVersion"
+            "StayProposalVersion",
+            "OpsFormalActivity"
           ]
         }
       }
@@ -666,8 +764,8 @@ async function loadOpsWorkbench() {
 
   const ownerLeadItems = ownerLeads.map(buildOwnerLeadItem);
   const proposalRequestItems = proposalRequests.map(buildProposalRequestItem);
-  const pendingCount = [...ownerLeadItems, ...proposalRequestItems].filter((item) =>
-    item.status === "NEW" || item.status === "REVIEWING"
+  const pendingCount = [...ownerLeadItems, ...proposalRequestItems].filter(
+    (item) => item.status === "NEW" || item.status === "REVIEWING"
   ).length;
 
   return {
@@ -830,7 +928,10 @@ async function updateWorkbenchItemStatus(input: {
   };
 }
 
-async function loadOpsCaseSource(itemType: WorkbenchItemType, id: string): Promise<OpsCaseSource | null> {
+async function loadOpsCaseSource(
+  itemType: WorkbenchItemType,
+  id: string
+): Promise<OpsCaseSource | null> {
   if (itemType === "owner-lead") {
     const lead = await prisma.ownerLead.findUnique({
       where: {
@@ -909,9 +1010,41 @@ async function ensureOpsCaseForSource(source: OpsCaseSource) {
 async function loadOpsCaseById(id: string) {
   return prisma.opsCase.findUniqueOrThrow({
     include: {
-      propertyOnboarding: true,
+      formalActivities: {
+        include: {
+          actor: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 20
+      },
+      propertyOnboarding: {
+        include: {
+          assignedUser: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          }
+        }
+      },
       stayProposal: {
         include: {
+          assignedUser: {
+            select: {
+              displayName: true,
+              email: true,
+              id: true
+            }
+          },
           versions: {
             orderBy: {
               version: "desc"
@@ -1085,6 +1218,7 @@ async function convertOwnerLeadCase(input: {
       ownerLeadId: input.source.sourceId
     },
     create: {
+      assignedUserId: input.actor.user.id,
       candidatePropertyName: input.source.item.title,
       checklist: buildDefaultOnboardingChecklist(),
       nextMilestone: "Completar calificacion y checklist documental inicial.",
@@ -1171,9 +1305,12 @@ async function convertStayProposalCase(input: {
       proposalRequestId: input.source.sourceId
     },
     create: {
+      assignedUserId: input.actor.user.id,
       arrivalDate: input.source.item.arrivalDate ? new Date(input.source.item.arrivalDate) : null,
       currentVersion: 1,
-      departureDate: input.source.item.departureDate ? new Date(input.source.item.departureDate) : null,
+      departureDate: input.source.item.departureDate
+        ? new Date(input.source.item.departureDate)
+        : null,
       destination: input.source.item.location,
       guestEmail: input.source.item.email,
       guestName: input.source.item.primaryName,
@@ -1187,7 +1324,9 @@ async function convertStayProposalCase(input: {
     },
     update: {
       arrivalDate: input.source.item.arrivalDate ? new Date(input.source.item.arrivalDate) : null,
-      departureDate: input.source.item.departureDate ? new Date(input.source.item.departureDate) : null,
+      departureDate: input.source.item.departureDate
+        ? new Date(input.source.item.departureDate)
+        : null,
       destination: input.source.item.location,
       guestEmail: input.source.item.email,
       guestName: input.source.item.primaryName,
@@ -1208,7 +1347,8 @@ async function convertStayProposalCase(input: {
       }
     },
     create: {
-      internalNotes: "Borrador creado desde expediente ops. Validar disponibilidad antes de enviar.",
+      internalNotes:
+        "Borrador creado desde expediente ops. Validar disponibilidad antes de enviar.",
       stayProposalId: proposal.id,
       summary: buildStayProposalSummary(input.source.item),
       termsLabel: "Borrador interno sujeto a disponibilidad final",
@@ -1523,6 +1663,8 @@ async function updateCaseConversion(input: {
       data.nextMilestone = normalizeRequiredText(input.body.nextMilestone, previous.nextMilestone);
     }
 
+    applyFormalAssignmentUpdate(data, input);
+
     const updated = Object.keys(data).length
       ? await prisma.propertyOnboarding.update({
           data,
@@ -1539,12 +1681,18 @@ async function updateCaseConversion(input: {
       entityId: updated.id,
       entityType: "PropertyOnboarding",
       previousValue: {
+        assignedUserId: previous.assignedUserId,
+        handoffNotes: previous.handoffNotes,
         nextMilestone: previous.nextMilestone,
-        status: previous.status
+        status: previous.status,
+        targetDate: formatDateOnly(previous.targetDate)
       },
       nextValue: {
+        assignedUserId: updated.assignedUserId,
+        handoffNotes: updated.handoffNotes,
         nextMilestone: updated.nextMilestone,
-        status: updated.status
+        status: updated.status,
+        targetDate: formatDateOnly(updated.targetDate)
       },
       reason: "property_onboarding_updated",
       request: input.request,
@@ -1574,15 +1722,22 @@ async function updateCaseConversion(input: {
     return null;
   }
 
-  const status = input.body.status ? stayProposalStatusSchema.parse(input.body.status) : previous.status;
-  const updated = await prisma.stayProposal.update({
-    data: {
-      status
-    },
-    where: {
-      id: previous.id
-    }
-  });
+  const data: Prisma.StayProposalUpdateInput = {};
+
+  if (input.body.status) {
+    data.status = stayProposalStatusSchema.parse(input.body.status);
+  }
+
+  applyFormalAssignmentUpdate(data, input);
+
+  const updated = Object.keys(data).length
+    ? await prisma.stayProposal.update({
+        data,
+        where: {
+          id: previous.id
+        }
+      })
+    : previous;
   const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
 
   await writeOpsAudit({
@@ -1591,10 +1746,16 @@ async function updateCaseConversion(input: {
     entityId: updated.id,
     entityType: "StayProposal",
     previousValue: {
-      status: previous.status
+      assignedUserId: previous.assignedUserId,
+      handoffNotes: previous.handoffNotes,
+      status: previous.status,
+      targetDate: formatDateOnly(previous.targetDate)
     },
     nextValue: {
-      status: updated.status
+      assignedUserId: updated.assignedUserId,
+      handoffNotes: updated.handoffNotes,
+      status: updated.status,
+      targetDate: formatDateOnly(updated.targetDate)
     },
     reason: "stay_proposal_updated",
     request: input.request,
@@ -1607,6 +1768,72 @@ async function updateCaseConversion(input: {
   };
 }
 
+async function createFormalActivity(input: {
+  actor: AuthorizedDevPortalSession;
+  body: string;
+  id: string;
+  itemType: WorkbenchItemType;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}) {
+  const source = await loadOpsCaseSource(input.itemType, input.id);
+
+  if (!source) {
+    await writeMissingCaseSourceAudit({
+      action: "ops.case.conversion.activity.create",
+      actor: input.actor,
+      id: input.id,
+      itemType: input.itemType,
+      request: input.request
+    });
+    return null;
+  }
+
+  const opsCase = await ensureOpsCaseForSource(source);
+  const formalEntity = resolveFormalEntity(opsCase);
+
+  if (!formalEntity) {
+    await writeMissingConversionAudit({
+      action: "ops.case.conversion.activity.create",
+      actor: input.actor,
+      entityType: source.sourceType === "OWNER_LEAD" ? "PropertyOnboarding" : "StayProposal",
+      opsCaseId: opsCase.id,
+      request: input.request
+    });
+    return null;
+  }
+
+  const activity = await prisma.opsFormalActivity.create({
+    data: {
+      actorUserId: input.actor.user.id,
+      body: input.body,
+      entityId: formalEntity.entityId,
+      entityType: formalEntity.entityType,
+      opsCaseId: opsCase.id
+    }
+  });
+  const caseDetail = buildOpsCaseDetail(await loadOpsCaseById(opsCase.id), source);
+
+  await writeOpsAudit({
+    action: "ops.case.conversion.activity.create",
+    actorUserId: input.actor.user.id,
+    entityId: activity.id,
+    entityType: "OpsFormalActivity",
+    nextValue: {
+      bodyLength: input.body.length,
+      formalEntityId: formalEntity.entityId,
+      formalEntityType: formalEntity.entityType,
+      opsCaseId: opsCase.id
+    },
+    reason: "formal_activity_created",
+    request: input.request,
+    result: "SUCCESS"
+  });
+
+  return {
+    caseDetail,
+    conversion: caseDetail.conversion
+  };
+}
 async function updateOnboardingChecklistItem(input: {
   actor: AuthorizedDevPortalSession;
   id: string;
@@ -1651,7 +1878,9 @@ async function updateOnboardingChecklistItem(input: {
   }
 
   const checklist = parseOnboardingChecklist(onboarding.checklist);
-  const nextChecklist = checklist.map((item) => (item.key === input.key ? { ...item, status: input.status } : item));
+  const nextChecklist = checklist.map((item) =>
+    item.key === input.key ? { ...item, status: input.status } : item
+  );
   const previousItem = checklist.find((item) => item.key === input.key);
 
   if (!previousItem) {
@@ -1983,28 +2212,47 @@ function buildOpsCaseDetail(opsCase: OpsCaseWithRelations, source: OpsCaseSource
 
 function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
   if (opsCase.propertyOnboarding) {
+    const entityType = "PropertyOnboarding";
+    const entityId = opsCase.propertyOnboarding.id;
+
     return {
       kind: "propertyOnboarding" as const,
-      id: opsCase.propertyOnboarding.id,
+      id: entityId,
       label: "Onboarding propiedad",
       status: opsCase.propertyOnboarding.status,
       statusLabel: propertyOnboardingStatusLabels[opsCase.propertyOnboarding.status],
       nextMilestone: opsCase.propertyOnboarding.nextMilestone,
-      checklist: opsCase.propertyOnboarding.checklist as Array<{ key: string; label: string; status: string }>,
+      checklist: opsCase.propertyOnboarding.checklist as Array<{
+        key: string;
+        label: string;
+        status: string;
+      }>,
+      assignee: buildUserSummary(opsCase.propertyOnboarding.assignedUser),
+      targetDate: formatDateOnly(opsCase.propertyOnboarding.targetDate),
+      handoffNotes: opsCase.propertyOnboarding.handoffNotes,
+      activities: buildFormalActivities(opsCase, entityType, entityId),
       createdAt: opsCase.propertyOnboarding.createdAt.toISOString(),
       updatedAt: opsCase.propertyOnboarding.updatedAt.toISOString()
     };
   }
 
   if (opsCase.stayProposal) {
+    const entityType = "StayProposal";
+    const entityId = opsCase.stayProposal.id;
+
     return {
       kind: "stayProposal" as const,
-      id: opsCase.stayProposal.id,
+      id: entityId,
       label: "Propuesta estancia",
       status: opsCase.stayProposal.status,
       statusLabel: stayProposalStatusLabels[opsCase.stayProposal.status],
       currentVersion: opsCase.stayProposal.currentVersion,
       stayName: opsCase.stayProposal.stayName,
+      assignee: buildUserSummary(opsCase.stayProposal.assignedUser),
+      targetDate: formatDateOnly(opsCase.stayProposal.targetDate),
+      handoffNotes: opsCase.stayProposal.handoffNotes,
+      activities: buildFormalActivities(opsCase, entityType, entityId),
+      preview: buildStayProposalPreview(opsCase.stayProposal),
       versions: opsCase.stayProposal.versions.map((version) => ({
         createdAt: version.createdAt.toISOString(),
         id: version.id,
@@ -2021,6 +2269,120 @@ function buildOpsCaseConversion(opsCase: OpsCaseWithRelations) {
 
   return null;
 }
+
+function buildFormalActivities(
+  opsCase: OpsCaseWithRelations,
+  entityType: string,
+  entityId: string
+) {
+  return opsCase.formalActivities
+    .filter((activity) => activity.entityType === entityType && activity.entityId === entityId)
+    .map((activity) => ({
+      actor: buildUserSummary(activity.actor),
+      body: activity.body,
+      createdAt: activity.createdAt.toISOString(),
+      id: activity.id
+    }));
+}
+
+function buildStayProposalPreview(proposal: NonNullable<OpsCaseWithRelations["stayProposal"]>) {
+  const latestVersion = proposal.versions[0];
+  const stayWindow = buildStayWindowLabel(proposal.arrivalDate, proposal.departureDate);
+  const summary = latestVersion?.summary ?? `Solicitud para ${proposal.stayName}.`;
+  const termsLabel = latestVersion?.termsLabel ?? "Condiciones pendientes de validar.";
+
+  return {
+    recipientEmail: proposal.guestEmail,
+    recipientName: proposal.guestName,
+    readinessLabel:
+      proposal.status === "READY_TO_SEND" ? "Lista para aprobacion interna" : "Borrador interno",
+    subject: `Propuesta KUQUBA - ${proposal.stayName}`,
+    body: [
+      `Hola ${proposal.guestName},`,
+      `Tenemos una propuesta para ${proposal.stayName} en ${proposal.destination}.`,
+      `Fechas: ${stayWindow}. Huespedes: ${proposal.guests}.`,
+      summary,
+      `Condiciones: ${termsLabel}.`,
+      "Preview interno: no se envia ninguna comunicacion real desde esta pantalla."
+    ]
+  };
+}
+
+function buildStayWindowLabel(arrivalDate: Date | null, departureDate: Date | null) {
+  if (!arrivalDate && !departureDate) {
+    return "flexibles";
+  }
+
+  if (!arrivalDate || !departureDate) {
+    return formatDateOnly(arrivalDate ?? departureDate) ?? "flexibles";
+  }
+
+  return `${formatDateOnly(arrivalDate)} a ${formatDateOnly(departureDate)}`;
+}
+
+function buildUserSummary(
+  user: { displayName: string; email: string; id: string } | null | undefined
+) {
+  if (!user) {
+    return null;
+  }
+
+  return {
+    displayName: user.displayName,
+    email: user.email,
+    id: user.id
+  };
+}
+
+function resolveFormalEntity(opsCase: OpsCaseWithRelations) {
+  if (opsCase.propertyOnboarding) {
+    return {
+      entityId: opsCase.propertyOnboarding.id,
+      entityType: "PropertyOnboarding" as const
+    };
+  }
+
+  if (opsCase.stayProposal) {
+    return {
+      entityId: opsCase.stayProposal.id,
+      entityType: "StayProposal" as const
+    };
+  }
+
+  return null;
+}
+
+function applyFormalAssignmentUpdate(
+  data: Prisma.PropertyOnboardingUpdateInput | Prisma.StayProposalUpdateInput,
+  input: {
+    actor: AuthorizedDevPortalSession;
+    body: z.infer<typeof conversionUpdateSchema>;
+  }
+) {
+  const target = data as Record<string, unknown>;
+
+  if (input.body.assigneeAction === "ASSIGN_SELF") {
+    target.assignedUser = {
+      connect: {
+        id: input.actor.user.id
+      }
+    };
+  }
+
+  if (input.body.assigneeAction === "CLEAR") {
+    target.assignedUser = {
+      disconnect: true
+    };
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input.body, "handoffNotes")) {
+    target.handoffNotes = normalizeNullableText(input.body.handoffNotes);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input.body, "targetDate")) {
+    target.targetDate = input.body.targetDate ? parseDateOnly(input.body.targetDate) : null;
+  }
+}
 function resolveEntityType(itemType: WorkbenchItemType): OpsCaseEntityType {
   return itemType === "owner-lead" ? "OwnerLead" : "StayProposalRequest";
 }
@@ -2029,6 +2391,14 @@ function normalizeNullableText(value: string | null | undefined) {
   const normalized = value?.trim();
 
   return normalized ? normalized : null;
+}
+
+function parseDateOnly(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function formatDateOnly(value: Date | null | undefined) {
+  return value ? value.toISOString().slice(0, 10) : null;
 }
 
 async function writeOpsAudit(input: {

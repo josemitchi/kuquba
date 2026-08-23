@@ -43,7 +43,9 @@ const devIds = {
   opsTaskProposalAvailability: "00000000-0000-4000-8000-000000000962",
   propertyOnboardingAtitlan: "00000000-0000-4000-8000-000000000971",
   stayProposalAtitlanFormal: "00000000-0000-4000-8000-000000000981",
-  stayProposalAtitlanVersionOne: "00000000-0000-4000-8000-000000000982"
+  stayProposalAtitlanVersionOne: "00000000-0000-4000-8000-000000000982",
+  formalActivityOnboardingAtitlan: "00000000-0000-4000-8000-000000000991",
+  formalActivityProposalAtitlan: "00000000-0000-4000-8000-000000000992"
 } as const;
 
 async function main() {
@@ -132,7 +134,7 @@ async function main() {
     identityProvider: "EMAIL_OTP"
   });
 
-  await seedDevUser(prisma, {
+  const opsUser = await seedDevUser(prisma, {
     organizationId: organization.id,
     email: "ops.dev@kuquba.local",
     displayName: "Equipo KUQUBA Dev",
@@ -146,16 +148,19 @@ async function main() {
     guestUserId: guestUser.id
   });
 
-  await seedOpsWorkbench(prisma);
+  await seedOpsWorkbench(prisma, { opsUserId: opsUser.id });
 }
 
-async function seedDevUser(prismaClient: PrismaClient, input: {
-  organizationId: string;
-  email: string;
-  displayName: string;
-  roleKey: string;
-  identityProvider: "EMAIL_OTP";
-}) {
+async function seedDevUser(
+  prismaClient: PrismaClient,
+  input: {
+    organizationId: string;
+    email: string;
+    displayName: string;
+    roleKey: string;
+    identityProvider: "EMAIL_OTP";
+  }
+) {
   const user = await prismaClient.user.upsert({
     where: {
       organizationId_email: {
@@ -608,7 +613,7 @@ async function seedOwnerDocument(
   });
 }
 
-async function seedOpsWorkbench(prismaClient: PrismaClient) {
+async function seedOpsWorkbench(prismaClient: PrismaClient, input: { opsUserId: string }) {
   await prismaClient.ownerLead.upsert({
     where: {
       id: devIds.ownerLeadAtitlan
@@ -851,6 +856,18 @@ async function seedOpsWorkbench(prismaClient: PrismaClient) {
       { key: "technical_visit", label: "Visita tecnica", status: "OPEN" },
       { key: "ownership_docs", label: "Documentos de propiedad", status: "OPEN" },
       { key: "access_rules", label: "Reglas de acceso", status: "OPEN" }
+    ],
+    assignedUserId: input.opsUserId,
+    targetDate: "2026-08-30",
+    handoffNotes:
+      "Coordinar visita tecnica, documentos iniciales y reglas de acceso antes de marcar listo ops.",
+    activities: [
+      {
+        id: devIds.formalActivityOnboardingAtitlan,
+        actorUserId: input.opsUserId,
+        body: "Asignado a equipo ops para preparar visita tecnica y validar documentacion base.",
+        createdAt: "2026-08-23T10:00:00.000Z"
+      }
     ]
   });
 
@@ -873,7 +890,19 @@ async function seedOpsWorkbench(prismaClient: PrismaClient) {
     title: "Propuesta inicial Villa Luz de Atitlan",
     summary: "Estancia familiar para cuatro personas con llegada flexible y cocina equipada.",
     termsLabel: "Borrador interno sujeto a disponibilidad final",
-    internalNotes: "No enviar hasta validar disponibilidad operativa y condiciones de llegada."
+    internalNotes: "No enviar hasta validar disponibilidad operativa y condiciones de llegada.",
+    assignedUserId: input.opsUserId,
+    targetDate: "2026-08-24",
+    handoffNotes:
+      "Validar disponibilidad, ajustar terminos y dejar propuesta lista para aprobacion interna.",
+    activities: [
+      {
+        id: devIds.formalActivityProposalAtitlan,
+        actorUserId: input.opsUserId,
+        body: "Propuesta formal abierta con version inicial y pendiente de validacion operativa.",
+        createdAt: "2026-08-23T10:10:00.000Z"
+      }
+    ]
   });
 }
 
@@ -891,7 +920,13 @@ async function seedOpsCase(
     priority: "high" | "normal" | "medium" | "low";
     nextStep: string;
     notes: Array<{ id: string; body: string }>;
-    tasks: Array<{ id: string; title: string; dueLabel: string; priority: "high" | "normal" | "medium" | "low"; sortOrder: number }>;
+    tasks: Array<{
+      id: string;
+      title: string;
+      dueLabel: string;
+      priority: "high" | "normal" | "medium" | "low";
+      sortOrder: number;
+    }>;
   }
 ) {
   const opsCase = await prismaClient.opsCase.upsert({
@@ -965,7 +1000,6 @@ async function seedOpsCase(
       }
     });
   }
-
 }
 
 async function seedPropertyOnboarding(
@@ -983,9 +1017,13 @@ async function seedPropertyOnboarding(
     status: "DRAFT" | "QUALIFICATION" | "DOCUMENTS" | "OPERATIONS_READY" | "CLOSED";
     nextMilestone: string;
     checklist: Array<{ key: string; label: string; status: "OPEN" | "DONE" }>;
+    assignedUserId: string | null;
+    targetDate: string | null;
+    handoffNotes: string | null;
+    activities: Array<{ id: string; actorUserId: string; body: string; createdAt: string }>;
   }
 ) {
-  await prismaClient.propertyOnboarding.upsert({
+  const onboarding = await prismaClient.propertyOnboarding.upsert({
     where: {
       ownerLeadId: input.ownerLeadId
     },
@@ -1001,7 +1039,10 @@ async function seedPropertyOnboarding(
       ownerPhone: input.ownerPhone,
       status: input.status,
       nextMilestone: input.nextMilestone,
-      checklist: input.checklist
+      checklist: input.checklist,
+      assignedUserId: input.assignedUserId,
+      targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
+      handoffNotes: input.handoffNotes
     },
     update: {
       opsCaseId: input.opsCaseId,
@@ -1013,8 +1054,18 @@ async function seedPropertyOnboarding(
       ownerPhone: input.ownerPhone,
       status: input.status,
       nextMilestone: input.nextMilestone,
-      checklist: input.checklist
+      checklist: input.checklist,
+      assignedUserId: input.assignedUserId,
+      targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
+      handoffNotes: input.handoffNotes
     }
+  });
+
+  await seedFormalActivities(prismaClient, {
+    opsCaseId: input.opsCaseId,
+    entityType: "PropertyOnboarding",
+    entityId: onboarding.id,
+    activities: input.activities
   });
 }
 
@@ -1040,6 +1091,10 @@ async function seedStayProposal(
     summary: string;
     termsLabel: string;
     internalNotes: string | null;
+    assignedUserId: string | null;
+    targetDate: string | null;
+    handoffNotes: string | null;
+    activities: Array<{ id: string; actorUserId: string; body: string; createdAt: string }>;
   }
 ) {
   const proposal = await prismaClient.stayProposal.upsert({
@@ -1060,7 +1115,10 @@ async function seedStayProposal(
       departureDate: input.departureDate ? parseDateOnly(input.departureDate) : null,
       guests: input.guests,
       status: input.status,
-      currentVersion: input.version
+      currentVersion: input.version,
+      assignedUserId: input.assignedUserId,
+      targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
+      handoffNotes: input.handoffNotes
     },
     update: {
       opsCaseId: input.opsCaseId,
@@ -1074,7 +1132,10 @@ async function seedStayProposal(
       departureDate: input.departureDate ? parseDateOnly(input.departureDate) : null,
       guests: input.guests,
       status: input.status,
-      currentVersion: input.version
+      currentVersion: input.version,
+      assignedUserId: input.assignedUserId,
+      targetDate: input.targetDate ? parseDateOnly(input.targetDate) : null,
+      handoffNotes: input.handoffNotes
     }
   });
 
@@ -1110,6 +1171,43 @@ async function seedStayProposal(
       internalNotes: input.internalNotes
     }
   });
+
+  await seedFormalActivities(prismaClient, {
+    opsCaseId: input.opsCaseId,
+    entityType: "StayProposal",
+    entityId: proposal.id,
+    activities: input.activities
+  });
+}
+
+async function seedFormalActivities(
+  prismaClient: PrismaClient,
+  input: {
+    opsCaseId: string;
+    entityType: "PropertyOnboarding" | "StayProposal";
+    entityId: string;
+    activities: Array<{ id: string; actorUserId: string; body: string; createdAt: string }>;
+  }
+) {
+  await prismaClient.opsFormalActivity.deleteMany({
+    where: {
+      opsCaseId: input.opsCaseId
+    }
+  });
+
+  for (const activity of input.activities) {
+    await prismaClient.opsFormalActivity.create({
+      data: {
+        id: activity.id,
+        opsCaseId: input.opsCaseId,
+        actorUserId: activity.actorUserId,
+        entityType: input.entityType,
+        entityId: input.entityId,
+        body: activity.body,
+        createdAt: new Date(activity.createdAt)
+      }
+    });
+  }
 }
 function parseDateOnly(value: string) {
   return new Date(`${value}T00:00:00.000Z`);

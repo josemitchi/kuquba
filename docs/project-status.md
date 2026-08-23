@@ -18,6 +18,7 @@ Ultima actualizacion: 2026-08-23
 - Notas y tareas internas ops persistidas por endpoints protegidos de caso.
 - Conversion formal ops disponible por `POST /api/ops/workbench/:itemType/:id/case/convert`.
 - Gestion de conversion formal ops disponible por endpoints protegidos para estado, checklist y versiones.
+- Asignacion formal ops disponible con responsable, fecha objetivo, notas de entrega, actividad y preview interno de propuesta.
 - Datos dev persistidos para owner y ops: propiedades, reservas, tareas, documentos, leads y solicitudes.
 - API Fastify disponible con healthcheck, bootstrap publico, kernel de identidad, rutas owner y rutas ops protegidas.
 - Prisma configurado con migraciones versionadas y seed IAM/dev owner/ops.
@@ -44,6 +45,7 @@ Ultima actualizacion: 2026-08-23
 - `PATCH /api/ops/workbench/:itemType/:id/case/conversion`
 - `PATCH /api/ops/workbench/:itemType/:id/case/conversion/checklist/:key`
 - `POST /api/ops/workbench/:itemType/:id/case/conversion/versions`
+- `POST /api/ops/workbench/:itemType/:id/case/conversion/activity`
 
 ## Incremento publico implementado
 
@@ -138,20 +140,33 @@ Alcance entregado:
 - Auditoria por cada actualizacion de flujo formal.
 - Seed dev vuelve deterministica la propuesta demo y limpia versiones extra al reseed.
 
+## Incremento asignacion formal ops implementado
+
+Se agrego preparacion interna del flujo formal sin enviar comunicaciones reales.
+
+Alcance entregado:
+
+- Modelo Prisma `OpsFormalActivity` y campos `assignedUserId`, `targetDate` y `handoffNotes` en onboarding/propuesta formal.
+- Endpoint protegido `POST /api/ops/workbench/:itemType/:id/case/conversion/activity` para registrar actividad formal.
+- `PATCH /api/ops/workbench/:itemType/:id/case/conversion` ahora permite asignarse, liberar responsable, guardar fecha objetivo y notas de entrega.
+- Panel ops muestra responsable, fecha objetivo, notas de entrega, timeline formal y preview interno de propuesta.
+- Seed dev incluye responsable ops, fechas objetivo, notas y actividad formal deterministica.
+- Permiso `operation:formal:update` queda asignado a ops admin; `operation:formal:approve` queda definido pero sin conceder todavia.
+
 ## Siguiente incremento recomendado
 
-Construir asignacion operativa y preparacion de entrega del flujo formal.
+Construir aprobacion interna y envio controlado del flujo formal.
 
 Alcance propuesto:
 
-- Asociar responsable ops y fecha objetivo por onboarding o propuesta formal.
-- Mostrar timeline de actividad formal junto al expediente.
-- Preparar preview interno de propuesta lista para enviar sin ejecutar envio real.
-- Definir permisos separados para edicion formal y aprobacion/envio.
+- Separar estados de borrador, listo para aprobacion, aprobado y enviado.
+- Activar `operation:formal:approve` solo para un rol autorizado.
+- Registrar aprobacion interna antes de cualquier envio real.
+- Preparar adaptador de envio transaccional sin acoplar proveedor definitivo.
 
 ## Criterios de aceptacion del siguiente incremento
 
-- Cada cambio requiere sesion interna valida y permiso especifico.
-- Responsable, fecha objetivo y actividad formal persisten en Prisma y generan auditoria.
-- La UI permite distinguir borrador, listo para aprobacion y aprobado sin enviar comunicaciones reales.
+- Ningun envio real ocurre sin aprobacion interna registrada.
+- La aprobacion requiere sesion interna valida y permiso `operation:formal:approve`.
+- El timeline formal distingue edicion, aprobacion y envio.
 - `npm run lint`, `npm run typecheck` y `npm run build` pasan.

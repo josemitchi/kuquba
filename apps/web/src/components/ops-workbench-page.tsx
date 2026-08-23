@@ -416,7 +416,7 @@ export function OpsWorkbenchPage() {
               )}
             </section>
 
-            <OpsCasePanel selectedItem={selectedItem} sessionToken={session?.sessionToken ?? null} />
+            <OpsCasePanel currentUser={session?.user ?? null} selectedItem={selectedItem} sessionToken={session?.sessionToken ?? null} />
 
             <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
               <div className="flex items-center gap-3">
