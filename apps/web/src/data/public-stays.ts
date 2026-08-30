@@ -22,7 +22,7 @@ export type PublicStay = {
   name: string;
   neighborhood: string;
   operations: string[];
-  proposalNote: string;
+  bookingNote: string;
   stayStyle: string;
   summary: string;
 };
@@ -49,9 +49,9 @@ export const publicStays: PublicStay[] = [
       { src: "/images/hero-villa-atitlan.png", alt: "Terraza abierta frente al Lago de Atitlan" },
       { src: "/images/guest-suite.png", alt: "Dormitorio preparado para llegada privada" }
     ],
-    houseRules: ["Llegada coordinada", "No se publican tarifas sin validacion", "Ocupacion segun propuesta"],
+    houseRules: ["Llegada coordinada", "Tarifa visible tras cotizacion", "Ocupacion segun reserva"],
     operations: ["Preparacion previa", "Soporte local", "Revision de salida"],
-    proposalNote: "Disponibilidad y tarifa final bajo confirmacion del equipo KUQUBA."
+    bookingNote: "Disponibilidad, tarifa y bloqueo temporal se validan antes de pago."
   },
   {
     id: "antigua-suite-jardin",
@@ -67,16 +67,16 @@ export const publicStays: PublicStay[] = [
     bathrooms: 1,
     stayStyle: "Suite curada",
     availability: "available",
-    availabilityLabel: "Lista para solicitud",
+    availabilityLabel: "Lista para reservar",
     highlights: ["Caminable", "Check-in guiado", "Ambiente silencioso"],
     amenities: ["Cama queen", "Cafe local", "WiFi", "Limpieza programada"],
     gallery: [
       { src: "/images/guest-suite.png", alt: "Suite con luz natural y textiles calidos" },
       { src: "/images/hero-villa-atitlan.png", alt: "Referencia de estancia seleccionada KUQUBA" }
     ],
-    houseRules: ["Estancia tranquila", "Acceso con verificacion", "Servicios bajo propuesta"],
+    houseRules: ["Estancia tranquila", "Acceso con verificacion", "Servicios segun reserva"],
     operations: ["Check-in guiado", "Recomendaciones locales", "Atencion durante estancia"],
-    proposalNote: "Inventario conceptual. KUQUBA confirma fechas antes de reservar."
+    bookingNote: "Fechas y tarifa se validan en la cotizacion antes de continuar a pago."
   },
   {
     id: "atitlan-casa-terraza",
@@ -92,7 +92,7 @@ export const publicStays: PublicStay[] = [
     bathrooms: 2,
     stayStyle: "Casa completa",
     availability: "request",
-    availabilityLabel: "Bajo solicitud",
+    availabilityLabel: "Bajo validacion",
     highlights: ["Terraza privada", "Grupo pequeno", "Llegada asistida"],
     amenities: ["Area social", "Cocina", "WiFi", "Limpieza previa"],
     gallery: [
@@ -101,10 +101,56 @@ export const publicStays: PublicStay[] = [
     ],
     houseRules: ["Grupo pequeno", "Coordinacion de llegada", "Politicas por propiedad"],
     operations: ["Limpieza previa", "Anfitrion coordinado", "Seguimiento post-estancia"],
-    proposalNote: "Tarifas, depositos y politicas se definen por propiedad antes de confirmar."
+    bookingNote: "La cotizacion valida tarifa y politicas antes de abrir el checkout."
   }
 ];
 
 export function findPublicStayById(id: string) {
   return publicStays.find((stay) => stay.id === id);
+}
+
+type PublicStaysListResponse = {
+  stays?: PublicStay[];
+};
+
+type PublicStayResponse = {
+  stay?: PublicStay;
+};
+
+export async function loadPublicStays() {
+  try {
+    const response = await fetch(`${getPublicApiBaseUrl()}/api/public/stays`, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return publicStays;
+    }
+
+    const payload = (await response.json()) as PublicStaysListResponse;
+    return payload.stays && payload.stays.length > 0 ? payload.stays : publicStays;
+  } catch {
+    return publicStays;
+  }
+}
+
+export async function loadPublicStayById(id: string) {
+  try {
+    const response = await fetch(`${getPublicApiBaseUrl()}/api/public/stays/${encodeURIComponent(id)}`, {
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return findPublicStayById(id) ?? null;
+    }
+
+    const payload = (await response.json()) as PublicStayResponse;
+    return payload.stay ?? findPublicStayById(id) ?? null;
+  } catch {
+    return findPublicStayById(id) ?? null;
+  }
+}
+
+function getPublicApiBaseUrl() {
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:4000";
 }

@@ -1,5 +1,5 @@
-import { PortalDashboardPage } from "@/components/portal-dashboard-page";
+import { GuestPortalHomePage } from "@/components/guest-portal-home-page";
 
 export default function StayHomePage() {
-  return <PortalDashboardPage audience="guest" />;
+  return <GuestPortalHomePage />;
 }

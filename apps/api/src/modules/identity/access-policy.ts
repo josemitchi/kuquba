@@ -1,4 +1,4 @@
-import { permissionKeys, portalEntries, roleProfiles, type PortalAudience } from "@kuquba/config";
+import { permissionKeys, opsPortalRoleKeys, portalEntries, roleProfiles, type PortalAudience } from "@kuquba/config";
 
 export function getAccessRequirements() {
   return portalEntries.map((portal) => ({
@@ -24,4 +24,14 @@ export function getPermissionCatalog() {
 
 export function getRoleKeyForAudience(audience: PortalAudience) {
   return portalEntries.find((entry) => entry.key === audience)?.roleKey;
+}
+
+export function getRoleKeysForAudience(audience: PortalAudience) {
+  const primaryRoleKey = getRoleKeyForAudience(audience);
+
+  if (primaryRoleKey === opsPortalRoleKeys[0]) {
+    return [...opsPortalRoleKeys];
+  }
+
+  return primaryRoleKey ? [primaryRoleKey] : [];
 }

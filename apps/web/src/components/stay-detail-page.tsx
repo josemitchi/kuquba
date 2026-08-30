@@ -13,7 +13,7 @@ import Image from "next/image";
 
 import type { PublicStay } from "@/data/public-stays";
 
-import { ProposalRequestForm } from "./proposal-request-form";
+import { StayQuotePanel } from "./stay-quote-panel";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
@@ -55,7 +55,11 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
 
             <div className="mt-9 grid max-w-5xl gap-3 sm:grid-cols-3">
               <HeroMetric icon={MapPin} label="Destino" value={stay.destination} />
-              <HeroMetric icon={UsersRound} label="Capacidad" value={`${stay.maxGuests} huespedes`} />
+              <HeroMetric
+                icon={UsersRound}
+                label="Capacidad"
+                value={`${stay.maxGuests} huespedes`}
+              />
               <HeroMetric icon={CalendarCheck2} label="Estado" value={stay.availabilityLabel} />
             </div>
           </div>
@@ -72,7 +76,11 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
                   alt={image.alt}
                   className="object-cover"
                   fill
-                  sizes={index === 0 ? "(min-width: 768px) 58vw, 100vw" : "(min-width: 768px) 30vw, 100vw"}
+                  sizes={
+                    index === 0
+                      ? "(min-width: 768px) 58vw, 100vw"
+                      : "(min-width: 768px) 30vw, 100vw"
+                  }
                   src={image.src}
                 />
               </div>
@@ -86,16 +94,20 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
               <section className="border-b border-line pb-8">
                 <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase text-green">Detalle de estancia</p>
+                    <p className="text-xs font-semibold uppercase text-green">
+                      Detalle de estancia
+                    </p>
                     <h2 className="mt-2 font-display text-3xl leading-tight text-midnight md:text-4xl">
-                      {stay.destination} · {stay.neighborhood}
+                      {stay.destination} - {stay.neighborhood}
                     </h2>
                   </div>
                   <span className="w-fit rounded-full border border-green/24 bg-green/10 px-3 py-1 text-xs font-semibold text-green">
                     {stay.availabilityLabel}
                   </span>
                 </div>
-                <p className="mt-5 max-w-3xl text-base leading-7 text-ink/72">{stay.proposalNote}</p>
+                <p className="mt-5 max-w-3xl text-base leading-7 text-ink/72">
+                  {stay.bookingNote}
+                </p>
               </section>
 
               <section className="grid gap-3 sm:grid-cols-3">
@@ -106,29 +118,28 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
 
               <InfoSection title="Amenidades" items={stay.amenities} />
               <InfoSection title="Operacion KUQUBA" items={stay.operations} />
-              <InfoSection title="Condiciones conceptuales" items={stay.houseRules} />
+              <InfoSection title="Condiciones de reserva" items={stay.houseRules} />
 
               <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
                 <div className="flex gap-3">
                   <ShieldCheck aria-hidden className="mt-0.5 h-6 w-6 shrink-0 text-green" />
                   <div>
-                    <h2 className="text-lg font-semibold text-midnight">Antes de reservar</h2>
+                    <h2 className="text-lg font-semibold text-midnight">Reserva directa</h2>
                     <p className="mt-2 text-sm leading-6 text-ink/68">
-                      KUQUBA revisa disponibilidad, tarifa aplicable, reglas de propiedad y condiciones
-                      antes de convertir una solicitud en reserva. Esta pagina no muestra precios reales
-                      ni inventario garantizado.
+                      KUQUBA valida disponibilidad, tarifa aplicable y reglas de propiedad antes
+                      de pago. Al continuar a checkout se protege la disponibilidad de forma
+                      temporal; cuando el pago se confirma, la reserva queda confirmada.
                     </p>
                   </div>
                 </div>
               </section>
             </div>
 
-            <aside className="lg:sticky lg:top-6">
-              <ProposalRequestForm
+            <aside className="space-y-4 lg:sticky lg:top-6">
+              <StayQuotePanel
                 defaultGuests={Math.min(stay.maxGuests, 2)}
-                destination={stay.destination}
+                maxGuests={stay.maxGuests}
                 stayId={stay.id}
-                stayName={stay.name}
               />
             </aside>
           </div>
@@ -139,7 +150,15 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
   );
 }
 
-function HeroMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function HeroMetric({
+  icon: Icon,
+  label,
+  value
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="rounded-[8px] border border-white/18 bg-white/9 p-4 backdrop-blur">
       <div className="flex items-center gap-3">
@@ -151,7 +170,15 @@ function HeroMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: str
   );
 }
 
-function StayFact({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+function StayFact({
+  icon: Icon,
+  label,
+  value
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
       <Icon aria-hidden className="h-6 w-6 text-green" />
@@ -167,7 +194,10 @@ function InfoSection({ title, items }: { title: string; items: string[] }) {
       <h2 className="text-xl font-semibold text-midnight">{title}</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {items.map((item) => (
-          <div className="flex gap-3 rounded-[8px] border border-line bg-white p-4 shadow-soft" key={item}>
+          <div
+            className="flex gap-3 rounded-[8px] border border-line bg-white p-4 shadow-soft"
+            key={item}
+          >
             <BadgeCheck aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
             <span className="text-sm leading-6 text-ink/72">{item}</span>
           </div>

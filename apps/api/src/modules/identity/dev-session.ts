@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { PortalAudience } from "@kuquba/config";
 
 import { prisma } from "../../lib/prisma";
-import { getRoleKeyForAudience } from "./access-policy";
+import { getRoleKeysForAudience } from "./access-policy";
 
 export type AuthorizedDevPortalSession = {
   audience: PortalAudience;
@@ -150,9 +150,17 @@ export async function authorizeDevPortalSession(input: {
 }
 
 function getAudienceRole(userRoles: UserRoleWithPermissions[], audience: PortalAudience) {
-  const roleKey = getRoleKeyForAudience(audience);
+  const roleKeys = getRoleKeysForAudience(audience);
 
-  return userRoles.find((assignment) => assignment.role.key === roleKey);
+  for (const roleKey of roleKeys) {
+    const userRole = userRoles.find((assignment) => assignment.role.key === roleKey);
+
+    if (userRole) {
+      return userRole;
+    }
+  }
+
+  return undefined;
 }
 
 function hashToken(token: string) {

@@ -10,7 +10,7 @@ import { createAuditEventEnvelope } from "../audit/audit-event";
 import {
   getAccessRequirements,
   getPermissionCatalog,
-  getRoleKeyForAudience,
+  getRoleKeysForAudience,
   getRoleProfiles
 } from "./access-policy";
 
@@ -119,7 +119,6 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
 
   app.post("/passwordless/verify", async (request, reply) => {
     const body = passwordlessVerifySchema.parse(request.body);
-    const roleKey = getRoleKeyForAudience(body.audience);
     const challenge = await prisma.authChallenge.findUnique({
       where: {
         id: body.challengeId
@@ -236,7 +235,7 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const user = challenge.identity?.user;
-    const userRole = user?.roles.find((assignment) => assignment.role.key === roleKey);
+    const userRole = user ? getAudienceRole(user.roles, body.audience) : undefined;
 
     if (!user || !userRole) {
       await writeAudit({
@@ -253,12 +252,26 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
+    const verifiedAt = new Date();
+
+    if (challenge.identity && challenge.identity.status === "PENDING") {
+      await prisma.identity.update({
+        data: {
+          status: "VERIFIED",
+          verifiedAt
+        },
+        where: {
+          id: challenge.identity.id
+        }
+      });
+    }
+
     await prisma.authChallenge.update({
       where: {
         id: challenge.id
       },
       data: {
-        consumedAt: new Date(),
+        consumedAt: verifiedAt,
         attempts: {
           increment: 1
         }
@@ -416,9 +429,17 @@ type UserRoleWithPermissions = {
 };
 
 function getAudienceRole(userRoles: UserRoleWithPermissions[], audience: "guest" | "owner" | "ops") {
-  const roleKey = getRoleKeyForAudience(audience);
+  const roleKeys = getRoleKeysForAudience(audience);
 
-  return userRoles.find((assignment) => assignment.role.key === roleKey);
+  for (const roleKey of roleKeys) {
+    const userRole = userRoles.find((assignment) => assignment.role.key === roleKey);
+
+    if (userRole) {
+      return userRole;
+    }
+  }
+
+  return undefined;
 }
 
 async function findValidDevSession(rawSessionToken: string, audience: "guest" | "owner" | "ops") {

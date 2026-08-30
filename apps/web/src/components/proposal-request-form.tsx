@@ -14,11 +14,13 @@ type ProposalRequestResponse = {
 
 export function ProposalRequestForm({
   defaultGuests,
+  maxGuests,
   destination,
   stayId,
   stayName
 }: {
   defaultGuests: number;
+  maxGuests: number;
   destination: string;
   stayId: string;
   stayName: string;
@@ -28,10 +30,11 @@ export function ProposalRequestForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setSubmitState("submitting");
     setRequestId(null);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const payload = {
       arrivalDate: getFormValue(formData, "arrivalDate") || undefined,
       departureDate: getFormValue(formData, "departureDate") || undefined,
@@ -52,7 +55,7 @@ export function ProposalRequestForm({
       );
       setRequestId(response.proposalRequest.id);
       setSubmitState("success");
-      event.currentTarget.reset();
+      form.reset();
     } catch {
       setSubmitState("error");
     }
@@ -130,7 +133,7 @@ export function ProposalRequestForm({
             defaultValue={String(defaultGuests)}
             name="guests"
           >
-            {[1, 2, 3, 4, 5, 6].map((count) => (
+            {Array.from({ length: maxGuests }, (_, index) => index + 1).map((count) => (
               <option key={count} value={count}>
                 {count} {count === 1 ? "huesped" : "huespedes"}
               </option>

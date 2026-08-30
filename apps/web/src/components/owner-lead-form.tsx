@@ -31,13 +31,16 @@ const operatingStatuses = [
 export function OwnerLeadForm() {
   const [submitState, setSubmitState] = useState<SubmitState>("idle");
   const [leadId, setLeadId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setSubmitState("submitting");
     setLeadId(null);
+    setErrorMessage(null);
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(form);
     const payload = {
       email: getFormValue(formData, "email"),
       message: getFormValue(formData, "message") || undefined,
@@ -53,8 +56,9 @@ export function OwnerLeadForm() {
       const response = await postJson<OwnerLeadResponse>("/api/public/owner-leads", payload);
       setLeadId(response.ownerLead.id);
       setSubmitState("success");
-      event.currentTarget.reset();
-    } catch {
+      form.reset();
+    } catch (error) {
+      setErrorMessage(getOwnerLeadErrorMessage(error instanceof Error ? error.message : "request_failed"));
       setSubmitState("error");
     }
   }
@@ -185,7 +189,7 @@ export function OwnerLeadForm() {
 
       {submitState === "error" ? (
         <div className="mt-5 rounded-[6px] border border-terracotta/30 bg-terracotta/10 p-4 text-sm text-midnight">
-          No se pudo enviar la evaluacion. Revisa los datos o intenta de nuevo.
+          {errorMessage ?? "No se pudo enviar la evaluacion. Revisa los datos o intenta de nuevo."}
         </div>
       ) : null}
 
@@ -207,7 +211,7 @@ export function OwnerLeadForm() {
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
+  const apiBase = getPublicApiBaseUrl();
   const response = await fetch(`${apiBase}${path}`, {
     body: JSON.stringify(body),
     headers: {
@@ -228,4 +232,23 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 function getFormValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function getPublicApiBaseUrl() {
+  const configuredApiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:4000";
+
+  if (typeof window !== "undefined" && window.location.hostname === "127.0.0.1") {
+    return configuredApiBase.replace("http://localhost:", "http://127.0.0.1:");
+  }
+
+  return configuredApiBase;
+}
+
+function getOwnerLeadErrorMessage(error: string) {
+  const messages: Record<string, string> = {
+    "Failed to fetch": "No se pudo conectar con el API local. Verifica que el backend este activo en 127.0.0.1:4000.",
+    request_failed: "No se pudo enviar la evaluacion. Revisa los datos o intenta de nuevo."
+  };
+
+  return messages[error] ?? error.replaceAll("_", " ");
 }

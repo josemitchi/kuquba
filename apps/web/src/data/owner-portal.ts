@@ -1,4 +1,6 @@
 export type OwnerPropertyStatus = "active" | "attention" | "onboarding";
+export type OwnerContractStatus = "DRAFT" | "ISSUED" | "SIGNED" | "ACTIVE" | "VOID" | "SUPERSEDED";
+export type OwnerSettlementStatus = "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "PAID";
 
 export type OwnerPortalMetric = {
   hint: string;
@@ -6,8 +8,71 @@ export type OwnerPortalMetric = {
   value: string;
 };
 
+export type OwnerContract = {
+  canAcceptDev: boolean;
+  currentVersion: number;
+  id: string;
+  issuedAt?: string | null;
+  signedAt?: string | null;
+  signatureProvider?: string | null;
+  signatureProviderRef?: string | null;
+  startsOn: string;
+  status: OwnerContractStatus;
+  statusLabel: string;
+  summary?: string | null;
+  terms: Array<{
+    label: string;
+    value: string;
+  }>;
+  title?: string | null;
+  versions: Array<{
+    createdAt: string;
+    id: string;
+    issuedAt?: string | null;
+    summary: string;
+    title: string;
+    version: number;
+  }>;
+};
+
+export type OwnerReservation = {
+  arrivalDate: string;
+  currency: string;
+  departureDate: string;
+  guestName: string;
+  id: string;
+  nights: number;
+  paymentStatus: string;
+  paymentStatusLabel: string;
+  propertyName: string;
+  reservationCode: string;
+  status: string;
+  statusLabel: string;
+  total: string;
+  unitName: string;
+};
+
+export type OwnerAvailabilityBlock = {
+  endsOn: string;
+  id: string;
+  note?: string | null;
+  reason: string;
+  reasonLabel: string;
+  startsOn: string;
+  unitId: string;
+};
+
+export type OwnerPropertyRevenue = {
+  confirmedCount: number;
+  currency: string;
+  estimatedOwnerPayout: string;
+  grossConfirmed: string;
+  label: string;
+};
 export type OwnerProperty = {
+  contract: OwnerContract;
   contractStage: string;
+  estimatedRevenue: OwnerPropertyRevenue;
   highlights: string[];
   id: string;
   image: string;
@@ -21,10 +86,13 @@ export type OwnerProperty = {
     label: string;
     state: string;
   }>;
+  reservations: OwnerReservation[];
+  requestedBlocks: OwnerAvailabilityBlock[];
   reviewLabel: string;
   serviceLevel: string;
   status: OwnerPropertyStatus;
   statusLabel: string;
+  units: Array<{ id: string; name: string }>;
 };
 
 export type OwnerUpcomingStay = {
@@ -49,12 +117,68 @@ export type OwnerSettlementItem = {
   status: string;
 };
 
+export type OwnerFinanceSummary = {
+  adjustments: string;
+  cleaningFees: string;
+  currency: string;
+  generatedAt?: string | null;
+  grossAccommodation: string;
+  kuqubaServiceFees: string;
+  lineCount: number;
+  ownerExpenses: string;
+  ownerPayout: string;
+  ownerPayoutLabel: string;
+  paidAt?: string | null;
+  periodLabel: string;
+  propertyCount: number;
+  status: OwnerSettlementStatus;
+  statusLabel: string;
+  taxes: string;
+};
+
+export type OwnerSettlement = {
+  adjustments: string;
+  approvedAt?: string | null;
+  cleaningFees: string;
+  currency: string;
+  generatedAt: string;
+  grossAccommodation: string;
+  id: string;
+  kuqubaServiceFees: string;
+  lineItems: Array<{
+    amount: string;
+    currency: string;
+    id: string;
+    label: string;
+    occurredAt: string;
+    reservationCode?: string | null;
+    sourceMemo?: string | null;
+    type: string;
+    typeLabel: string;
+  }>;
+  ownerExpenses: string;
+  ownerPayout: string;
+  ownerPayoutLabel: string;
+  paidAt?: string | null;
+  periodEnd: string;
+  periodLabel: string;
+  periodStart: string;
+  propertyName: string;
+  reviewedAt?: string | null;
+  status: OwnerSettlementStatus;
+  statusLabel: string;
+  taxes: string;
+};
+
 export type OwnerPortalSnapshot = {
+  financeSummary: OwnerFinanceSummary;
   governance: string[];
   metrics: OwnerPortalMetric[];
   ownerName: string;
   periodLabel: string;
   properties: OwnerProperty[];
+  reservations: OwnerReservation[];
+  settlements: OwnerSettlement[];
   settlementItems: OwnerSettlementItem[];
   summary: string;
   tasks: OwnerTask[];
@@ -65,7 +189,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
   ownerName: "Propietario KUQUBA",
   periodLabel: "Agosto 2026",
   summary:
-    "Vista dev para revisar propiedades asignadas, estancias proximas, pendientes operativos y cierre documental sin exponer reglas financieras definitivas.",
+    "Vista dev para revisar propiedades asignadas, estancias proximas, pendientes operativos, contratos y finanzas owner desde liquidaciones persistidas.",
   metrics: [
     {
       hint: "1 operativa, 1 en activacion",
@@ -83,11 +207,34 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
       value: "5"
     },
     {
-      hint: "Sin montos en esta etapa",
-      label: "Cierre mensual",
-      value: "En revision"
+      hint: "1 firmado, 1 pendiente",
+      label: "Contratos",
+      value: "1 pendiente"
+    },
+    {
+      hint: "Lista para revision - 01 Ago - 31 Ago 2026",
+      label: "Saldo owner",
+      value: "Q5,075.00"
     }
   ],
+  financeSummary: {
+    adjustments: "0.00",
+    cleaningFees: "425.00",
+    currency: "GTQ",
+    generatedAt: "2026-08-28T00:00:00.000Z",
+    grossAccommodation: "6200.00",
+    kuqubaServiceFees: "496.00",
+    lineCount: 5,
+    ownerExpenses: "250.00",
+    ownerPayout: "5075.00",
+    ownerPayoutLabel: "Q5,075.00",
+    paidAt: null,
+    periodLabel: "01 Ago - 31 Ago 2026",
+    propertyCount: 1,
+    status: "READY_FOR_REVIEW",
+    statusLabel: "Lista para revision",
+    taxes: "854.00"
+  },
   properties: [
     {
       id: "atitlan-villa-luz",
@@ -97,7 +244,46 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
       imageAlt: "Villa con terraza abierta frente al Lago de Atitlan",
       status: "active",
       statusLabel: "Operativa",
-      contractStage: "Contrato activo, documentos base completos",
+      contract: {
+        id: "contract-atitlan-v1",
+        currentVersion: 1,
+        status: "ACTIVE",
+        statusLabel: "Contrato activo",
+        title: "Contrato KUQUBA v1 - Villa Luz de Atitlan",
+        summary: "Administracion profesional para Villa Luz de Atitlan en Lago de Atitlan.",
+        startsOn: "2026-01-01T00:00:00.000Z",
+        issuedAt: "2025-12-15T00:00:00.000Z",
+        signedAt: "2025-12-20T00:00:00.000Z",
+        signatureProvider: "seed_dev_signature",
+        signatureProviderRef: "DEV-SIGN-ATITLAN-SEED",
+        canAcceptDev: false,
+        terms: [
+          { label: "Participacion owner", value: "Por definir" },
+          { label: "Participacion KUQUBA", value: "Por definir" },
+          { label: "Vigencia", value: "01 Ene 2026" }
+        ],
+        versions: [
+          {
+            id: "contract-version-atitlan-v1",
+            version: 1,
+            title: "Contrato KUQUBA v1 - Villa Luz de Atitlan",
+            summary: "Administracion profesional para Villa Luz de Atitlan en Lago de Atitlan.",
+            createdAt: "2025-12-15T00:00:00.000Z",
+            issuedAt: "2025-12-15T00:00:00.000Z"
+          }
+        ]
+      },
+      contractStage: "Contrato activo y firmado el 20 Dic 2025",
+      estimatedRevenue: {
+        confirmedCount: 2,
+        currency: "GTQ",
+        estimatedOwnerPayout: "5084.00",
+        grossConfirmed: "6200.00",
+        label: "2 confirmada(s)"
+      },
+      reservations: [],
+      requestedBlocks: [],
+      units: [{ id: "unit-atitlan-main", name: "Villa completa" }],
       nextArrival: "24 Ago 2026",
       occupancySignal: "Demanda activa",
       openItems: 2,
@@ -116,9 +302,48 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
       location: "Antigua Guatemala",
       image: "/images/owner-dashboard.png",
       imageAlt: "Dashboard conceptual de administracion para propietario",
-      status: "onboarding",
-      statusLabel: "Activacion",
-      contractStage: "Inventario y reglas de casa en validacion",
+      status: "attention",
+      statusLabel: "Atencion",
+      contract: {
+        id: "contract-antigua-v1",
+        currentVersion: 1,
+        status: "ISSUED",
+        statusLabel: "Pendiente de firma",
+        title: "Contrato KUQUBA v1 - Casa Patio Antigua",
+        summary: "Administracion profesional para Casa Patio Antigua en Antigua Guatemala.",
+        startsOn: "2026-08-01T00:00:00.000Z",
+        issuedAt: "2026-08-15T00:00:00.000Z",
+        signedAt: null,
+        signatureProvider: null,
+        signatureProviderRef: null,
+        canAcceptDev: true,
+        terms: [
+          { label: "Participacion owner", value: "Por definir" },
+          { label: "Participacion KUQUBA", value: "Por definir" },
+          { label: "Vigencia", value: "01 Ago 2026" }
+        ],
+        versions: [
+          {
+            id: "contract-version-antigua-v1",
+            version: 1,
+            title: "Contrato KUQUBA v1 - Casa Patio Antigua",
+            summary: "Administracion profesional para Casa Patio Antigua en Antigua Guatemala.",
+            createdAt: "2026-08-15T00:00:00.000Z",
+            issuedAt: "2026-08-15T00:00:00.000Z"
+          }
+        ]
+      },
+      contractStage: "Contrato emitido y pendiente de aceptacion dev del propietario",
+      estimatedRevenue: {
+        confirmedCount: 0,
+        currency: "GTQ",
+        estimatedOwnerPayout: "0.00",
+        grossConfirmed: "0.00",
+        label: "Sin reservas confirmadas"
+      },
+      reservations: [],
+      requestedBlocks: [],
+      units: [{ id: "unit-antigua-main", name: "Casa completa" }],
       nextArrival: "Pendiente de publicacion",
       occupancySignal: "Preparando inventario",
       openItems: 3,
@@ -186,16 +411,76 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
       ownerAction: false
     }
   ],
+  reservations: [],
+  settlements: [
+    {
+      id: "settlement-atitlan-2026-08",
+      propertyName: "Villa Luz de Atitlan",
+      periodLabel: "01 Ago - 31 Ago 2026",
+      periodStart: "2026-08-01T00:00:00.000Z",
+      periodEnd: "2026-08-31T00:00:00.000Z",
+      status: "READY_FOR_REVIEW",
+      statusLabel: "Lista para revision",
+      currency: "GTQ",
+      grossAccommodation: "6200.00",
+      cleaningFees: "425.00",
+      taxes: "854.00",
+      kuqubaServiceFees: "496.00",
+      ownerExpenses: "250.00",
+      adjustments: "0.00",
+      ownerPayout: "5075.00",
+      ownerPayoutLabel: "Q5,075.00",
+      generatedAt: "2026-08-28T00:00:00.000Z",
+      reviewedAt: "2026-08-28T00:00:00.000Z",
+      approvedAt: null,
+      paidAt: null,
+      lineItems: [
+        {
+          id: "settlement-line-accommodation",
+          label: "Alojamiento confirmado KQB-ATITLAN-20260824",
+          type: "ACCOMMODATION",
+          typeLabel: "Ingreso alojamiento",
+          amount: "6200.00",
+          currency: "GTQ",
+          occurredAt: "2026-08-24T00:00:00.000Z",
+          reservationCode: "KQB-ATITLAN-20260824",
+          sourceMemo: "seed owner finance"
+        },
+        {
+          id: "settlement-line-service",
+          label: "Servicio KUQUBA",
+          type: "KUQUBA_SERVICE_FEE",
+          typeLabel: "Servicio KUQUBA",
+          amount: "496.00",
+          currency: "GTQ",
+          occurredAt: "2026-08-24T00:00:00.000Z",
+          reservationCode: "KQB-ATITLAN-20260824",
+          sourceMemo: "seed owner finance"
+        },
+        {
+          id: "settlement-line-expense",
+          label: "Mantenimiento preventivo terraza",
+          type: "OWNER_EXPENSE",
+          typeLabel: "Gasto owner",
+          amount: "250.00",
+          currency: "GTQ",
+          occurredAt: "2026-08-26T00:00:00.000Z",
+          reservationCode: null,
+          sourceMemo: "seed owner finance"
+        }
+      ]
+    }
+  ],
   settlementItems: [
     {
       label: "Reservas conciliadas",
       status: "En revision",
-      detail: "Se mostraran importes cuando exista libro mayor validado."
+      detail: "Una liquidacion owner dev esta lista para revision."
     },
     {
       label: "Gastos operativos",
       status: "Pendiente",
-      detail: "Mantenimiento y servicios requieren aprobacion documental."
+      detail: "Mantenimiento y servicios se muestran como lineas financieras separadas."
     },
     {
       label: "Documentos",
@@ -205,7 +490,10 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
   ],
   governance: [
     "El portal respeta permisos de propietario y no muestra propiedades no asignadas.",
-    "Liquidaciones y montos quedan fuera del mock hasta definir contrato y ledger.",
-    "Acciones sensibles quedan preparadas para auditoria por sesion."
+    "Contratos y aceptaciones dev quedan preparados para auditoria por sesion.",
+    "Finanzas owner se leen desde liquidaciones y lineas ledger persistidas; payouts reales siguen deshabilitados."
   ]
 };
+
+
+

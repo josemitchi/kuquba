@@ -15,9 +15,63 @@ enum PropertyVisibility {
 
 enum ReservationStatus {
   HOLD
+  PENDING_PAYMENT
   CONFIRMED
   CANCELLED
   COMPLETED
+  EXPIRED
+}
+
+enum AvailabilityBlockReason {
+  OWNER_HOLD
+  MAINTENANCE
+  OPS_HOLD
+}
+
+enum HousekeepingTaskStatus {
+  SCHEDULED
+  ASSIGNED
+  IN_PROGRESS
+  DONE
+  BLOCKED
+  CANCELLED
+}
+
+enum MaintenanceTicketStatus {
+  OPEN
+  TRIAGED
+  SCHEDULED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum MaintenanceSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum StayQuoteStatus {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+}
+
+enum ContractStatus {
+  DRAFT
+  ISSUED
+  SIGNED
+  ACTIVE
+  VOID
+  SUPERSEDED
 }
 
 enum LedgerEntryType {
@@ -34,6 +88,13 @@ enum LedgerEntryType {
   REFUND
   ADJUSTMENT
   SETTLEMENT
+}
+
+enum OwnerSettlementStatus {
+  DRAFT
+  READY_FOR_REVIEW
+  APPROVED
+  PAID
 }
 
 enum IdentityProvider {
@@ -249,77 +310,193 @@ model DevSession {
 }
 
 model Owner {
-  id             String          @id @default(uuid())
+  id             String            @id @default(uuid())
   organizationId String
-  userId         String?         @unique
+  userId         String?           @unique
   displayName    String
   email          String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  organization   Organization    @relation(fields: [organizationId], references: [id])
-  user           User?           @relation("OwnerUser", fields: [userId], references: [id])
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  user           User?             @relation("OwnerUser", fields: [userId], references: [id])
   contracts      Contract[]
   tasks          OwnerTask[]
   documents      OwnerDocument[]
+  settlements    OwnerSettlement[]
 }
 
 model Property {
-  id             String             @id @default(uuid())
-  organizationId String
-  name           String
-  destination    String
-  visibility     PropertyVisibility @default(PUBLIC)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  organization   Organization       @relation(fields: [organizationId], references: [id])
-  units          Unit[]
-  stayCodes      StayCode[]
-  contracts      Contract[]
-  reservations   Reservation[]
-  ownerTasks     OwnerTask[]
-  ownerDocuments OwnerDocument[]
+  id                 String              @id @default(uuid())
+  organizationId     String
+  name               String
+  destination        String
+  neighborhood       String?
+  summary            String?
+  stayStyle          String?
+  bookingNote        String?
+  amenities          Json?
+  houseRules         Json?
+  operations         Json?
+  visibility         PropertyVisibility  @default(PUBLIC)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  units              Unit[]
+  stayCodes          StayCode[]
+  images             PropertyImage[]
+  availabilityBlocks AvailabilityBlock[]
+  ratePlans          RatePlan[]
+  contracts          Contract[]
+  reservations       Reservation[]
+  stayQuotes         StayQuote[]
+  ownerTasks         OwnerTask[]
+  ownerDocuments     OwnerDocument[]
+  ownerSettlements   OwnerSettlement[]
+  housekeepingTasks  HousekeepingTask[]
+  maintenanceTickets MaintenanceTicket[]
 
   @@index([organizationId, destination])
 }
 
 model Unit {
-  id           String        @id @default(uuid())
-  propertyId   String
-  name         String
-  maxGuests    Int
-  bedrooms     Int
-  bathrooms    Decimal       @db.Decimal(5, 2)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  property     Property      @relation(fields: [propertyId], references: [id])
-  reservations Reservation[]
+  id                 String              @id @default(uuid())
+  propertyId         String
+  name               String
+  maxGuests          Int
+  bedrooms           Int
+  bathrooms          Decimal             @db.Decimal(5, 2)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  property           Property            @relation(fields: [propertyId], references: [id])
+  stayCodes          StayCode[]
+  availabilityBlocks AvailabilityBlock[]
+  ratePlans          RatePlan[]
+  reservations       Reservation[]
+  stayQuotes         StayQuote[]
+  housekeepingTasks  HousekeepingTask[]
+  maintenanceTickets MaintenanceTicket[]
 }
 
 model StayCode {
   id         String   @id @default(uuid())
   propertyId String
+  unitId     String?
   code       String
   active     Boolean  @default(true)
   createdAt  DateTime @default(now())
   property   Property @relation(fields: [propertyId], references: [id])
+  unit       Unit?    @relation(fields: [unitId], references: [id])
 
   @@unique([code])
+  @@index([propertyId, active])
+  @@index([unitId])
+}
+
+model PropertyImage {
+  id         String   @id @default(uuid())
+  propertyId String
+  url        String
+  alt        String?
+  sortOrder  Int      @default(0)
+  isCover    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  property   Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId, sortOrder])
+  @@index([propertyId, isCover])
+}
+model AvailabilityBlock {
+  id         String                  @id @default(uuid())
+  propertyId String
+  unitId     String
+  startsOn   DateTime
+  endsOn     DateTime
+  reason     AvailabilityBlockReason
+  note       String?
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  property   Property                @relation(fields: [propertyId], references: [id])
+  unit       Unit                    @relation(fields: [unitId], references: [id])
+
+  @@index([propertyId, startsOn, endsOn])
+  @@index([unitId, startsOn, endsOn])
+  @@index([reason, startsOn])
+}
+
+model RatePlan {
+  id                 String    @id @default(uuid())
+  propertyId         String
+  unitId             String
+  name               String
+  currency           String    @default("GTQ")
+  baseNightlyRate    Decimal   @db.Decimal(12, 2)
+  weekendNightlyRate Decimal?  @db.Decimal(12, 2)
+  cleaningFee        Decimal   @default(0) @db.Decimal(12, 2)
+  serviceFeeBps      Int       @default(0)
+  taxBps             Int       @default(0)
+  minNights          Int       @default(1)
+  startsOn           DateTime?
+  endsOn             DateTime?
+  active             Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  property           Property  @relation(fields: [propertyId], references: [id])
+  unit               Unit      @relation(fields: [unitId], references: [id])
+
+  @@index([propertyId, active])
+  @@index([unitId, active])
+  @@index([startsOn, endsOn])
 }
 
 model Contract {
-  id             String    @id @default(uuid())
-  propertyId     String
-  ownerId        String
-  startsOn       DateTime
-  endsOn         DateTime?
-  ownerShareBps  Int
-  kuqubaShareBps Int
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  property       Property  @relation(fields: [propertyId], references: [id])
-  owner          Owner     @relation(fields: [ownerId], references: [id])
+  id                    String              @id @default(uuid())
+  propertyId            String
+  ownerId               String
+  propertyOnboardingId  String?             @unique
+  status                ContractStatus      @default(DRAFT)
+  currentVersion        Int                 @default(1)
+  title                 String?
+  summary               String?
+  termsSnapshot         Json?
+  startsOn              DateTime
+  endsOn                DateTime?
+  ownerShareBps         Int
+  kuqubaShareBps        Int
+  issuedAt              DateTime?
+  issuedByUserId        String?
+  signedAt              DateTime?
+  signedByUserId        String?
+  signatureProvider     String?
+  signatureProviderRef  String?             @unique
+  signatureEvidenceHash String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  property              Property            @relation(fields: [propertyId], references: [id])
+  owner                 Owner               @relation(fields: [ownerId], references: [id])
+  propertyOnboarding    PropertyOnboarding? @relation(fields: [propertyOnboardingId], references: [id])
+  versions              ContractVersion[]
 
   @@index([propertyId, ownerId])
+  @@index([status, startsOn])
+  @@index([propertyOnboardingId])
+}
+
+model ContractVersion {
+  id              String    @id @default(uuid())
+  contractId      String
+  version         Int
+  title           String
+  summary         String
+  termsSnapshot   Json
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  issuedAt        DateTime?
+  contract        Contract  @relation(fields: [contractId], references: [id])
+
+  @@unique([contractId, version])
+  @@index([contractId, createdAt])
+  @@index([createdByUserId])
 }
 
 model Guest {
@@ -333,37 +510,94 @@ model Guest {
   updatedAt    DateTime      @updatedAt
   user         User?         @relation("GuestUser", fields: [userId], references: [id])
   reservations Reservation[]
+
+  @@index([email])
 }
 
 model Reservation {
-  id            String            @id @default(uuid())
-  guestId       String
-  propertyId    String
-  unitId        String
-  status        ReservationStatus @default(HOLD)
-  arrivalDate   DateTime
-  departureDate DateTime
-  privateCode   String            @unique
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  guest         Guest             @relation(fields: [guestId], references: [id])
-  property      Property          @relation(fields: [propertyId], references: [id])
-  unit          Unit              @relation(fields: [unitId], references: [id])
-  payments      Payment[]
-  ledgerEntries LedgerEntry[]
+  id                   String                @id @default(uuid())
+  guestId              String
+  propertyId           String
+  unitId               String
+  stayQuoteId          String?               @unique
+  status               ReservationStatus     @default(HOLD)
+  arrivalDate          DateTime
+  departureDate        DateTime
+  holdExpiresAt        DateTime?
+  privateCode          String                @unique
+  confirmationSource   String?
+  currency             String?
+  total                Decimal?              @db.Decimal(12, 2)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  guest                Guest                 @relation(fields: [guestId], references: [id])
+  property             Property              @relation(fields: [propertyId], references: [id])
+  unit                 Unit                  @relation(fields: [unitId], references: [id])
+  stayQuote            StayQuote?            @relation(fields: [stayQuoteId], references: [id])
+  payments             Payment[]
+  ledgerEntries        LedgerEntry[]
+  ownerSettlementLines OwnerSettlementLine[]
+  housekeepingTasks    HousekeepingTask[]
 
   @@index([propertyId, arrivalDate, departureDate])
+  @@index([unitId, arrivalDate, departureDate])
+  @@index([guestId, status, arrivalDate])
+  @@index([status, holdExpiresAt])
+}
+
+model StayQuote {
+  id                String          @id @default(uuid())
+  stayId            String
+  propertyId        String
+  unitId            String
+  status            StayQuoteStatus
+  unavailableReason String?
+  arrivalDate       DateTime
+  departureDate     DateTime
+  nights            Int
+  guests            Int
+  currency          String
+  nightlySubtotal   Decimal         @db.Decimal(12, 2)
+  cleaningFee       Decimal         @db.Decimal(12, 2)
+  serviceFee        Decimal         @db.Decimal(12, 2)
+  tax               Decimal         @db.Decimal(12, 2)
+  total             Decimal         @db.Decimal(12, 2)
+  expiresAt         DateTime
+  source            String          @default("public_stay_detail")
+  correlationId     String
+  ipAddress         String?
+  createdAt         DateTime        @default(now())
+  property          Property        @relation(fields: [propertyId], references: [id])
+  unit              Unit            @relation(fields: [unitId], references: [id])
+  reservation       Reservation?
+
+  @@index([stayId, createdAt])
+  @@index([propertyId, arrivalDate, departureDate])
+  @@index([unitId, arrivalDate, departureDate])
+  @@index([status, createdAt])
+  @@index([correlationId])
 }
 
 model Payment {
-  id            String      @id @default(uuid())
-  reservationId String
-  provider      String
-  providerRef   String
-  amount        Decimal     @db.Decimal(12, 2)
-  currency      String
-  createdAt     DateTime    @default(now())
-  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  id             String        @id @default(uuid())
+  reservationId  String
+  provider       String
+  providerRef    String        @unique
+  idempotencyKey String?       @unique
+  status         PaymentStatus @default(PENDING)
+  amount         Decimal       @db.Decimal(12, 2)
+  currency       String
+  checkoutUrl    String?
+  expiresAt      DateTime?
+  confirmedAt    DateTime?
+  failedAt       DateTime?
+  failureReason  String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  reservation    Reservation   @relation(fields: [reservationId], references: [id])
+
+  @@index([reservationId, status])
+  @@index([status, expiresAt])
 }
 
 model LedgerAccount {
@@ -375,18 +609,71 @@ model LedgerAccount {
 }
 
 model LedgerEntry {
-  id              String          @id @default(uuid())
-  reservationId   String?
-  ledgerAccountId String
-  type            LedgerEntryType
-  amount          Decimal         @db.Decimal(12, 2)
-  currency        String
-  memo            String?
-  createdAt       DateTime        @default(now())
-  reservation     Reservation?    @relation(fields: [reservationId], references: [id])
-  ledgerAccount   LedgerAccount   @relation(fields: [ledgerAccountId], references: [id])
+  id                   String                @id @default(uuid())
+  reservationId        String?
+  ledgerAccountId      String
+  type                 LedgerEntryType
+  amount               Decimal               @db.Decimal(12, 2)
+  currency             String
+  memo                 String?
+  createdAt            DateTime              @default(now())
+  reservation          Reservation?          @relation(fields: [reservationId], references: [id])
+  ledgerAccount        LedgerAccount         @relation(fields: [ledgerAccountId], references: [id])
+  ownerSettlementLines OwnerSettlementLine[]
 
   @@index([reservationId, type])
+}
+
+model OwnerSettlement {
+  id                 String                @id @default(uuid())
+  ownerId            String
+  propertyId         String?
+  periodStart        DateTime
+  periodEnd          DateTime
+  status             OwnerSettlementStatus @default(DRAFT)
+  currency           String
+  grossAccommodation Decimal               @default(0) @db.Decimal(12, 2)
+  cleaningFees       Decimal               @default(0) @db.Decimal(12, 2)
+  taxes              Decimal               @default(0) @db.Decimal(12, 2)
+  kuqubaServiceFees  Decimal               @default(0) @db.Decimal(12, 2)
+  ownerExpenses      Decimal               @default(0) @db.Decimal(12, 2)
+  adjustments        Decimal               @default(0) @db.Decimal(12, 2)
+  ownerPayout        Decimal               @default(0) @db.Decimal(12, 2)
+  generatedAt        DateTime              @default(now())
+  reviewedAt         DateTime?
+  approvedAt         DateTime?
+  paidAt             DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  owner              Owner                 @relation(fields: [ownerId], references: [id])
+  property           Property?             @relation(fields: [propertyId], references: [id])
+  lines              OwnerSettlementLine[]
+
+  @@index([ownerId, periodStart, periodEnd])
+  @@index([propertyId, periodStart])
+  @@index([status, periodEnd])
+}
+
+model OwnerSettlementLine {
+  id            String          @id @default(uuid())
+  settlementId  String
+  ledgerEntryId String?
+  reservationId String?
+  type          LedgerEntryType
+  label         String
+  amount        Decimal         @db.Decimal(12, 2)
+  currency      String
+  occurredAt    DateTime        @default(now())
+  sourceMemo    String?
+  createdAt     DateTime        @default(now())
+  settlement    OwnerSettlement @relation(fields: [settlementId], references: [id])
+  ledgerEntry   LedgerEntry?    @relation(fields: [ledgerEntryId], references: [id])
+  reservation   Reservation?    @relation(fields: [reservationId], references: [id])
+
+  @@index([settlementId, occurredAt])
+  @@index([ledgerEntryId])
+  @@index([reservationId])
+  @@index([type, occurredAt])
 }
 
 model StayProposalRequest {
@@ -508,6 +795,7 @@ model OpsFormalActivity {
 
 model OpsFormalDelivery {
   id                String               @id @default(uuid())
+  idempotencyKey    String?              @unique
   opsCaseId         String
   actorUserId       String?
   entityType        String
@@ -523,6 +811,11 @@ model OpsFormalDelivery {
   subject           String
   errorCode         String?
   errorMessage      String?
+  attemptCount      Int                  @default(0)
+  maxAttempts       Int                  @default(3)
+  nextAttemptAt     DateTime?
+  lastAttemptAt     DateTime?
+  acceptedAt        DateTime?
   createdAt         DateTime             @default(now())
   sentAt            DateTime?
   deliveredAt       DateTime?
@@ -534,6 +827,7 @@ model OpsFormalDelivery {
   @@index([entityType, entityId, createdAt])
   @@index([providerMessageId])
   @@index([status, createdAt])
+  @@index([status, nextAttemptAt])
   @@index([actorUserId])
 }
 
@@ -576,6 +870,7 @@ model PropertyOnboarding {
   assignedUser            User?                    @relation("PropertyOnboardingAssignee", fields: [assignedUserId], references: [id])
   approvedBy              User?                    @relation("PropertyOnboardingApprover", fields: [approvedByUserId], references: [id])
   sentBy                  User?                    @relation("PropertyOnboardingSender", fields: [sentByUserId], references: [id])
+  contract                Contract?
 
   @@index([status, updatedAt])
   @@index([approvalStatus, updatedAt])
@@ -655,6 +950,60 @@ model StayProposalVersion {
 
   @@unique([stayProposalId, version])
   @@index([stayProposalId, createdAt])
+}
+
+model HousekeepingTask {
+  id            String                 @id @default(uuid())
+  propertyId    String
+  unitId        String?
+  reservationId String?
+  title         String
+  status        HousekeepingTaskStatus @default(SCHEDULED)
+  priority      String                 @default("normal")
+  serviceDate   DateTime
+  serviceWindow String?
+  assigneeName  String?
+  vendorName    String?
+  checklist     Json
+  notes         String?
+  blockedReason String?
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  property      Property               @relation(fields: [propertyId], references: [id])
+  unit          Unit?                  @relation(fields: [unitId], references: [id])
+  reservation   Reservation?           @relation(fields: [reservationId], references: [id])
+
+  @@index([propertyId, status, serviceDate])
+  @@index([unitId, serviceDate])
+  @@index([reservationId])
+  @@index([status, serviceDate])
+}
+
+model MaintenanceTicket {
+  id              String                  @id @default(uuid())
+  propertyId      String
+  unitId          String?
+  title           String
+  category        String
+  severity        MaintenanceSeverity     @default(MEDIUM)
+  status          MaintenanceTicketStatus @default(OPEN)
+  reportedAt      DateTime                @default(now())
+  dueAt           DateTime?
+  assigneeName    String?
+  vendorName      String?
+  description     String
+  resolutionNotes String?
+  completedAt     DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  property        Property                @relation(fields: [propertyId], references: [id])
+  unit            Unit?                   @relation(fields: [unitId], references: [id])
+
+  @@index([propertyId, status, dueAt])
+  @@index([unitId, status])
+  @@index([severity, status])
+  @@index([status, reportedAt])
 }
 
 model OwnerTask {

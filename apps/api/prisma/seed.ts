@@ -1,4 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
+import { createHash } from "node:crypto";
+
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { permissionKeys, roleProfiles } from "@kuquba/config";
 
 process.env.DATABASE_URL ??=
@@ -12,13 +14,29 @@ const devIds = {
   guest: "00000000-0000-4000-8000-000000000102",
   atitlanProperty: "00000000-0000-4000-8000-000000000201",
   antiguaProperty: "00000000-0000-4000-8000-000000000202",
+  atitlanTerrazaProperty: "00000000-0000-4000-8000-000000000203",
   atitlanUnit: "00000000-0000-4000-8000-000000000301",
   antiguaUnit: "00000000-0000-4000-8000-000000000302",
+  atitlanTerrazaUnit: "00000000-0000-4000-8000-000000000303",
+  stayCodeAtitlanVilla: "00000000-0000-4000-8000-000000000331",
+  stayCodeAntiguaSuite: "00000000-0000-4000-8000-000000000332",
+  stayCodeAtitlanTerraza: "00000000-0000-4000-8000-000000000333",
+  ratePlanAtitlanBase: "00000000-0000-4000-8000-000000000341",
+  ratePlanAntiguaBase: "00000000-0000-4000-8000-000000000342",
+  ratePlanAtitlanTerrazaBase: "00000000-0000-4000-8000-000000000343",
+  availabilityBlockAtitlanMaintenance: "00000000-0000-4000-8000-000000000351",
   atitlanContract: "00000000-0000-4000-8000-000000000401",
   antiguaContract: "00000000-0000-4000-8000-000000000402",
+  atitlanContractVersionOne: "00000000-0000-4000-8000-000000000411",
+  antiguaContractVersionOne: "00000000-0000-4000-8000-000000000412",
   reservationAtitlanOne: "00000000-0000-4000-8000-000000000501",
   reservationAtitlanTwo: "00000000-0000-4000-8000-000000000502",
   reservationAtitlanThree: "00000000-0000-4000-8000-000000000503",
+  housekeepingTurnoverAtitlanDone: "00000000-0000-4000-8000-000000000611",
+  housekeepingTurnoverAtitlanNext: "00000000-0000-4000-8000-000000000612",
+  housekeepingInspectionAntigua: "00000000-0000-4000-8000-000000000613",
+  maintenanceTerraceAtitlan: "00000000-0000-4000-8000-000000000621",
+  maintenanceWifiAntigua: "00000000-0000-4000-8000-000000000622",
   taskDocsTax: "00000000-0000-4000-8000-000000000601",
   taskInventoryAntigua: "00000000-0000-4000-8000-000000000602",
   taskMaintenanceAtitlan: "00000000-0000-4000-8000-000000000603",
@@ -26,6 +44,18 @@ const devIds = {
   documentReservations: "00000000-0000-4000-8000-000000000701",
   documentExpenses: "00000000-0000-4000-8000-000000000702",
   documentTax: "00000000-0000-4000-8000-000000000703",
+  ownerFinanceLedgerAccount: "00000000-0000-4000-8000-000000000711",
+  ledgerAtitlanAccommodation: "00000000-0000-4000-8000-000000000721",
+  ledgerAtitlanCleaning: "00000000-0000-4000-8000-000000000722",
+  ledgerAtitlanService: "00000000-0000-4000-8000-000000000723",
+  ledgerAtitlanTax: "00000000-0000-4000-8000-000000000724",
+  ledgerAtitlanExpense: "00000000-0000-4000-8000-000000000725",
+  ownerSettlementAtitlanAugust: "00000000-0000-4000-8000-000000000731",
+  ownerSettlementLineAccommodation: "00000000-0000-4000-8000-000000000741",
+  ownerSettlementLineCleaning: "00000000-0000-4000-8000-000000000742",
+  ownerSettlementLineService: "00000000-0000-4000-8000-000000000743",
+  ownerSettlementLineTax: "00000000-0000-4000-8000-000000000744",
+  ownerSettlementLineExpense: "00000000-0000-4000-8000-000000000745",
   ownerLeadAtitlan: "00000000-0000-4000-8000-000000000801",
   ownerLeadAntigua: "00000000-0000-4000-8000-000000000802",
   proposalRequestAtitlan: "00000000-0000-4000-8000-000000000811",
@@ -142,6 +172,14 @@ async function main() {
     roleKey: "ops_admin",
     identityProvider: "EMAIL_OTP"
   });
+  await seedDevUser(prisma, {
+    organizationId: organization.id,
+    email: 'iam.admin@kuquba.local',
+    displayName: 'Administrador IAM Dev',
+    roleKey: 'iam_admin',
+    identityProvider: 'EMAIL_OTP'
+  });
+
 
   await seedOwnerPortal(prisma, {
     organizationId: organization.id,
@@ -294,14 +332,32 @@ async function seedOwnerPortal(
     create: {
       id: devIds.antiguaProperty,
       organizationId: input.organizationId,
-      name: "Casa Patio Antigua",
+      name: "Suite Jardin Colonial",
       destination: "Antigua Guatemala",
-      visibility: "PRIVATE"
+      visibility: "PUBLIC"
     },
     update: {
-      name: "Casa Patio Antigua",
+      name: "Suite Jardin Colonial",
       destination: "Antigua Guatemala",
-      visibility: "PRIVATE"
+      visibility: "PUBLIC"
+    }
+  });
+
+  const atitlanTerrazaProperty = await prismaClient.property.upsert({
+    where: {
+      id: devIds.atitlanTerrazaProperty
+    },
+    create: {
+      id: devIds.atitlanTerrazaProperty,
+      organizationId: input.organizationId,
+      name: "Casa Terraza del Lago",
+      destination: "Lago de Atitlan",
+      visibility: "PUBLIC"
+    },
+    update: {
+      name: "Casa Terraza del Lago",
+      destination: "Lago de Atitlan",
+      visibility: "PUBLIC"
     }
   });
 
@@ -333,21 +389,130 @@ async function seedOwnerPortal(
     create: {
       id: devIds.antiguaUnit,
       propertyId: antiguaProperty.id,
-      name: "Casa completa",
+      name: "Suite Jardin",
+      maxGuests: 2,
+      bedrooms: 1,
+      bathrooms: "1.00"
+    },
+    update: {
+      propertyId: antiguaProperty.id,
+      name: "Suite Jardin",
+      maxGuests: 2,
+      bedrooms: 1,
+      bathrooms: "1.00"
+    }
+  });
+
+  const atitlanTerrazaUnit = await prismaClient.unit.upsert({
+    where: {
+      id: devIds.atitlanTerrazaUnit
+    },
+    create: {
+      id: devIds.atitlanTerrazaUnit,
+      propertyId: atitlanTerrazaProperty.id,
+      name: "Casa Terraza",
       maxGuests: 4,
       bedrooms: 2,
       bathrooms: "2.00"
     },
     update: {
-      propertyId: antiguaProperty.id,
-      name: "Casa completa",
+      propertyId: atitlanTerrazaProperty.id,
+      name: "Casa Terraza",
       maxGuests: 4,
       bedrooms: 2,
       bathrooms: "2.00"
     }
   });
 
-  await prismaClient.contract.upsert({
+  await seedStayCode(prismaClient, {
+    id: devIds.stayCodeAtitlanVilla,
+    propertyId: atitlanProperty.id,
+    unitId: atitlanUnit.id,
+    code: "atitlan-villa-luz"
+  });
+
+  await seedStayCode(prismaClient, {
+    id: devIds.stayCodeAntiguaSuite,
+    propertyId: antiguaProperty.id,
+    unitId: devIds.antiguaUnit,
+    code: "antigua-suite-jardin"
+  });
+
+  await seedStayCode(prismaClient, {
+    id: devIds.stayCodeAtitlanTerraza,
+    propertyId: atitlanTerrazaProperty.id,
+    unitId: atitlanTerrazaUnit.id,
+    code: "atitlan-casa-terraza"
+  });
+
+  await seedRatePlan(prismaClient, {
+    id: devIds.ratePlanAtitlanBase,
+    propertyId: atitlanProperty.id,
+    unitId: atitlanUnit.id,
+    name: "Tarifa base Atitlan",
+    currency: "GTQ",
+    baseNightlyRate: "1550.00",
+    weekendNightlyRate: "1750.00",
+    cleaningFee: "425.00",
+    serviceFeeBps: 800,
+    taxBps: 1200,
+    minNights: 2
+  });
+
+  await seedRatePlan(prismaClient, {
+    id: devIds.ratePlanAntiguaBase,
+    propertyId: antiguaProperty.id,
+    unitId: devIds.antiguaUnit,
+    name: "Tarifa base Antigua",
+    currency: "GTQ",
+    baseNightlyRate: "820.00",
+    weekendNightlyRate: "960.00",
+    cleaningFee: "180.00",
+    serviceFeeBps: 800,
+    taxBps: 1200,
+    minNights: 1
+  });
+
+  await seedRatePlan(prismaClient, {
+    id: devIds.ratePlanAtitlanTerrazaBase,
+    propertyId: atitlanTerrazaProperty.id,
+    unitId: atitlanTerrazaUnit.id,
+    name: "Tarifa base Casa Terraza",
+    currency: "GTQ",
+    baseNightlyRate: "1180.00",
+    weekendNightlyRate: "1380.00",
+    cleaningFee: "325.00",
+    serviceFeeBps: 800,
+    taxBps: 1200,
+    minNights: 2
+  });
+
+  await seedAvailabilityBlock(prismaClient, {
+    id: devIds.availabilityBlockAtitlanMaintenance,
+    propertyId: atitlanProperty.id,
+    unitId: atitlanUnit.id,
+    startsOn: "2026-09-18",
+    endsOn: "2026-09-20",
+    reason: "MAINTENANCE",
+    note: "Mantenimiento preventivo de terraza"
+  });
+
+  const atitlanContractIssuedAt = new Date("2025-12-15T00:00:00.000Z");
+  const atitlanContractSignedAt = new Date("2025-12-20T00:00:00.000Z");
+  const atitlanContractTitle = "Contrato KUQUBA v1 - Villa Luz de Atitlan";
+  const atitlanContractSummary =
+    "Administracion profesional para Villa Luz de Atitlan en Lago de Atitlan.";
+  const atitlanContractTerms = buildSeedContractTermsSnapshot({
+    kuqubaShareBps: 0,
+    ownerName: owner.displayName,
+    ownerShareBps: 0,
+    propertyLocation: atitlanProperty.destination,
+    propertyName: atitlanProperty.name,
+    propertyType: "Casa completa",
+    version: 1
+  });
+  const atitlanSignatureRef = "DEV-SIGN-ATITLAN-SEED";
+  const atitlanContract = await prismaClient.contract.upsert({
     where: {
       id: devIds.atitlanContract
     },
@@ -355,21 +520,80 @@ async function seedOwnerPortal(
       id: devIds.atitlanContract,
       ownerId: owner.id,
       propertyId: atitlanProperty.id,
+      status: "ACTIVE",
+      currentVersion: 1,
+      title: atitlanContractTitle,
+      summary: atitlanContractSummary,
+      termsSnapshot: atitlanContractTerms,
       startsOn: parseDateOnly("2026-01-01"),
       ownerShareBps: 0,
-      kuqubaShareBps: 0
+      kuqubaShareBps: 0,
+      issuedAt: atitlanContractIssuedAt,
+      signedAt: atitlanContractSignedAt,
+      signedByUserId: input.ownerUserId,
+      signatureProvider: "seed_dev_signature",
+      signatureProviderRef: atitlanSignatureRef,
+      signatureEvidenceHash: buildSeedSignatureHash(devIds.atitlanContract, atitlanSignatureRef)
     },
     update: {
       ownerId: owner.id,
       propertyId: atitlanProperty.id,
+      status: "ACTIVE",
+      currentVersion: 1,
+      title: atitlanContractTitle,
+      summary: atitlanContractSummary,
+      termsSnapshot: atitlanContractTerms,
       startsOn: parseDateOnly("2026-01-01"),
       endsOn: null,
       ownerShareBps: 0,
-      kuqubaShareBps: 0
+      kuqubaShareBps: 0,
+      issuedAt: atitlanContractIssuedAt,
+      signedAt: atitlanContractSignedAt,
+      signedByUserId: input.ownerUserId,
+      signatureProvider: "seed_dev_signature",
+      signatureProviderRef: atitlanSignatureRef,
+      signatureEvidenceHash: buildSeedSignatureHash(devIds.atitlanContract, atitlanSignatureRef)
     }
   });
 
-  await prismaClient.contract.upsert({
+  await prismaClient.contractVersion.upsert({
+    where: {
+      contractId_version: {
+        contractId: atitlanContract.id,
+        version: 1
+      }
+    },
+    create: {
+      id: devIds.atitlanContractVersionOne,
+      contractId: atitlanContract.id,
+      version: 1,
+      title: atitlanContractTitle,
+      summary: atitlanContractSummary,
+      termsSnapshot: atitlanContractTerms,
+      issuedAt: atitlanContractIssuedAt
+    },
+    update: {
+      title: atitlanContractTitle,
+      summary: atitlanContractSummary,
+      termsSnapshot: atitlanContractTerms,
+      issuedAt: atitlanContractIssuedAt
+    }
+  });
+
+  const antiguaContractIssuedAt = new Date("2026-08-15T00:00:00.000Z");
+  const antiguaContractTitle = "Contrato KUQUBA v1 - Suite Jardin Colonial";
+  const antiguaContractSummary =
+    "Administracion profesional para Suite Jardin Colonial en Antigua Guatemala.";
+  const antiguaContractTerms = buildSeedContractTermsSnapshot({
+    kuqubaShareBps: 0,
+    ownerName: owner.displayName,
+    ownerShareBps: 0,
+    propertyLocation: antiguaProperty.destination,
+    propertyName: antiguaProperty.name,
+    propertyType: "Suite",
+    version: 1
+  });
+  const antiguaContract = await prismaClient.contract.upsert({
     where: {
       id: devIds.antiguaContract
     },
@@ -377,17 +601,58 @@ async function seedOwnerPortal(
       id: devIds.antiguaContract,
       ownerId: owner.id,
       propertyId: antiguaProperty.id,
+      status: "ISSUED",
+      currentVersion: 1,
+      title: antiguaContractTitle,
+      summary: antiguaContractSummary,
+      termsSnapshot: antiguaContractTerms,
       startsOn: parseDateOnly("2026-08-01"),
       ownerShareBps: 0,
-      kuqubaShareBps: 0
+      kuqubaShareBps: 0,
+      issuedAt: antiguaContractIssuedAt
     },
     update: {
       ownerId: owner.id,
       propertyId: antiguaProperty.id,
+      status: "ISSUED",
+      currentVersion: 1,
+      title: antiguaContractTitle,
+      summary: antiguaContractSummary,
+      termsSnapshot: antiguaContractTerms,
       startsOn: parseDateOnly("2026-08-01"),
       endsOn: null,
       ownerShareBps: 0,
-      kuqubaShareBps: 0
+      kuqubaShareBps: 0,
+      issuedAt: antiguaContractIssuedAt,
+      signedAt: null,
+      signedByUserId: null,
+      signatureProvider: null,
+      signatureProviderRef: null,
+      signatureEvidenceHash: null
+    }
+  });
+
+  await prismaClient.contractVersion.upsert({
+    where: {
+      contractId_version: {
+        contractId: antiguaContract.id,
+        version: 1
+      }
+    },
+    create: {
+      id: devIds.antiguaContractVersionOne,
+      contractId: antiguaContract.id,
+      version: 1,
+      title: antiguaContractTitle,
+      summary: antiguaContractSummary,
+      termsSnapshot: antiguaContractTerms,
+      issuedAt: antiguaContractIssuedAt
+    },
+    update: {
+      title: antiguaContractTitle,
+      summary: antiguaContractSummary,
+      termsSnapshot: antiguaContractTerms,
+      issuedAt: antiguaContractIssuedAt
     }
   });
 
@@ -398,6 +663,8 @@ async function seedOwnerPortal(
     propertyId: atitlanProperty.id,
     unitId: atitlanUnit.id,
     status: "CONFIRMED",
+    currency: "GTQ",
+    total: "7975.00",
     arrivalDate: "2026-08-24",
     departureDate: "2026-08-28"
   });
@@ -422,6 +689,240 @@ async function seedOwnerPortal(
     status: "HOLD",
     arrivalDate: "2026-09-02",
     departureDate: "2026-09-05"
+  });
+
+  await seedHousekeepingTask(prismaClient, {
+    id: devIds.housekeepingTurnoverAtitlanDone,
+    propertyId: atitlanProperty.id,
+    unitId: atitlanUnit.id,
+    reservationId: devIds.reservationAtitlanOne,
+    title: "Turnover Villa Luz post checkout",
+    status: "DONE",
+    priority: "high",
+    serviceDate: "2026-08-28",
+    serviceWindow: "11:00-15:00",
+    assigneeName: "Equipo Ops Atitlan",
+    vendorName: "Limpiezas Lago Dev",
+    checklist: ["Lavanderia", "Banos", "Cocina", "Amenidades", "Reporte fotografico"],
+    notes: "Limpieza completada para salida confirmada.",
+    blockedReason: null,
+    completedAt: "2026-08-28T15:10:00.000Z"
+  });
+
+  await seedHousekeepingTask(prismaClient, {
+    id: devIds.housekeepingTurnoverAtitlanNext,
+    propertyId: atitlanProperty.id,
+    unitId: atitlanUnit.id,
+    reservationId: devIds.reservationAtitlanTwo,
+    title: "Preparar Villa Luz para hold activo",
+    status: "ASSIGNED",
+    priority: "high",
+    serviceDate: "2026-08-31",
+    serviceWindow: "10:00-14:00",
+    assigneeName: "Equipo Ops Atitlan",
+    vendorName: "Limpiezas Lago Dev",
+    checklist: ["Inventario rapido", "Amenidades", "Toallas", "Refrigerador", "Fotos antes de check-in"],
+    notes: "Pendiente de confirmar si el hold pasa a pago.",
+    blockedReason: null,
+    completedAt: null
+  });
+
+  await seedHousekeepingTask(prismaClient, {
+    id: devIds.housekeepingInspectionAntigua,
+    propertyId: antiguaProperty.id,
+    unitId: devIds.antiguaUnit,
+    reservationId: null,
+    title: "Inspeccion preventiva Suite Jardin",
+    status: "SCHEDULED",
+    priority: "medium",
+    serviceDate: "2026-09-01",
+    serviceWindow: "09:00-11:00",
+    assigneeName: "Ops Antigua",
+    vendorName: "Housekeeping Colonial Dev",
+    checklist: ["Ropa de cama", "Humedad", "Cerraduras", "Kit bienvenida"],
+    notes: "Revision sin reserva asociada.",
+    blockedReason: null,
+    completedAt: null
+  });
+
+  await seedMaintenanceTicket(prismaClient, {
+    id: devIds.maintenanceTerraceAtitlan,
+    propertyId: atitlanProperty.id,
+    unitId: atitlanUnit.id,
+    title: "Sellado preventivo de terraza",
+    category: "Preventivo",
+    severity: "MEDIUM",
+    status: "SCHEDULED",
+    reportedAt: "2026-08-26T09:00:00.000Z",
+    dueAt: "2026-09-18T09:00:00.000Z",
+    assigneeName: "Ops Atitlan",
+    vendorName: "Mantenimiento Lago Dev",
+    description: "Bloqueo de disponibilidad ya creado para mantenimiento preventivo de terraza.",
+    resolutionNotes: null,
+    completedAt: null
+  });
+
+  await seedMaintenanceTicket(prismaClient, {
+    id: devIds.maintenanceWifiAntigua,
+    propertyId: antiguaProperty.id,
+    unitId: devIds.antiguaUnit,
+    title: "Intermitencia WiFi Suite Jardin",
+    category: "Conectividad",
+    severity: "HIGH",
+    status: "TRIAGED",
+    reportedAt: "2026-08-28T10:30:00.000Z",
+    dueAt: "2026-08-29T18:00:00.000Z",
+    assigneeName: "Ops Antigua",
+    vendorName: "Proveedor ISP Dev",
+    description: "Revisar router antes de publicar nuevas fechas.",
+    resolutionNotes: null,
+    completedAt: null
+  });
+  const ownerFinanceAccount = await seedLedgerAccount(prismaClient, {
+    id: devIds.ownerFinanceLedgerAccount,
+    name: "KUQUBA Owner Finance Dev",
+    currency: "GTQ"
+  });
+
+  const accommodationEntry = await seedLedgerEntry(prismaClient, {
+    id: devIds.ledgerAtitlanAccommodation,
+    ledgerAccountId: ownerFinanceAccount.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "ACCOMMODATION",
+    amount: "6200.00",
+    currency: "GTQ",
+    memo: "Reserva confirmada KQB-ATITLAN-20260824",
+    createdAt: "2026-08-24T00:00:00.000Z"
+  });
+
+  const cleaningEntry = await seedLedgerEntry(prismaClient, {
+    id: devIds.ledgerAtitlanCleaning,
+    ledgerAccountId: ownerFinanceAccount.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "CLEANING",
+    amount: "425.00",
+    currency: "GTQ",
+    memo: "Limpieza reserva KQB-ATITLAN-20260824",
+    createdAt: "2026-08-24T00:00:00.000Z"
+  });
+
+  const serviceEntry = await seedLedgerEntry(prismaClient, {
+    id: devIds.ledgerAtitlanService,
+    ledgerAccountId: ownerFinanceAccount.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "KUQUBA_SERVICE_FEE",
+    amount: "496.00",
+    currency: "GTQ",
+    memo: "Servicio KUQUBA reserva KQB-ATITLAN-20260824",
+    createdAt: "2026-08-24T00:00:00.000Z"
+  });
+
+  const taxEntry = await seedLedgerEntry(prismaClient, {
+    id: devIds.ledgerAtitlanTax,
+    ledgerAccountId: ownerFinanceAccount.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "TAX",
+    amount: "854.00",
+    currency: "GTQ",
+    memo: "Impuestos estimados reserva KQB-ATITLAN-20260824",
+    createdAt: "2026-08-24T00:00:00.000Z"
+  });
+
+  const expenseEntry = await seedLedgerEntry(prismaClient, {
+    id: devIds.ledgerAtitlanExpense,
+    ledgerAccountId: ownerFinanceAccount.id,
+    reservationId: null,
+    type: "OWNER_EXPENSE",
+    amount: "250.00",
+    currency: "GTQ",
+    memo: "Mantenimiento preventivo terraza",
+    createdAt: "2026-08-26T00:00:00.000Z"
+  });
+
+  const ownerSettlement = await seedOwnerSettlement(prismaClient, {
+    id: devIds.ownerSettlementAtitlanAugust,
+    ownerId: owner.id,
+    propertyId: atitlanProperty.id,
+    periodStart: "2026-08-01",
+    periodEnd: "2026-08-31",
+    status: "READY_FOR_REVIEW",
+    currency: "GTQ",
+    grossAccommodation: "6200.00",
+    cleaningFees: "425.00",
+    taxes: "854.00",
+    kuqubaServiceFees: "496.00",
+    ownerExpenses: "250.00",
+    adjustments: "0.00",
+    ownerPayout: "5075.00",
+    generatedAt: "2026-08-28T00:00:00.000Z",
+    reviewedAt: "2026-08-28T00:00:00.000Z",
+    approvedAt: null,
+    paidAt: null
+  });
+
+  await seedOwnerSettlementLine(prismaClient, {
+    id: devIds.ownerSettlementLineAccommodation,
+    settlementId: ownerSettlement.id,
+    ledgerEntryId: accommodationEntry.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "ACCOMMODATION",
+    label: "Alojamiento confirmado KQB-ATITLAN-20260824",
+    amount: "6200.00",
+    currency: "GTQ",
+    occurredAt: "2026-08-24T00:00:00.000Z",
+    sourceMemo: "seed owner finance"
+  });
+
+  await seedOwnerSettlementLine(prismaClient, {
+    id: devIds.ownerSettlementLineCleaning,
+    settlementId: ownerSettlement.id,
+    ledgerEntryId: cleaningEntry.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "CLEANING",
+    label: "Limpieza reserva KQB-ATITLAN-20260824",
+    amount: "425.00",
+    currency: "GTQ",
+    occurredAt: "2026-08-24T00:00:00.000Z",
+    sourceMemo: "seed owner finance"
+  });
+
+  await seedOwnerSettlementLine(prismaClient, {
+    id: devIds.ownerSettlementLineService,
+    settlementId: ownerSettlement.id,
+    ledgerEntryId: serviceEntry.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "KUQUBA_SERVICE_FEE",
+    label: "Servicio KUQUBA",
+    amount: "496.00",
+    currency: "GTQ",
+    occurredAt: "2026-08-24T00:00:00.000Z",
+    sourceMemo: "seed owner finance"
+  });
+
+  await seedOwnerSettlementLine(prismaClient, {
+    id: devIds.ownerSettlementLineTax,
+    settlementId: ownerSettlement.id,
+    ledgerEntryId: taxEntry.id,
+    reservationId: devIds.reservationAtitlanOne,
+    type: "TAX",
+    label: "Impuestos estimados",
+    amount: "854.00",
+    currency: "GTQ",
+    occurredAt: "2026-08-24T00:00:00.000Z",
+    sourceMemo: "seed owner finance"
+  });
+
+  await seedOwnerSettlementLine(prismaClient, {
+    id: devIds.ownerSettlementLineExpense,
+    settlementId: ownerSettlement.id,
+    ledgerEntryId: expenseEntry.id,
+    reservationId: null,
+    type: "OWNER_EXPENSE",
+    label: "Mantenimiento preventivo terraza",
+    amount: "250.00",
+    currency: "GTQ",
+    occurredAt: "2026-08-26T00:00:00.000Z",
+    sourceMemo: "seed owner finance"
   });
 
   await seedOwnerTask(prismaClient, {
@@ -499,6 +1000,120 @@ async function seedOwnerPortal(
   });
 }
 
+async function seedStayCode(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    propertyId: string;
+    unitId: string;
+    code: string;
+  }
+) {
+  await prismaClient.stayCode.upsert({
+    where: {
+      code: input.code
+    },
+    create: {
+      id: input.id,
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      code: input.code,
+      active: true
+    },
+    update: {
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      active: true
+    }
+  });
+}
+
+async function seedRatePlan(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    propertyId: string;
+    unitId: string;
+    name: string;
+    currency: string;
+    baseNightlyRate: string;
+    weekendNightlyRate: string | null;
+    cleaningFee: string;
+    serviceFeeBps: number;
+    taxBps: number;
+    minNights: number;
+  }
+) {
+  await prismaClient.ratePlan.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      name: input.name,
+      currency: input.currency,
+      baseNightlyRate: input.baseNightlyRate,
+      weekendNightlyRate: input.weekendNightlyRate,
+      cleaningFee: input.cleaningFee,
+      serviceFeeBps: input.serviceFeeBps,
+      taxBps: input.taxBps,
+      minNights: input.minNights,
+      active: true
+    },
+    update: {
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      name: input.name,
+      currency: input.currency,
+      baseNightlyRate: input.baseNightlyRate,
+      weekendNightlyRate: input.weekendNightlyRate,
+      cleaningFee: input.cleaningFee,
+      serviceFeeBps: input.serviceFeeBps,
+      taxBps: input.taxBps,
+      minNights: input.minNights,
+      active: true
+    }
+  });
+}
+
+async function seedAvailabilityBlock(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    propertyId: string;
+    unitId: string;
+    startsOn: string;
+    endsOn: string;
+    reason: "OWNER_HOLD" | "MAINTENANCE" | "OPS_HOLD";
+    note: string | null;
+  }
+) {
+  await prismaClient.availabilityBlock.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      startsOn: parseDateOnly(input.startsOn),
+      endsOn: parseDateOnly(input.endsOn),
+      reason: input.reason,
+      note: input.note
+    },
+    update: {
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      startsOn: parseDateOnly(input.startsOn),
+      endsOn: parseDateOnly(input.endsOn),
+      reason: input.reason,
+      note: input.note
+    }
+  });
+}
+
 async function seedReservation(
   prismaClient: PrismaClient,
   input: {
@@ -507,7 +1122,10 @@ async function seedReservation(
     guestId: string;
     propertyId: string;
     unitId: string;
-    status: "HOLD" | "CONFIRMED" | "CANCELLED" | "COMPLETED";
+    status: "HOLD" | "PENDING_PAYMENT" | "CONFIRMED" | "CANCELLED" | "COMPLETED" | "EXPIRED";
+    holdExpiresAt?: string | null;
+    currency?: string | null;
+    total?: string | null;
     arrivalDate: string;
     departureDate: string;
   }
@@ -524,7 +1142,11 @@ async function seedReservation(
       status: input.status,
       arrivalDate: parseDateOnly(input.arrivalDate),
       departureDate: parseDateOnly(input.departureDate),
-      privateCode: input.privateCode
+      privateCode: input.privateCode,
+      holdExpiresAt: input.holdExpiresAt ? new Date(input.holdExpiresAt) : null,
+      confirmationSource: input.status === "HOLD" ? "seed_dev" : null,
+      currency: input.currency ?? null,
+      total: input.total ?? null
     },
     update: {
       guestId: input.guestId,
@@ -532,11 +1154,334 @@ async function seedReservation(
       unitId: input.unitId,
       status: input.status,
       arrivalDate: parseDateOnly(input.arrivalDate),
-      departureDate: parseDateOnly(input.departureDate)
+      departureDate: parseDateOnly(input.departureDate),
+      holdExpiresAt: input.holdExpiresAt ? new Date(input.holdExpiresAt) : null,
+      confirmationSource: input.status === "HOLD" ? "seed_dev" : null,
+      currency: input.currency ?? null,
+      total: input.total ?? null
     }
   });
 }
 
+async function seedLedgerAccount(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    name: string;
+    currency: string;
+  }
+) {
+  return prismaClient.ledgerAccount.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      name: input.name,
+      currency: input.currency
+    },
+    update: {
+      name: input.name,
+      currency: input.currency
+    }
+  });
+}
+
+async function seedLedgerEntry(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    ledgerAccountId: string;
+    reservationId: string | null;
+    type:
+      | "ACCOMMODATION"
+      | "TAX"
+      | "OTA_FEE"
+      | "PAYMENT_PROCESSING_FEE"
+      | "CLEANING"
+      | "KUQUBA_SERVICE_FEE"
+      | "OWNER_SHARE"
+      | "KUQUBA_SHARE"
+      | "MAINTENANCE_FUND"
+      | "OWNER_EXPENSE"
+      | "REFUND"
+      | "ADJUSTMENT"
+      | "SETTLEMENT";
+    amount: string;
+    currency: string;
+    memo: string;
+    createdAt: string;
+  }
+) {
+  return prismaClient.ledgerEntry.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      ledgerAccountId: input.ledgerAccountId,
+      reservationId: input.reservationId,
+      type: input.type,
+      amount: input.amount,
+      currency: input.currency,
+      memo: input.memo,
+      createdAt: new Date(input.createdAt)
+    },
+    update: {
+      ledgerAccountId: input.ledgerAccountId,
+      reservationId: input.reservationId,
+      type: input.type,
+      amount: input.amount,
+      currency: input.currency,
+      memo: input.memo,
+      createdAt: new Date(input.createdAt)
+    }
+  });
+}
+
+async function seedOwnerSettlement(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    ownerId: string;
+    propertyId: string;
+    periodStart: string;
+    periodEnd: string;
+    status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "PAID";
+    currency: string;
+    grossAccommodation: string;
+    cleaningFees: string;
+    taxes: string;
+    kuqubaServiceFees: string;
+    ownerExpenses: string;
+    adjustments: string;
+    ownerPayout: string;
+    generatedAt: string;
+    reviewedAt: string | null;
+    approvedAt: string | null;
+    paidAt: string | null;
+  }
+) {
+  return prismaClient.ownerSettlement.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      ownerId: input.ownerId,
+      propertyId: input.propertyId,
+      periodStart: parseDateOnly(input.periodStart),
+      periodEnd: parseDateOnly(input.periodEnd),
+      status: input.status,
+      currency: input.currency,
+      grossAccommodation: input.grossAccommodation,
+      cleaningFees: input.cleaningFees,
+      taxes: input.taxes,
+      kuqubaServiceFees: input.kuqubaServiceFees,
+      ownerExpenses: input.ownerExpenses,
+      adjustments: input.adjustments,
+      ownerPayout: input.ownerPayout,
+      generatedAt: new Date(input.generatedAt),
+      reviewedAt: input.reviewedAt ? new Date(input.reviewedAt) : null,
+      approvedAt: input.approvedAt ? new Date(input.approvedAt) : null,
+      paidAt: input.paidAt ? new Date(input.paidAt) : null
+    },
+    update: {
+      ownerId: input.ownerId,
+      propertyId: input.propertyId,
+      periodStart: parseDateOnly(input.periodStart),
+      periodEnd: parseDateOnly(input.periodEnd),
+      status: input.status,
+      currency: input.currency,
+      grossAccommodation: input.grossAccommodation,
+      cleaningFees: input.cleaningFees,
+      taxes: input.taxes,
+      kuqubaServiceFees: input.kuqubaServiceFees,
+      ownerExpenses: input.ownerExpenses,
+      adjustments: input.adjustments,
+      ownerPayout: input.ownerPayout,
+      generatedAt: new Date(input.generatedAt),
+      reviewedAt: input.reviewedAt ? new Date(input.reviewedAt) : null,
+      approvedAt: input.approvedAt ? new Date(input.approvedAt) : null,
+      paidAt: input.paidAt ? new Date(input.paidAt) : null
+    }
+  });
+}
+
+async function seedOwnerSettlementLine(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    settlementId: string;
+    ledgerEntryId: string;
+    reservationId: string | null;
+    type:
+      | "ACCOMMODATION"
+      | "TAX"
+      | "OTA_FEE"
+      | "PAYMENT_PROCESSING_FEE"
+      | "CLEANING"
+      | "KUQUBA_SERVICE_FEE"
+      | "OWNER_SHARE"
+      | "KUQUBA_SHARE"
+      | "MAINTENANCE_FUND"
+      | "OWNER_EXPENSE"
+      | "REFUND"
+      | "ADJUSTMENT"
+      | "SETTLEMENT";
+    label: string;
+    amount: string;
+    currency: string;
+    occurredAt: string;
+    sourceMemo: string;
+  }
+) {
+  return prismaClient.ownerSettlementLine.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      settlementId: input.settlementId,
+      ledgerEntryId: input.ledgerEntryId,
+      reservationId: input.reservationId,
+      type: input.type,
+      label: input.label,
+      amount: input.amount,
+      currency: input.currency,
+      occurredAt: new Date(input.occurredAt),
+      sourceMemo: input.sourceMemo
+    },
+    update: {
+      settlementId: input.settlementId,
+      ledgerEntryId: input.ledgerEntryId,
+      reservationId: input.reservationId,
+      type: input.type,
+      label: input.label,
+      amount: input.amount,
+      currency: input.currency,
+      occurredAt: new Date(input.occurredAt),
+      sourceMemo: input.sourceMemo
+    }
+  });
+}
+
+async function seedHousekeepingTask(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    propertyId: string;
+    unitId: string | null;
+    reservationId: string | null;
+    title: string;
+    status: "SCHEDULED" | "ASSIGNED" | "IN_PROGRESS" | "DONE" | "BLOCKED" | "CANCELLED";
+    priority: "high" | "medium" | "low";
+    serviceDate: string;
+    serviceWindow: string | null;
+    assigneeName: string | null;
+    vendorName: string | null;
+    checklist: Prisma.InputJsonValue;
+    notes: string | null;
+    blockedReason: string | null;
+    completedAt: string | null;
+  }
+) {
+  await prismaClient.housekeepingTask.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      reservationId: input.reservationId,
+      title: input.title,
+      status: input.status,
+      priority: input.priority,
+      serviceDate: parseDateOnly(input.serviceDate),
+      serviceWindow: input.serviceWindow,
+      assigneeName: input.assigneeName,
+      vendorName: input.vendorName,
+      checklist: input.checklist,
+      notes: input.notes,
+      blockedReason: input.blockedReason,
+      completedAt: input.completedAt ? new Date(input.completedAt) : null
+    },
+    update: {
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      reservationId: input.reservationId,
+      title: input.title,
+      status: input.status,
+      priority: input.priority,
+      serviceDate: parseDateOnly(input.serviceDate),
+      serviceWindow: input.serviceWindow,
+      assigneeName: input.assigneeName,
+      vendorName: input.vendorName,
+      checklist: input.checklist,
+      notes: input.notes,
+      blockedReason: input.blockedReason,
+      completedAt: input.completedAt ? new Date(input.completedAt) : null
+    }
+  });
+}
+
+async function seedMaintenanceTicket(
+  prismaClient: PrismaClient,
+  input: {
+    id: string;
+    propertyId: string;
+    unitId: string | null;
+    title: string;
+    category: string;
+    severity: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+    status: "OPEN" | "TRIAGED" | "SCHEDULED" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+    reportedAt: string;
+    dueAt: string | null;
+    assigneeName: string | null;
+    vendorName: string | null;
+    description: string;
+    resolutionNotes: string | null;
+    completedAt: string | null;
+  }
+) {
+  await prismaClient.maintenanceTicket.upsert({
+    where: {
+      id: input.id
+    },
+    create: {
+      id: input.id,
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      title: input.title,
+      category: input.category,
+      severity: input.severity,
+      status: input.status,
+      reportedAt: new Date(input.reportedAt),
+      dueAt: input.dueAt ? new Date(input.dueAt) : null,
+      assigneeName: input.assigneeName,
+      vendorName: input.vendorName,
+      description: input.description,
+      resolutionNotes: input.resolutionNotes,
+      completedAt: input.completedAt ? new Date(input.completedAt) : null
+    },
+    update: {
+      propertyId: input.propertyId,
+      unitId: input.unitId,
+      title: input.title,
+      category: input.category,
+      severity: input.severity,
+      status: input.status,
+      reportedAt: new Date(input.reportedAt),
+      dueAt: input.dueAt ? new Date(input.dueAt) : null,
+      assigneeName: input.assigneeName,
+      vendorName: input.vendorName,
+      description: input.description,
+      resolutionNotes: input.resolutionNotes,
+      completedAt: input.completedAt ? new Date(input.completedAt) : null
+    }
+  });
+}
 async function seedOwnerTask(
   prismaClient: PrismaClient,
   input: {
@@ -1310,6 +2255,40 @@ async function seedFormalActivities(
     });
   }
 }
+function buildSeedContractTermsSnapshot(input: {
+  kuqubaShareBps: number;
+  ownerName: string;
+  ownerShareBps: number;
+  propertyLocation: string;
+  propertyName: string;
+  propertyType: string;
+  version: number;
+}) {
+  return {
+    commercialModel: "seed_dev_terms_pending_finance",
+    kuqubaShareBps: input.kuqubaShareBps,
+    ownerName: input.ownerName,
+    ownerShareBps: input.ownerShareBps,
+    propertyLocation: input.propertyLocation,
+    propertyName: input.propertyName,
+    propertyType: input.propertyType,
+    serviceScope: ["publicacion", "operacion", "housekeeping_coordination", "owner_reporting"],
+    version: input.version
+  };
+}
+
+function buildSeedSignatureHash(contractId: string, signatureProviderRef: string) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        contractId,
+        signatureProvider: "seed_dev_signature",
+        signatureProviderRef
+      })
+    )
+    .digest("hex");
+}
+
 function parseDateOnly(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }

@@ -43,19 +43,19 @@ export function LandingPage() {
             fill
             priority
             sizes="100vw"
-            className="absolute inset-0 -z-20 h-full w-full object-cover"
+            className="absolute inset-0 -z-20 h-full w-full object-cover brightness-125 contrast-105 saturate-110"
           />
-          <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.92)_0%,rgba(13,34,51,0.74)_40%,rgba(13,34,51,0.42)_100%)]" />
-          <div className="absolute inset-x-0 bottom-0 -z-10 h-48 bg-gradient-to-t from-midnight/82 to-transparent" />
+          <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.58)_0%,rgba(13,34,51,0.34)_42%,rgba(13,34,51,0.06)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 -z-10 h-32 bg-gradient-to-t from-midnight/30 to-transparent" />
 
           <SiteHeader />
 
           <div className="container-shell pb-12 pt-8 md:pb-16 md:pt-14">
             <div className="max-w-4xl">
-              <h1 className="font-display text-[clamp(3rem,6vw,5.8rem)] leading-[1.03] text-white">
+              <h1 className="font-display text-[clamp(3rem,6vw,5.8rem)] leading-[1.03] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,0.55)]">
                 Encuentra una estancia excepcional.
               </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/88 md:text-xl">
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] md:text-xl">
                 Propiedades seleccionadas. Experiencias administradas con atencion personalizada
                 de principio a fin.
               </p>

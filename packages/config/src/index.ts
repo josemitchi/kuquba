@@ -60,6 +60,7 @@ export const portalEntries = [
 ] as const;
 
 export type PortalAudience = (typeof portalEntries)[number]["key"];
+export const opsPortalRoleKeys = ['ops_admin', 'iam_admin'] as const;
 
 export const permissionKeys = [
   "reservation:self:read",
@@ -67,6 +68,7 @@ export const permissionKeys = [
   "property:assigned:read",
   "property:assigned:update",
   "owner:settlement:read",
+  "contract:self:sign",
   "operation:calendar:read",
   "operation:task:update",
   "operation:formal:update",
@@ -85,7 +87,7 @@ export const roleProfiles = [
   {
     key: "owner",
     label: "Propietario",
-    permissions: ["property:assigned:read", "owner:settlement:read"]
+    permissions: ["property:assigned:read", "owner:settlement:read", "contract:self:sign"]
   },
   {
     key: "ops_admin",
@@ -100,6 +102,21 @@ export const roleProfiles = [
       "finance:ledger:read",
       "audit:event:read",
       "identity:user:manage"
+    ]
+  },
+  {
+    key: 'iam_admin',
+    label: 'Administrador IAM',
+    permissions: [
+      'property:assigned:read',
+      'property:assigned:update',
+      'operation:calendar:read',
+      'operation:task:update',
+      'operation:formal:update',
+      'operation:formal:approve',
+      'finance:ledger:read',
+      'audit:event:read',
+      'identity:user:manage'
     ]
   }
 ] as const;

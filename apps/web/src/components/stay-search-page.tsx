@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-import { publicStays, type PublicStay, type StayAvailability } from "@/data/public-stays";
+import { type PublicStay, type StayAvailability } from "@/data/public-stays";
 
 import { SearchPanel, type SearchPanelDefaults } from "./search-panel";
 import { SiteFooter } from "./site-footer";
@@ -33,9 +33,9 @@ const availabilityClasses: Record<StayAvailability, string> = {
   request: "border-midnight/18 bg-midnight/8 text-midnight"
 };
 
-export function StaySearchPage({ searchParams }: { searchParams: StaySearchParams }) {
+export function StaySearchPage({ searchParams, stays }: { searchParams: StaySearchParams; stays: PublicStay[] }) {
   const criteria = buildCriteria(searchParams);
-  const visibleStays = filterStays(criteria);
+  const visibleStays = filterStays(criteria, stays);
   const destinationLabel = criteria.destination || "Guatemala";
   const dateLabel = buildDateLabel(criteria.arrival, criteria.departure);
   const resultTitle =
@@ -47,14 +47,14 @@ export function StaySearchPage({ searchParams }: { searchParams: StaySearchParam
         <section className="relative isolate overflow-hidden bg-midnight text-white">
           <Image
             alt=""
-            className="absolute inset-0 -z-20 h-full w-full object-cover"
+            className="absolute inset-0 -z-20 h-full w-full object-cover brightness-125 contrast-105 saturate-110"
             fill
             priority
             sizes="100vw"
             src="/images/hero-villa-atitlan.png"
           />
-          <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.95)_0%,rgba(13,34,51,0.82)_48%,rgba(13,34,51,0.54)_100%)]" />
-          <div className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-ivory to-transparent" />
+          <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.58)_0%,rgba(13,34,51,0.34)_48%,rgba(13,34,51,0.08)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 -z-10 h-32 bg-gradient-to-t from-ivory/70 to-transparent" />
 
           <SiteHeader homeHref="/" navigationBaseHref="/" />
 
@@ -68,12 +68,12 @@ export function StaySearchPage({ searchParams }: { searchParams: StaySearchParam
             </a>
             <div className="mt-8 max-w-4xl">
               <p className="text-xs font-semibold uppercase text-beige">Estancias seleccionadas</p>
-              <h1 className="mt-4 font-display text-[clamp(2.8rem,6vw,5.4rem)] leading-[1.04] text-white">
+              <h1 className="mt-4 font-display text-[clamp(2.8rem,6vw,5.4rem)] leading-[1.04] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,0.55)]">
                 Encuentra el lugar correcto para tu viaje.
               </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/84 md:text-xl">
-                Explora propiedades curadas por KUQUBA con disponibilidad conceptual y atencion
-                local antes, durante y despues de la estancia.
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] md:text-xl">
+                Explora propiedades curadas por KUQUBA, valida disponibilidad y continua a pago
+                desde el detalle de cada estancia.
               </p>
             </div>
 
@@ -100,8 +100,8 @@ export function StaySearchPage({ searchParams }: { searchParams: StaySearchParam
                   </h2>
                 </div>
                 <p className="max-w-xl text-sm leading-6 text-ink/66">
-                  Muestra de inventario para validar experiencia. La disponibilidad, tarifas y
-                  politicas se confirman antes de cualquier reserva.
+                  Selecciona una propiedad, valida fechas y continua a pago para confirmar la
+                  reserva con disponibilidad protegida durante checkout.
                 </p>
               </div>
 
@@ -132,12 +132,12 @@ export function StaySearchPage({ searchParams }: { searchParams: StaySearchParam
               </dl>
 
               <div className="mt-7 border-t border-line pt-6">
-                <h3 className="text-sm font-semibold text-midnight">Confirmacion KUQUBA</h3>
+                <h3 className="text-sm font-semibold text-midnight">Reserva directa</h3>
                 <ul className="mt-4 space-y-3 text-sm leading-6 text-ink/68">
                   {[
-                    "Validacion de disponibilidad real por propiedad.",
-                    "Propuesta final sin tarifas inventadas en esta etapa.",
-                    "Acompanamiento antes de llegada y durante la estancia."
+                    "Disponibilidad y tarifa validadas antes de pago.",
+                    "Bloqueo temporal durante checkout.",
+                    "Reserva confirmada al aprobarse el pago."
                   ].map((item) => (
                     <li className="flex gap-3" key={item}>
                       <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
@@ -167,7 +167,7 @@ function StayCard({ stay }: { stay: PublicStay }) {
           src={stay.image}
         />
         <div className="absolute left-4 top-4 rounded-full border border-white/30 bg-midnight/72 px-3 py-1 text-xs font-semibold text-white backdrop-blur">
-          Inventario conceptual
+          Reserva directa
         </div>
       </div>
 
@@ -176,7 +176,7 @@ function StayCard({ stay }: { stay: PublicStay }) {
           <div>
             <p className="flex items-center gap-2 text-sm font-medium text-green">
               <MapPin aria-hidden className="h-4 w-4" />
-              {stay.destination} · {stay.neighborhood}
+              {stay.destination} - {stay.neighborhood}
             </p>
             <h3 className="mt-2 font-display text-3xl leading-tight text-midnight">{stay.name}</h3>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-ink/70">{stay.summary}</p>
@@ -218,7 +218,7 @@ function StayCard({ stay }: { stay: PublicStay }) {
             </ul>
             <p className="mt-4 flex gap-2 text-sm leading-6 text-ink/62">
               <Clock3 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-terracotta" />
-              <span>{stay.proposalNote}</span>
+              <span>{stay.bookingNote}</span>
             </p>
           </div>
 
@@ -226,7 +226,7 @@ function StayCard({ stay }: { stay: PublicStay }) {
             className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] bg-green px-5 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
             href={`/stay/properties/${stay.id}`}
           >
-            Ver detalle
+            Reservar
             <ArrowRight aria-hidden className="h-4 w-4" />
           </a>
         </div>
@@ -301,10 +301,10 @@ function buildCriteria(searchParams: StaySearchParams): StaySearchCriteria {
   };
 }
 
-function filterStays(criteria: StaySearchCriteria) {
+function filterStays(criteria: StaySearchCriteria, stays: PublicStay[]) {
   const destinationQuery = criteria.destination.toLowerCase();
 
-  return publicStays.filter((stay) => {
+  return stays.filter((stay) => {
     const matchesDestination =
       !destinationQuery ||
       [stay.destination, stay.name, stay.neighborhood].some((value) =>

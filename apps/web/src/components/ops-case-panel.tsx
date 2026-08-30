@@ -37,6 +37,7 @@ type StayProposalStatus = "DRAFT" | "READY_TO_SEND" | "SENT" | "ACCEPTED" | "DEC
 type FormalApprovalStatus = "DRAFT" | "READY_FOR_APPROVAL" | "APPROVED" | "SENT";
 type FormalDeliveryStatus = "PENDING" | "SENT" | "DELIVERED" | "FAILED";
 type FormalTransitionAction = "approval-request" | "approve" | "send";
+type ContractStatus = "DRAFT" | "ISSUED" | "SIGNED" | "ACTIVE" | "VOID" | "SUPERSEDED";
 type Priority = "high" | "normal" | "medium" | "low";
 type LoadState = "idle" | "loading" | "ready" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
@@ -81,12 +82,18 @@ type StayProposalPreview = {
 };
 
 type OpsFormalDeliveryState = {
+  acceptedAt?: string | null;
+  attemptCount?: number;
   channel?: string | null;
   deliveredAt?: string | null;
   errorMessage?: string | null;
   failedAt?: string | null;
+  lastAttemptAt?: string | null;
+  maxAttempts?: number;
+  nextAttemptAt?: string | null;
   provider?: string | null;
   providerMessageId?: string | null;
+  retryable?: boolean;
   status: FormalDeliveryStatus;
   statusLabel: string;
   templateKey?: string | null;
@@ -105,17 +112,60 @@ type OpsFormalState = {
   statusLabel: string;
 };
 
+type OpsPropertyActivationState = {
+  canActivate: boolean;
+  coverImageUrl?: string | null;
+  imageCount: number;
+  isActive: boolean;
+  propertyId?: string | null;
+  propertyVisibility?: string | null;
+  ratePlanName?: string | null;
+  statusLabel: string;
+  stayCode?: string | null;
+  unitName?: string | null;
+};
+
+type OpsContractState = {
+  canIssue: boolean;
+  currentVersion: number;
+  id?: string | null;
+  issuedAt?: string | null;
+  ownerName?: string | null;
+  propertyName?: string | null;
+  signedAt?: string | null;
+  signatureProvider?: string | null;
+  signatureProviderRef?: string | null;
+  status: ContractStatus;
+  statusLabel: string;
+  summary?: string | null;
+  title?: string | null;
+  versions: Array<{
+    createdAt: string;
+    id: string;
+    issuedAt?: string | null;
+    summary: string;
+    title: string;
+    version: number;
+  }>;
+};
+
 type OpsFormalDelivery = {
+  acceptedAt?: string | null;
   actor: OpsCaseAssignee;
+  attemptCount: number;
   channel: string;
   createdAt: string;
   deliveredAt?: string | null;
   errorMessage?: string | null;
   failedAt?: string | null;
   id: string;
+  lastAttemptAt?: string | null;
+  maxAttempts: number;
+  nextAttemptAt?: string | null;
   provider: string;
   providerMessageId?: string | null;
   recipientMasked: string;
+  retryable: boolean;
   sentAt?: string | null;
   status: FormalDeliveryStatus;
   statusLabel: string;
@@ -145,6 +195,8 @@ type OpsCaseConversion =
       targetDate?: string | null;
       handoffNotes?: string | null;
       formalState: OpsFormalState;
+      contract: OpsContractState;
+      activation: OpsPropertyActivationState;
       activities: OpsFormalActivity[];
       deliveries: OpsFormalDelivery[];
       createdAt: string;
@@ -233,6 +285,33 @@ type CaseConversionResponse = CaseDetailResponse & {
   conversion: OpsCaseConversion;
 };
 
+type ContractIssueResponse = CaseConversionResponse & {
+  contract: OpsContractState;
+};
+
+type PropertyActivationResponse = CaseConversionResponse & {
+  activation: OpsPropertyActivationState;
+};
+
+type PropertyActivationForm = {
+  baseNightlyRate: string;
+  bathrooms: string;
+  bedrooms: string;
+  cleaningFee: string;
+  coverImageUrl: string;
+  currency: string;
+  maxGuests: string;
+  minNights: string;
+  note: string;
+  photoGalleryUrls: string;
+  ratePlanName: string;
+  serviceFeeBps: string;
+  stayCode: string;
+  taxBps: string;
+  unitName: string;
+  weekendNightlyRate: string;
+};
+
 const caseStatusClasses: Record<CaseStatus, string> = {
   OPEN: "border-terracotta/30 bg-terracotta/10 text-terracotta",
   QUALIFYING: "border-midnight/18 bg-midnight/8 text-midnight",
@@ -291,6 +370,7 @@ export function OpsCasePanel({
     "Borrador interno sujeto a disponibilidad final"
   );
   const [proposalInternalNotes, setProposalInternalNotes] = useState("");
+  const [activationForm, setActivationForm] = useState<PropertyActivationForm>(buildEmptyActivationForm());
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
@@ -346,8 +426,10 @@ export function OpsCasePanel({
 
     if (detail.conversion?.kind === "propertyOnboarding") {
       setConversionMilestone(detail.conversion.nextMilestone);
+      setActivationForm(buildActivationForm(detail));
     } else {
       setConversionMilestone("");
+      setActivationForm(buildEmptyActivationForm());
     }
   }
 
@@ -634,6 +716,59 @@ export function OpsCasePanel({
       setUpdatingKey(null);
     }
   }
+
+  async function handleContractIssue() {
+    if (!sessionToken || !caseDetail || caseDetail.conversion?.kind !== "propertyOnboarding") {
+      return;
+    }
+
+    setUpdatingKey("conversion:contract");
+    setNotice(null);
+
+    try {
+      const response = await postContractIssue(
+        caseDetail.source.item,
+        {
+          note: formalHandoffNotes.trim() || undefined,
+          startsOn: formalTargetDate || undefined
+        },
+        sessionToken
+      );
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: "Contrato emitido para firma." });
+    } catch {
+      setNotice({ kind: "error", text: "No se pudo emitir el contrato." });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
+  async function handlePropertyActivation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!sessionToken || !caseDetail || caseDetail.conversion?.kind !== "propertyOnboarding") {
+      return;
+    }
+
+    setUpdatingKey("conversion:activate-property");
+    setNotice(null);
+
+    try {
+      const response = await postPropertyActivation(caseDetail.source.item, activationForm, sessionToken);
+      applyCaseDetail(response.caseDetail);
+      setNotice({ kind: "success", text: "Propiedad activada y publicada para reservas." });
+    } catch (error) {
+      setNotice({
+        kind: "error",
+        text: getPropertyActivationErrorMessage(error instanceof Error ? error.message : "property_activation_failed")
+      });
+    } finally {
+      setUpdatingKey(null);
+    }
+  }
+
+  function handleActivationFormChange(field: keyof PropertyActivationForm, value: string) {
+    setActivationForm((current) => ({ ...current, [field]: value }));
+  }
   async function handleChecklistStatusChange(item: {
     key: string;
     label: string;
@@ -792,6 +927,10 @@ export function OpsCasePanel({
             onFormalPlanSubmit={handleFormalPlanSubmit}
             onFormalTransition={handleFormalTransition}
             onFormalTargetDateChange={setFormalTargetDate}
+            activationForm={activationForm}
+            onActivationFormChange={handleActivationFormChange}
+            onContractIssue={handleContractIssue}
+            onPropertyActivate={handlePropertyActivation}
             onProposalInternalNotesChange={setProposalInternalNotes}
             onProposalSummaryChange={setProposalSummary}
             onProposalTermsLabelChange={setProposalTermsLabel}
@@ -1013,6 +1152,10 @@ function ConversionSection({
   onFormalPlanSubmit,
   onFormalTransition,
   onFormalTargetDateChange,
+  activationForm,
+  onActivationFormChange,
+  onContractIssue,
+  onPropertyActivate,
   onProposalInternalNotesChange,
   onProposalSummaryChange,
   onProposalTermsLabelChange,
@@ -1022,6 +1165,7 @@ function ConversionSection({
   proposalTermsLabel,
   updatingKey
 }: {
+  activationForm: PropertyActivationForm;
   canApproveFormal: boolean;
   caseDetail: OpsCaseDetail;
   conversionMilestone: string;
@@ -1041,6 +1185,9 @@ function ConversionSection({
   onFormalPlanSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onFormalTransition: (action: FormalTransitionAction) => void;
   onFormalTargetDateChange: (value: string) => void;
+  onActivationFormChange: (field: keyof PropertyActivationForm, value: string) => void;
+  onContractIssue: () => void;
+  onPropertyActivate: (event: FormEvent<HTMLFormElement>) => void;
   onProposalInternalNotesChange: (value: string) => void;
   onProposalSummaryChange: (value: string) => void;
   onProposalTermsLabelChange: (value: string) => void;
@@ -1123,6 +1270,23 @@ function ConversionSection({
           onFormalPlanSubmit={onFormalPlanSubmit}
           onFormalTransition={onFormalTransition}
           onFormalTargetDateChange={onFormalTargetDateChange}
+          updatingKey={updatingKey}
+        />
+
+        <ContractOpsBlock
+          canApproveFormal={canApproveFormal}
+          contract={conversion.contract}
+          onContractIssue={onContractIssue}
+          updatingKey={updatingKey}
+        />
+
+        <PropertyActivationBlock
+          activation={conversion.activation}
+          canApproveFormal={canApproveFormal}
+          contract={conversion.contract}
+          form={activationForm}
+          onChange={onActivationFormChange}
+          onSubmit={onPropertyActivate}
           updatingKey={updatingKey}
         />
 
@@ -1357,6 +1521,7 @@ function FormalOpsControls({
           <p className="mt-1">
             ID proveedor: {conversion.formalState.delivery.providerMessageId ?? "pendiente"}
           </p>
+          <p className="mt-1">{buildDeliveryAttemptDetail(conversion.formalState.delivery)}</p>
           {conversion.formalState.delivery.errorMessage ? (
             <p className="mt-1 text-terracotta">{conversion.formalState.delivery.errorMessage}</p>
           ) : null}
@@ -1504,6 +1669,7 @@ function FormalOpsControls({
                 {delivery.providerMessageId ?? "sin id proveedor"} -{" "}
                 {formatDateTime(delivery.createdAt)}
               </p>
+              <p className="mt-1 text-xs text-ink/52">{buildDeliveryAttemptDetail(delivery)}</p>
               {delivery.errorMessage ? (
                 <p className="mt-1 text-xs text-terracotta">{delivery.errorMessage}</p>
               ) : null}
@@ -1541,6 +1707,188 @@ function FormalOpsControls({
   );
 }
 
+function ContractOpsBlock({
+  canApproveFormal,
+  contract,
+  onContractIssue,
+  updatingKey
+}: {
+  canApproveFormal: boolean;
+  contract: OpsContractState;
+  onContractIssue: () => void;
+  updatingKey: string | null;
+}) {
+  const isUpdating = updatingKey === "conversion:contract";
+
+  return (
+    <div className="mt-4 border-b border-green/20 pb-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <FileText aria-hidden className="h-4 w-4 text-green" />
+            <p className="text-sm font-semibold text-midnight">
+              {contract.title ?? "Contrato propietario"}
+            </p>
+            <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[0.7rem] font-semibold text-midnight/72">
+              {contract.statusLabel}
+            </span>
+          </div>
+          {contract.summary ? <p className="mt-2 text-sm leading-6 text-ink/64">{contract.summary}</p> : null}
+          <p className="mt-2 text-xs leading-5 text-ink/54">
+            Version {contract.currentVersion || 1} - Emitido {formatNullableDateTime(contract.issuedAt)} - Firmado{" "}
+            {formatNullableDateTime(contract.signedAt)}
+          </p>
+          {contract.signatureProviderRef ? (
+            <p className="mt-1 text-xs leading-5 text-ink/54">Referencia: {contract.signatureProviderRef}</p>
+          ) : null}
+        </div>
+
+        <button
+          className="focus-ring inline-flex min-h-10 w-fit items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
+          disabled={!canApproveFormal || !contract.canIssue || isUpdating}
+          onClick={onContractIssue}
+          type="button"
+        >
+          <Send aria-hidden className="h-4 w-4" />
+          {isUpdating ? "Emitiendo" : contract.id ? "Reemitir contrato" : "Emitir contrato"}
+        </button>
+      </div>
+
+      <div className="mt-3 divide-y divide-green/20 text-sm">
+        {contract.versions.map((version) => (
+          <div className="py-2 first:pt-0 last:pb-0" key={version.id}>
+            <p className="font-semibold text-midnight">v{version.version} - {version.title}</p>
+            <p className="mt-1 text-xs leading-5 text-ink/56">{version.summary}</p>
+          </div>
+        ))}
+        {contract.versions.length === 0 ? (
+          <p className="text-sm leading-6 text-ink/62">Sin versiones emitidas.</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function PropertyActivationBlock({
+  activation,
+  canApproveFormal,
+  contract,
+  form,
+  onChange,
+  onSubmit,
+  updatingKey
+}: {
+  activation: OpsPropertyActivationState;
+  canApproveFormal: boolean;
+  contract: OpsContractState;
+  form: PropertyActivationForm;
+  onChange: (field: keyof PropertyActivationForm, value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  updatingKey: string | null;
+}) {
+  const isUpdating = updatingKey === "conversion:activate-property";
+  const canSubmit = canApproveFormal && activation.canActivate && contract.status === "ACTIVE";
+
+  return (
+    <form className="mt-4 border-b border-green/20 pb-4" onSubmit={onSubmit}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <ShieldCheck aria-hidden className="h-4 w-4 text-green" />
+            <p className="text-sm font-semibold text-midnight">Alta comercial</p>
+            <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[0.7rem] font-semibold text-midnight/72">
+              {activation.statusLabel}
+            </span>
+          </div>
+          <p className="mt-2 text-xs leading-5 text-ink/58">
+            {activation.isActive
+              ? `Codigo ${activation.stayCode ?? "publico"} listo para reservas.`
+              : "Publica la casa creando inventario minimo, tarifa base, codigo de estancia y fotografias."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <ActivationInput label="Unidad" value={form.unitName} onChange={(value) => onChange("unitName", value)} />
+        <ActivationInput label="Codigo estancia" value={form.stayCode} onChange={(value) => onChange("stayCode", value)} />
+        <ActivationInput label="Huespedes" type="number" value={form.maxGuests} onChange={(value) => onChange("maxGuests", value)} />
+        <ActivationInput label="Habitaciones" type="number" value={form.bedrooms} onChange={(value) => onChange("bedrooms", value)} />
+        <ActivationInput label="Banos" type="number" step="0.5" value={form.bathrooms} onChange={(value) => onChange("bathrooms", value)} />
+        <ActivationInput label="Moneda" value={form.currency} onChange={(value) => onChange("currency", value.toUpperCase())} />
+        <ActivationInput label="Tarifa base" type="number" value={form.baseNightlyRate} onChange={(value) => onChange("baseNightlyRate", value)} />
+        <ActivationInput label="Tarifa fin de semana" type="number" value={form.weekendNightlyRate} onChange={(value) => onChange("weekendNightlyRate", value)} />
+        <ActivationInput label="Limpieza" type="number" value={form.cleaningFee} onChange={(value) => onChange("cleaningFee", value)} />
+        <ActivationInput label="Minimo noches" type="number" value={form.minNights} onChange={(value) => onChange("minNights", value)} />
+        <ActivationInput label="Fee KUQUBA bps" type="number" value={form.serviceFeeBps} onChange={(value) => onChange("serviceFeeBps", value)} />
+        <ActivationInput label="Impuesto bps" type="number" value={form.taxBps} onChange={(value) => onChange("taxBps", value)} />
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <ActivationInput label="Foto portada URL" value={form.coverImageUrl} onChange={(value) => onChange("coverImageUrl", value)} />
+        <label className="block text-xs font-semibold uppercase text-ink/48" htmlFor="property-activation-gallery">
+          Galeria URLs
+          <textarea
+            className="focus-ring mt-2 min-h-24 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 normal-case text-ink outline-none"
+            id="property-activation-gallery"
+            onChange={(event) => onChange("photoGalleryUrls", event.target.value)}
+            placeholder="Una URL por linea"
+            value={form.photoGalleryUrls}
+          />
+        </label>
+        <p className="text-xs leading-5 text-ink/58">
+          Minimo 3 fotos incluyendo portada. Registradas: {countActivationImages(form)}.
+        </p>
+      </div>
+      <label className="mt-3 block text-xs font-semibold uppercase text-ink/48" htmlFor="property-activation-note">
+        Nota de activacion
+      </label>
+      <textarea
+        className="focus-ring mt-2 min-h-20 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
+        id="property-activation-note"
+        maxLength={700}
+        onChange={(event) => onChange("note", event.target.value)}
+        value={form.note}
+      />
+
+      <button
+        className="focus-ring mt-3 inline-flex min-h-10 w-fit items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
+        disabled={!canSubmit || isUpdating || activation.isActive || countActivationImages(form) < 3}
+        type="submit"
+      >
+        <ShieldCheck aria-hidden className="h-4 w-4" />
+        {isUpdating ? "Activando" : activation.isActive ? "Propiedad activa" : "Activar propiedad"}
+      </button>
+    </form>
+  );
+}
+
+function ActivationInput({
+  label,
+  onChange,
+  step,
+  type = "text",
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  step?: string;
+  type?: "number" | "text";
+  value: string;
+}) {
+  return (
+    <label className="block text-xs font-semibold uppercase text-ink/48">
+      {label}
+      <input
+        className="focus-ring mt-2 min-h-10 w-full rounded-[6px] border border-line bg-white px-3 text-sm font-semibold normal-case text-midnight outline-none"
+        min={type === "number" ? "0" : undefined}
+        onChange={(event) => onChange(event.target.value)}
+        step={step ?? (type === "number" ? "1" : undefined)}
+        type={type}
+        value={value}
+      />
+    </label>
+  );
+}
 function FormalSummaryItem({
   detail,
   icon: Icon,
@@ -1809,6 +2157,64 @@ async function postFormalActivity(
   return payload;
 }
 
+async function postContractIssue(
+  item: OpsCaseWorkbenchItem,
+  body: { note?: string; startsOn?: string },
+  sessionToken: string
+): Promise<ContractIssueResponse> {
+  const response = await fetch(
+    `${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/conversion/contract/issue`,
+    {
+      body: JSON.stringify(body),
+      headers: {
+        "content-type": "application/json",
+        "x-kuquba-dev-session": sessionToken
+      },
+      method: "POST"
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as ContractIssueResponse & {
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "case_conversion_contract_issue_failed");
+  }
+
+  return payload;
+}
+
+async function postPropertyActivation(
+  item: OpsCaseWorkbenchItem,
+  body: PropertyActivationForm,
+  sessionToken: string
+): Promise<PropertyActivationResponse> {
+  const response = await fetch(
+    `${getDevPortalApiBaseUrl()}/api/ops/workbench/${getItemType(item)}/${item.id}/case/conversion/property/activate`,
+    {
+      body: JSON.stringify({
+        ...body,
+        weekendNightlyRate: body.weekendNightlyRate.trim() || undefined
+      }),
+      headers: {
+        "content-type": "application/json",
+        "x-kuquba-dev-session": sessionToken
+      },
+      method: "POST"
+    }
+  );
+
+  const payload = (await response.json().catch(() => ({}))) as PropertyActivationResponse & {
+    error?: string;
+  };
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "property_activation_failed");
+  }
+
+  return payload;
+}
 async function postFormalTransition(
   item: OpsCaseWorkbenchItem,
   action: FormalTransitionAction,
@@ -1940,6 +2346,10 @@ function formatDateOnlyLabel(value?: string | null) {
     timeZone: "UTC"
   }).format(date);
 }
+function formatNullableDateTime(value?: string | null) {
+  return value ? formatDateTime(value) : "Pendiente";
+}
+
 function buildFormalStateDetail(state: OpsFormalState) {
   if (state.sentAt) {
     return `Enviado ${formatDateTime(state.sentAt)}`;
@@ -1961,13 +2371,128 @@ function buildDeliveryStateDetail(delivery: OpsFormalDeliveryState) {
     return `Fallido ${formatDateTime(delivery.failedAt)}`;
   }
 
+  if (delivery.nextAttemptAt) {
+    return `Reintento ${formatDateTime(delivery.nextAttemptAt)}`;
+  }
+
   if (delivery.deliveredAt) {
     return `Entregado ${formatDateTime(delivery.deliveredAt)}`;
+  }
+
+  if (delivery.acceptedAt) {
+    return `Aceptado ${formatDateTime(delivery.acceptedAt)}`;
   }
 
   return delivery.provider ?? "Proveedor pendiente";
 }
 
+function buildDeliveryAttemptDetail(delivery: {
+  attemptCount?: number;
+  lastAttemptAt?: string | null;
+  maxAttempts?: number;
+  nextAttemptAt?: string | null;
+}) {
+  const attemptCount = delivery.attemptCount ?? 0;
+  const maxAttempts = delivery.maxAttempts ?? 0;
+  const attemptLabel =
+    maxAttempts > 0 ? `Intento ${attemptCount}/${maxAttempts}` : `Intento ${attemptCount}`;
+
+  if (delivery.nextAttemptAt) {
+    return `${attemptLabel} - reintento ${formatDateTime(delivery.nextAttemptAt)}`;
+  }
+
+  if (delivery.lastAttemptAt) {
+    return `${attemptLabel} - ultimo ${formatDateTime(delivery.lastAttemptAt)}`;
+  }
+
+  return attemptLabel;
+}
+
+function buildPropertyActivationImages(form: PropertyActivationForm) {
+  const urls = [form.coverImageUrl, ...form.photoGalleryUrls.split(/\r?\n/)]
+    .map((url) => url.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+
+  return urls
+    .filter((url) => {
+      if (seen.has(url)) {
+        return false;
+      }
+
+      seen.add(url);
+      return true;
+    })
+    .map((url, index) => ({
+      alt: index === 0 ? "Foto portada de propiedad" : `Foto ${index + 1} de propiedad`,
+      isCover: index === 0,
+      sortOrder: index,
+      url
+    }));
+}
+
+function countActivationImages(form: PropertyActivationForm) {
+  return buildPropertyActivationImages(form).length;
+}
+function buildEmptyActivationForm(): PropertyActivationForm {
+  return {
+    baseNightlyRate: "1200",
+    bathrooms: "1",
+    bedrooms: "1",
+    cleaningFee: "0",
+    coverImageUrl: "",
+    currency: "GTQ",
+    maxGuests: "2",
+    minNights: "1",
+    note: "",
+    photoGalleryUrls: "",
+    ratePlanName: "Tarifa base",
+    serviceFeeBps: "0",
+    stayCode: "",
+    taxBps: "0",
+    unitName: "Casa completa",
+    weekendNightlyRate: ""
+  };
+}
+
+function buildActivationForm(detail: OpsCaseDetail): PropertyActivationForm {
+  const empty = buildEmptyActivationForm();
+  const conversion = detail.conversion?.kind === "propertyOnboarding" ? detail.conversion : null;
+
+  return {
+    ...empty,
+    coverImageUrl: conversion?.activation.coverImageUrl ?? empty.coverImageUrl,
+    photoGalleryUrls: "",
+    ratePlanName: conversion?.activation.ratePlanName ?? empty.ratePlanName,
+    stayCode: conversion?.activation.stayCode ?? slugifyStayCode(detail.source.item.title),
+    unitName: conversion?.activation.unitName ?? detail.source.item.title
+  };
+}
+
+function slugifyStayCode(value: string) {
+  const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug.length >= 3 ? slug : "kuquba-estancia";
+}
+
+function getPropertyActivationErrorMessage(error: string) {
+  if (error === "contract_required") {
+    return "Primero debes emitir el contrato.";
+  }
+
+  if (error === "contract_activation_required") {
+    return "El propietario debe aceptar el contrato antes de publicar la casa.";
+  }
+
+  if (error === "stay_code_already_in_use") {
+    return "Ese codigo de estancia ya esta asociado a otra propiedad.";
+  }
+
+  if (error === "stay_code_invalid") {
+    return "El codigo de estancia debe tener al menos tres caracteres validos.";
+  }
+
+  return "No se pudo activar la propiedad.";
+}
 function buildFormalTransitionNotice(action: FormalTransitionAction) {
   if (action === "approval-request") {
     return "Solicitud de aprobacion formal registrada.";
@@ -1977,7 +2502,7 @@ function buildFormalTransitionNotice(action: FormalTransitionAction) {
     return "Aprobacion interna registrada.";
   }
 
-  return "Envio transaccional registrado por adaptador dev.";
+  return "Intento de envio formal registrado.";
 }
 
 function formatDateTime(value: string) {
