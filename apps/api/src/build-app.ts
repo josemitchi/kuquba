@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import sensible from "@fastify/sensible";
-import Fastify from "fastify";
+import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
 
 import { env } from "./config/env";
 import { registerIdentityRoutes } from "./modules/identity/routes";
@@ -16,8 +16,8 @@ import { registerRequestContext } from "./plugins/request-context";
 import { registerHealthRoutes } from "./routes/health";
 import { registerPublicRoutes } from "./routes/public";
 
-export async function buildApp() {
-  const app = Fastify({
+export function getFastifyOptions(): FastifyServerOptions {
+  return {
     logger: {
       level: env.NODE_ENV === "production" ? "info" : "debug",
       redact: [
@@ -32,8 +32,10 @@ export async function buildApp() {
     },
     genReqId: (request) =>
       request.headers["x-request-id"]?.toString() ?? crypto.randomUUID()
-  });
+  };
+}
 
+export async function configureApp(app: FastifyInstance) {
   await app.register(registerRequestContext);
   registerObservability(app);
   await app.register(helmet, {
@@ -59,4 +61,9 @@ export async function buildApp() {
   await app.register(registerPublicRoutes, { prefix: "/api/public" });
 
   return app;
+}
+
+export async function buildApp() {
+  const app = Fastify(getFastifyOptions());
+  return configureApp(app);
 }

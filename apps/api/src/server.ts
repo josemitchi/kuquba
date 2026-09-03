@@ -1,8 +1,11 @@
-import { buildApp } from "./build-app";
+import Fastify from "fastify";
+
+import { configureApp, getFastifyOptions } from "./build-app";
 import { env } from "./config/env";
 
 async function main() {
-  const app = await buildApp();
+  const app = Fastify(getFastifyOptions());
+  await configureApp(app);
 
   try {
     await app.listen({
