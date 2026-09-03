@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { permissionKeys, roleProfiles } from "@kuquba/config";
+import { seedPublicCatalog } from "./public-catalog-seed";
 
 process.env.DATABASE_URL ??=
   "postgresql://kuquba:kuquba_dev_password@127.0.0.1:55432/kuquba_dev?schema=public";
@@ -174,18 +175,19 @@ async function main() {
   });
   await seedDevUser(prisma, {
     organizationId: organization.id,
-    email: 'iam.admin@kuquba.local',
-    displayName: 'Administrador IAM Dev',
-    roleKey: 'iam_admin',
-    identityProvider: 'EMAIL_OTP'
+    email: "iam.admin@kuquba.local",
+    displayName: "Administrador IAM Dev",
+    roleKey: "iam_admin",
+    identityProvider: "EMAIL_OTP"
   });
-
 
   await seedOwnerPortal(prisma, {
     organizationId: organization.id,
     ownerUserId: ownerUser.id,
     guestUserId: guestUser.id
   });
+
+  await seedPublicCatalog(prisma);
 
   await seedOpsWorkbench(prisma, { opsUserId: opsUser.id });
 }
@@ -274,7 +276,7 @@ async function seedOwnerPortal(
 ) {
   const owner = await prismaClient.owner.upsert({
     where: {
-      userId: input.ownerUserId
+      id: devIds.owner
     },
     create: {
       id: devIds.owner,
@@ -284,6 +286,8 @@ async function seedOwnerPortal(
       email: "owner.dev@kuquba.local"
     },
     update: {
+      organizationId: input.organizationId,
+      userId: input.ownerUserId,
       displayName: "Propietario KUQUBA",
       email: "owner.dev@kuquba.local"
     }
@@ -721,7 +725,13 @@ async function seedOwnerPortal(
     serviceWindow: "10:00-14:00",
     assigneeName: "Equipo Ops Atitlan",
     vendorName: "Limpiezas Lago Dev",
-    checklist: ["Inventario rapido", "Amenidades", "Toallas", "Refrigerador", "Fotos antes de check-in"],
+    checklist: [
+      "Inventario rapido",
+      "Amenidades",
+      "Toallas",
+      "Refrigerador",
+      "Fotos antes de check-in"
+    ],
     notes: "Pendiente de confirmar si el hold pasa a pago.",
     blockedReason: null,
     completedAt: null

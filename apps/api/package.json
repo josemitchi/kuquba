@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "prebuild": "npm run build --workspace @kuquba/config",
     "build": "tsc -p tsconfig.json",
+    "build:vercel": "npm run build --workspace @kuquba/config && prisma migrate deploy --schema prisma/schema.prisma && tsx prisma/public-catalog-seed.ts && tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "pretypecheck": "npm run build --workspace @kuquba/config",
     "typecheck": "tsc -p tsconfig.json --noEmit",
