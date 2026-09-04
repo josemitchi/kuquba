@@ -1,4 +1,4 @@
-﻿-- CreateEnum
+-- CreateEnum
 CREATE TYPE "PropertyVisibility" AS ENUM ('PUBLIC', 'SEGMENTED', 'PRIVATE');
 
 -- CreateEnum
