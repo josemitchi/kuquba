@@ -1,4 +1,5 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
+import { permissionKeys, roleProfiles } from "@kuquba/config";
 
 const defaultDevDatabaseUrl =
   "postgresql://kuquba:kuquba_dev_password@127.0.0.1:55432/kuquba_dev?schema=public";
@@ -36,6 +37,8 @@ const stay = {
 } as const;
 
 export async function seedPublicCatalog(prisma: PrismaClient) {
+  await seedAccessControl(prisma);
+
   const organization = await prisma.organization.upsert({
     where: { id: ids.organization },
     create: {
@@ -285,6 +288,57 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
   });
 }
 
+async function seedAccessControl(prisma: PrismaClient) {
+  const permissions = await Promise.all(
+    permissionKeys.map((key) =>
+      prisma.permission.upsert({
+        where: { key },
+        create: {
+          key,
+          description: `Permission ${key}`
+        },
+        update: {}
+      })
+    )
+  );
+  const permissionByKey = new Map(permissions.map((permission) => [permission.key, permission]));
+
+  for (const roleProfile of roleProfiles) {
+    const role = await prisma.role.upsert({
+      where: { key: roleProfile.key },
+      create: {
+        key: roleProfile.key,
+        name: roleProfile.label,
+        description: `Rol base ${roleProfile.label}`
+      },
+      update: {
+        name: roleProfile.label
+      }
+    });
+
+    for (const permissionKey of roleProfile.permissions) {
+      const permission = permissionByKey.get(permissionKey);
+
+      if (!permission) {
+        throw new Error(`Missing permission seed for ${permissionKey}`);
+      }
+
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: role.id,
+            permissionId: permission.id
+          }
+        },
+        create: {
+          roleId: role.id,
+          permissionId: permission.id
+        },
+        update: {}
+      });
+    }
+  }
+}
 function buildTermsSnapshot(): Prisma.InputJsonObject {
   return {
     source: "public_catalog_seed",
