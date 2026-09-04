@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
   getDevPortalApiBaseUrl,
@@ -457,100 +457,100 @@ function ReservationDetailPanel({
 
   return (
     <section className={containerClassName}>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase text-green">Detalle de reserva</p>
-          <h2 className="mt-1 text-lg font-semibold text-midnight">
+          <h2 className="mt-1 text-base font-semibold text-midnight">
             {reservation.reservationCode}
           </h2>
-          <p className="mt-1 text-sm text-ink/64">{reservation.propertyName}</p>
         </div>
-        <FileText aria-hidden className="h-5 w-5 text-green" />
+        <p className="text-sm font-semibold text-ink/58">
+          {formatDate(reservation.arrivalDate)} - {formatDate(reservation.departureDate)}
+        </p>
       </div>
 
-      <div className="mt-5 grid gap-3 text-sm">
-        <DetailRow label="Estado" value={reservation.statusLabel} />
-        <DetailRow label="Destino" value={reservation.propertyDestination} />
-        <DetailRow label="Unidad" value={reservation.unitName} />
-        <DetailRow
-          label="Fechas"
-          value={`${formatDate(reservation.arrivalDate)} - ${formatDate(reservation.departureDate)}`}
-        />
-        <DetailRow label="Total" value={formatCurrency(reservation.total, reservation.currency)} />
-      </div>
-
-      <div className="mt-6 border-t border-line pt-5">
-        <div className="flex items-center gap-2">
-          <DoorOpen aria-hidden className="h-5 w-5 text-green" />
-          <h3 className="text-sm font-semibold text-midnight">Llegada y check-in</h3>
-        </div>
-        <dl className="mt-3 grid gap-2 text-sm">
-          <DetailRow label="Estado llegada" value={reservation.arrival.readinessLabel} />
-          <DetailRow label="Check-in" value={reservation.arrival.checkInWindow} />
-          <DetailRow label="Check-out" value={reservation.arrival.checkOutTime} />
-        </dl>
-        <ul className="mt-3 space-y-2 text-sm leading-6 text-ink/68">
-          {reservation.arrival.instructions.map((instruction) => (
-            <li className="flex gap-2" key={instruction}>
-              <CheckCircle2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-green" />
-              <span>{instruction}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div className="mt-6 border-t border-line pt-5">
-        <div className="flex items-center gap-2">
-          <CreditCard aria-hidden className="h-5 w-5 text-green" />
-          <h3 className="text-sm font-semibold text-midnight">Estado de pago</h3>
-        </div>
-        {reservation.payment ? (
-          <div className="mt-3 grid gap-2 text-sm">
-            <DetailRow label="Pago" value={reservation.payment.statusLabel} />
-            <DetailRow
-              label="Monto"
-              value={formatCurrency(reservation.payment.amount, reservation.payment.currency)}
-            />
-            <DetailRow
-              label="Confirmado"
-              value={
-                reservation.payment.confirmedAt
-                  ? formatDateTime(reservation.payment.confirmedAt)
-                  : "Pendiente"
-              }
-            />
-          </div>
-        ) : (
-          <p className="mt-3 text-sm leading-6 text-ink/68">No hay pago asociado todavia.</p>
-        )}
-      </div>
-
-      <div className="mt-6 border-t border-line pt-5">
-        <div className="flex items-center gap-2">
-          <FileText aria-hidden className="h-5 w-5 text-green" />
-          <h3 className="text-sm font-semibold text-midnight">Confirmacion</h3>
-        </div>
-        <div className="mt-3 rounded-[6px] border border-line bg-ivory p-4 text-sm">
-          <p className="font-semibold text-midnight">{reservation.confirmation.documentLabel}</p>
-          <p className="mt-1 text-ink/64">
-            {reservation.confirmation.documentStatus} / {reservation.confirmation.statusLabel}
-          </p>
-          <ul className="mt-3 space-y-1 text-xs leading-5 text-ink/64">
-            {reservation.confirmation.sections.map((section) => (
-              <li key={section}>{section}</li>
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr_1fr]">
+        <DetailSection icon={DoorOpen} title="Llegada y check-in">
+          <dl className="grid gap-2 text-sm sm:grid-cols-3 lg:grid-cols-1">
+            <DetailRow label="Estado" value={reservation.arrival.readinessLabel} />
+            <DetailRow label="Check-in" value={reservation.arrival.checkInWindow} />
+            <DetailRow label="Check-out" value={reservation.arrival.checkOutTime} />
+          </dl>
+          <ul className="mt-3 grid gap-2 text-xs leading-5 text-ink/68">
+            {reservation.arrival.instructions.map((instruction) => (
+              <li className="flex gap-2" key={instruction}>
+                <CheckCircle2 aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-green" />
+                <span>{instruction}</span>
+              </li>
             ))}
           </ul>
-        </div>
+        </DetailSection>
+
+        <DetailSection icon={CreditCard} title="Pago">
+          {reservation.payment ? (
+            <dl className="grid gap-2 text-sm">
+              <DetailRow label="Estado" value={reservation.payment.statusLabel} />
+              <DetailRow
+                label="Monto"
+                value={formatCurrency(reservation.payment.amount, reservation.payment.currency)}
+              />
+              <DetailRow
+                label="Confirmado"
+                value={
+                  reservation.payment.confirmedAt
+                    ? formatDateTime(reservation.payment.confirmedAt)
+                    : "Pendiente"
+                }
+              />
+            </dl>
+          ) : (
+            <p className="text-sm leading-6 text-ink/68">No hay pago asociado todavía.</p>
+          )}
+        </DetailSection>
+
+        <DetailSection icon={FileText} title="Confirmación">
+          <div className="text-sm leading-6 text-ink/68">
+            <p className="font-semibold text-midnight">{reservation.confirmation.documentLabel}</p>
+            <p className="mt-1">
+              {reservation.confirmation.documentStatus} / {reservation.confirmation.statusLabel}
+            </p>
+            <ul className="mt-3 grid gap-1 text-xs leading-5">
+              {reservation.confirmation.sections.map((section) => (
+                <li key={section}>{section}</li>
+              ))}
+            </ul>
+          </div>
+        </DetailSection>
       </div>
+    </section>
+  );
+}
+
+function DetailSection({
+  children,
+  icon: Icon,
+  title
+}: {
+  children: ReactNode;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <section className="border-t border-line pt-4 first:border-t-0 first:pt-0 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0 lg:first:border-l-0 lg:first:pl-0">
+      <div className="mb-3 flex items-center gap-2">
+        <Icon aria-hidden className="h-5 w-5 text-green" />
+        <h3 className="text-sm font-semibold text-midnight">{title}</h3>
+      </div>
+      {children}
     </section>
   );
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[6px] border border-line bg-ivory px-3 py-2">
-      <dt className="text-xs font-semibold uppercase text-ink/45">{label}</dt>
-      <dd className="mt-1 break-words font-semibold text-midnight">{value}</dd>
+    <div className="min-h-14 rounded-[6px] border border-line bg-white px-3 py-2">
+      <dt className="text-[0.68rem] font-semibold uppercase text-ink/45">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-midnight">{value}</dd>
     </div>
   );
 }
