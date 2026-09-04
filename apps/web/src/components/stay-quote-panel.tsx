@@ -118,6 +118,16 @@ type StayAvailabilityResponse = {
   availability: StayAvailability;
 };
 
+type AvailabilityMonth = {
+  availableDays: number;
+  days: StayAvailabilityDay[];
+  key: string;
+  label: string;
+  leadingBlanks: number;
+};
+
+const calendarWeekdays = ["L", "M", "M", "J", "V", "S", "D"];
+
 type AvailabilityLoadState = "idle" | "loading" | "success" | "error";
 
 export function StayQuotePanel({
@@ -511,11 +521,19 @@ function AvailabilityGuide({
   onSuggestedRangeSelect: () => void;
 }) {
   const selectedRange = arrivalDate && departureDate ? { arrivalDate, departureDate } : null;
+  const months = availability ? buildAvailabilityMonths(availability.days) : [];
+  const firstAvailabilityDay = availability?.days[0];
+  const lastAvailabilityDay = availability?.days[availability.days.length - 1];
+  const calendarRangeLabel = firstAvailabilityDay && lastAvailabilityDay
+    ? `${formatShortDate(firstAvailabilityDay.date)} - ${formatShortDate(lastAvailabilityDay.date)}`
+    : null;
 
   return (
     <div className="rounded-[6px] border border-line bg-ivory p-4">
       <div className="flex items-start gap-3">
-        <CalendarDays aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
+          <CalendarDays aria-hidden className="h-5 w-5" />
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -523,10 +541,15 @@ function AvailabilityGuide({
               <p className="mt-1 text-xs leading-5 text-ink/62">
                 Selecciona una fecha disponible para rellenar llegada y salida.
               </p>
+              {calendarRangeLabel ? (
+                <p className="mt-2 text-[0.7rem] font-semibold uppercase text-green">
+                  Ventana visible: {calendarRangeLabel}
+                </p>
+              ) : null}
             </div>
             {availability?.nextAvailableRange ? (
               <button
-                className="focus-ring inline-flex min-h-9 w-fit items-center justify-center rounded-[6px] border border-green px-3 text-xs font-semibold text-green transition hover:bg-green hover:text-white"
+                className="focus-ring inline-flex min-h-9 w-fit items-center justify-center rounded-[6px] border border-green bg-white px-3 text-xs font-semibold text-green transition hover:bg-green hover:text-white"
                 onClick={onSuggestedRangeSelect}
                 type="button"
               >
@@ -550,26 +573,57 @@ function AvailabilityGuide({
 
           {availability ? (
             <>
-              <div className="mt-4 grid grid-cols-7 gap-1.5">
-                {availability.days.map((day) => {
-                  const isSelected = selectedRange
-                    ? day.date >= selectedRange.arrivalDate &&
-                      day.date < selectedRange.departureDate
-                    : false;
-                  return (
-                    <button
-                      aria-label={`${formatShortDate(day.date)}: ${day.statusLabel}`}
-                      className={`focus-ring min-h-10 rounded-[6px] border px-1 text-xs font-semibold transition ${getAvailabilityDayClasses(day, isSelected)}`}
-                      disabled={day.status !== "AVAILABLE"}
-                      key={day.date}
-                      onClick={() => onDaySelect(day)}
-                      title={day.statusLabel}
-                      type="button"
-                    >
-                      {formatDayNumber(day.date)}
-                    </button>
-                  );
-                })}
+              <div className="mt-4 space-y-4">
+                {months.map((month) => (
+                  <section
+                    className="rounded-[8px] border border-line bg-white/78 p-3 shadow-[0_10px_30px_rgba(13,34,51,0.04)]"
+                    key={month.key}
+                  >
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold capitalize text-midnight">{month.label}</h3>
+                      <span className="rounded-full bg-green/10 px-2.5 py-1 text-[0.68rem] font-semibold text-green">
+                        {month.availableDays} disponible{month.availableDays === 1 ? "" : "s"}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 text-center text-[0.65rem] font-semibold uppercase text-ink/45">
+                      {calendarWeekdays.map((weekday, index) => (
+                        <span key={`${month.key}-${weekday}-${index}`}>{weekday}</span>
+                      ))}
+                    </div>
+
+                    <div className="mt-1.5 grid grid-cols-7 gap-1.5">
+                      {Array.from({ length: month.leadingBlanks }, (_, index) => (
+                        <span
+                          aria-hidden
+                          className="aspect-square rounded-[6px] border border-transparent"
+                          key={`${month.key}-blank-${index}`}
+                        />
+                      ))}
+
+                      {month.days.map((day) => {
+                        const isSelected = selectedRange
+                          ? day.date >= selectedRange.arrivalDate &&
+                            day.date < selectedRange.departureDate
+                          : false;
+
+                        return (
+                          <button
+                            aria-label={`${formatFullDate(day.date)}: ${day.statusLabel}`}
+                            className={`focus-ring aspect-square rounded-[6px] border text-[0.72rem] font-semibold transition ${getAvailabilityDayClasses(day, isSelected)}`}
+                            disabled={day.status !== "AVAILABLE"}
+                            key={day.date}
+                            onClick={() => onDaySelect(day)}
+                            title={day.statusLabel}
+                            type="button"
+                          >
+                            {formatDayNumber(day.date)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2 text-[0.7rem] font-semibold text-ink/62">
@@ -1009,6 +1063,33 @@ function getAvailabilityDayClasses(day: StayAvailabilityDay, isSelected: boolean
   return "cursor-not-allowed border-line bg-white text-ink/38";
 }
 
+function buildAvailabilityMonths(days: StayAvailabilityDay[]): AvailabilityMonth[] {
+  const monthMap = new Map<string, StayAvailabilityDay[]>();
+
+  for (const day of days) {
+    const key = day.date.slice(0, 7);
+    monthMap.set(key, [...(monthMap.get(key) ?? []), day]);
+  }
+
+  return Array.from(monthMap.entries()).flatMap(([key, monthDays]) => {
+    const firstDay = monthDays[0];
+
+    if (!firstDay) {
+      return [];
+    }
+
+    return [
+      {
+        availableDays: monthDays.filter((day) => day.status === "AVAILABLE").length,
+        days: monthDays,
+        key,
+        label: formatMonthTitle(firstDay.date),
+        leadingBlanks: getMondayFirstWeekdayIndex(firstDay.date)
+      }
+    ];
+  });
+}
+
 function addDateOnlyDays(value: string, days: number) {
   const date = new Date(value + "T00:00:00.000Z");
   date.setUTCDate(date.getUTCDate() + days);
@@ -1029,6 +1110,27 @@ function formatShortDate(value: string) {
     timeZone: "UTC"
   }).format(new Date(value + "T00:00:00.000Z"));
 }
+
+function formatFullDate(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    dateStyle: "full",
+    timeZone: "UTC"
+  }).format(new Date(value + "T00:00:00.000Z"));
+}
+
+function formatMonthTitle(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric"
+  }).format(new Date(value + "T00:00:00.000Z"));
+}
+
+function getMondayFirstWeekdayIndex(value: string) {
+  const day = new Date(value + "T00:00:00.000Z").getUTCDay();
+  return (day + 6) % 7;
+}
+
 function formatCurrency(amount: string, currency: string) {
   return new Intl.NumberFormat("es-GT", {
     currency,
