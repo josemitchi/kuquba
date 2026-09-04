@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { prisma } from "../lib/prisma";
 import { createAuditEventEnvelope } from "../modules/audit/audit-event";
+import { sendReservationConfirmationEmail } from "../modules/notifications/reservation-confirmation-email";
 
 const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -1221,6 +1222,11 @@ async function confirmPublicDevPayment(input: {
     request: input.request
   });
 
+  const confirmationEmail = await deliverReservationConfirmationEmail({
+    reservation: result.reservation,
+    request: input.request
+  });
+
   await writePublicPaymentAudit({
     action: "public.payment_checkout.confirm",
     entityId: result.payment.id,
@@ -1229,6 +1235,7 @@ async function confirmPublicDevPayment(input: {
       currency: result.payment.currency,
       ledgerEntryCount: result.ledgerEntryCount,
       provider: result.payment.provider,
+      confirmationEmail,
       reservationId: result.payment.reservationId,
       reservationStatus: result.reservation.status,
       status: result.payment.status
@@ -2156,6 +2163,73 @@ async function writeGuestPortalProvisioningAudit(input: {
   });
 
   input.request.log.info({ auditEvent }, "audit.event");
+}
+type ReservationConfirmationEmailAudit = {
+  error: string | null;
+  provider: "resend_email";
+  providerMessageId: string | null;
+  reason: string | null;
+  sentAt: string;
+  status: "ACCEPTED" | "FAILED" | "SKIPPED";
+};
+
+async function deliverReservationConfirmationEmail(input: {
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  reservation: PaymentForCheckoutAction["reservation"];
+}): Promise<ReservationConfirmationEmailAudit> {
+  try {
+    const delivery = await sendReservationConfirmationEmail({
+      arrivalDate: input.reservation.arrivalDate,
+      currency: input.reservation.currency,
+      departureDate: input.reservation.departureDate,
+      guestEmail: input.reservation.guest.email,
+      guestName: input.reservation.guest.fullName,
+      nights: differenceInNights(input.reservation.arrivalDate, input.reservation.departureDate),
+      propertyDestination: input.reservation.property.destination,
+      propertyName: input.reservation.property.name,
+      reservationCode: input.reservation.privateCode,
+      total: input.reservation.total?.toString() ?? "0.00",
+      unitName: input.reservation.unit.name
+    });
+
+    const confirmationEmail = {
+      error: null,
+      provider: delivery.provider,
+      providerMessageId: delivery.status === "ACCEPTED" ? delivery.providerMessageId ?? null : null,
+      reason: delivery.status === "SKIPPED" ? delivery.reason : null,
+      sentAt: delivery.sentAt.toISOString(),
+      status: delivery.status
+    } satisfies ReservationConfirmationEmailAudit;
+
+    input.request.log.info(
+      {
+        confirmationEmail,
+        reservationId: input.reservation.id
+      },
+      "reservation.confirmation_email"
+    );
+
+    return confirmationEmail;
+  } catch (error) {
+    const confirmationEmail = {
+      error: error instanceof Error ? error.message : "unknown_error",
+      provider: "resend_email",
+      providerMessageId: null,
+      reason: null,
+      sentAt: new Date().toISOString(),
+      status: "FAILED"
+    } satisfies ReservationConfirmationEmailAudit;
+
+    input.request.log.error(
+      {
+        err: error,
+        reservationId: input.reservation.id
+      },
+      "reservation.confirmation_email_failed"
+    );
+
+    return confirmationEmail;
+  }
 }
 async function writePublicPaymentAudit(input: {
   action: string;

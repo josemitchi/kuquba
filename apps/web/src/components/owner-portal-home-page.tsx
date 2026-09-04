@@ -237,7 +237,7 @@ export function OwnerPortalHomePage() {
           <div className="max-w-4xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-green/20 bg-green/10 px-4 py-2 text-sm font-semibold text-green">
               <Building2 aria-hidden className="h-4 w-4" />
-              Portal del propietario
+              Propietarios
             </p>
             <h1 className="mt-5 font-display text-4xl leading-tight text-midnight md:text-5xl">
               Portfolio y operacion de propiedades

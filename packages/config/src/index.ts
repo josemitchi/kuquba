@@ -20,9 +20,9 @@ export const publicNavigation = [
 ] as const;
 
 export const accessOptions = [
-  { label: "Portal del propietario", href: "/owner" },
-  { label: "Mi estancia", href: "/stay" },
-  { label: "Equipo KUQUBA", href: "/ops" }
+  { label: "Huespedes", href: "/stay" },
+  { label: "Propietarios", href: "/owner" },
+  { label: "Operaciones", href: "/ops" }
 ] as const;
 
 export const trustPillars = [
@@ -35,7 +35,7 @@ export const trustPillars = [
 export const portalEntries = [
   {
     key: "guest",
-    label: "Mi estancia",
+    label: "Huespedes",
     href: "/stay",
     roleKey: "guest",
     accessMethod: "OTP por correo",
@@ -43,7 +43,7 @@ export const portalEntries = [
   },
   {
     key: "owner",
-    label: "Portal del propietario",
+    label: "Propietarios",
     href: "/owner",
     roleKey: "owner",
     accessMethod: "MFA obligatorio",
@@ -51,7 +51,7 @@ export const portalEntries = [
   },
   {
     key: "ops",
-    label: "Equipo KUQUBA",
+    label: "Operaciones",
     href: "/ops",
     roleKey: "ops_admin",
     accessMethod: "MFA obligatorio y privilegio minimo",
@@ -91,7 +91,7 @@ export const roleProfiles = [
   },
   {
     key: "ops_admin",
-    label: "Equipo KUQUBA",
+    label: "Operaciones",
     permissions: [
       "property:assigned:read",
       "property:assigned:update",

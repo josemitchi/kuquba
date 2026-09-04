@@ -28,21 +28,21 @@ const dashboardCopy: Record<
   }
 > = {
   guest: {
-    title: "Mi estancia",
+    title: "Huespedes",
     eyebrow: "Centro del huesped",
     summary: "Aqui vivira el resumen de reserva, llegada, soporte y checkout.",
     items: ["Reserva y pago", "Preparar llegada", "Soporte durante la estancia"],
     icon: CalendarCheck2
   },
   owner: {
-    title: "Portal del propietario",
+    title: "Propietarios",
     eyebrow: "Gestion y transparencia",
     summary: "Aqui viviran propiedades asignadas, reservas, mantenimiento y liquidaciones.",
     items: ["Propiedades", "Reservas", "Documentos y liquidaciones"],
     icon: Building2
   },
   ops: {
-    title: "Equipo KUQUBA",
+    title: "Operaciones",
     eyebrow: "Operacion interna",
     summary: "Aqui viviran calendario operacional, housekeeping, mantenimiento y auditoria.",
     items: ["Calendario", "Housekeeping", "Auditoria y permisos"],

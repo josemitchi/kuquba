@@ -23,7 +23,7 @@ type PortalCopy = {
 
 const portalCopy: Record<PortalAudience, PortalCopy> = {
   guest: {
-    eyebrow: "Mi estancia",
+    eyebrow: "Huespedes",
     title: "Accede a los detalles de tu reserva.",
     body: "Usa el correo o telefono asociado a tu reserva para recibir una verificacion segura.",
     primaryFieldLabel: "Correo o telefono",
@@ -36,7 +36,7 @@ const portalCopy: Record<PortalAudience, PortalCopy> = {
     ]
   },
   owner: {
-    eyebrow: "Portal del propietario",
+    eyebrow: "Propietarios",
     title: "Controla tu propiedad con acceso verificado.",
     body: "El portal de propietarios requiere MFA para proteger informacion operativa, documentos y liquidaciones.",
     primaryFieldLabel: "Correo del propietario",
@@ -49,7 +49,7 @@ const portalCopy: Record<PortalAudience, PortalCopy> = {
     ]
   },
   ops: {
-    eyebrow: "Equipo KUQUBA",
+    eyebrow: "Operaciones",
     title: "Operaciones con privilegio minimo.",
     body: "El acceso del equipo requiere MFA y permisos por rol para proteger reservas, finanzas y datos sensibles.",
     primaryFieldLabel: "Correo corporativo",

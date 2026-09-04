@@ -144,7 +144,7 @@ export function GuestPortalHomePage() {
           <div className="max-w-4xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-green/20 bg-green/10 px-4 py-2 text-sm font-semibold text-green">
               <DoorOpen aria-hidden className="h-4 w-4" />
-              Mi estancia
+              Huespedes
             </p>
             <h1 className="mt-5 font-display text-4xl leading-tight text-midnight md:text-5xl">
               Reservas y llegada

@@ -53,7 +53,7 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t border-white/10 py-5 text-center text-xs text-white/58">
-        © 2024 KUQUBA. Todos los derechos reservados.
+        © 2026 KUQUBA. Todos los derechos reservados.
       </div>
     </footer>
   );
