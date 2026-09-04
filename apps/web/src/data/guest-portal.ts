@@ -51,6 +51,8 @@ export type GuestReservation = {
   payment: GuestPayment | null;
   propertyDestination: string;
   propertyName: string;
+  propertyImageAlt: string;
+  propertyImageUrl: string;
   reservationCode: string;
   source: string;
   status: GuestReservationStatus;

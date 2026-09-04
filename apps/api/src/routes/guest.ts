@@ -119,7 +119,13 @@ async function loadGuestPortalRecord(input: { email: string; userId: string }) {
               createdAt: "desc"
             }
           },
-          property: true,
+          property: {
+            include: {
+              images: {
+                orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }]
+              }
+            }
+          },
           stayQuote: true,
           unit: true
         },
@@ -269,6 +275,7 @@ function buildGuestPortal(
 
 function mapGuestReservation(reservation: GuestReservationRecord, now: Date) {
   const latestPayment = getLatestPayment(reservation);
+  const propertyImage = reservation.property.images[0] ?? null;
 
   return {
     arrivalDate: toDateOnly(reservation.arrivalDate),
@@ -281,6 +288,8 @@ function mapGuestReservation(reservation: GuestReservationRecord, now: Date) {
     payment: latestPayment ? mapGuestPayment(latestPayment) : null,
     propertyDestination: reservation.property.destination,
     propertyName: reservation.property.name,
+    propertyImageAlt: propertyImage?.alt ?? `Vista de ${reservation.property.name}`,
+    propertyImageUrl: propertyImage?.url ?? "/images/hero-villa-atitlan.png",
     reservationCode: reservation.privateCode,
     source: reservation.confirmationSource ?? reservation.stayQuote?.source ?? "manual",
     arrival: buildGuestArrivalInfo(reservation),

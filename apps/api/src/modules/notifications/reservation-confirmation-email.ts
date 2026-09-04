@@ -1,7 +1,10 @@
 import { env } from "../../config/env";
 
 const resendEmailsUrl = "https://api.resend.com/emails";
-const guestPortalUrl = "https://kuquba.com/stay";
+const publicSiteUrl = "https://kuquba.com";
+const guestPortalUrl = publicSiteUrl + "/stay";
+const brandLogoUrl = publicSiteUrl + "/brand/kuquba-logo.svg";
+const defaultPropertyImageUrl = publicSiteUrl + "/images/hero-villa-atitlan.png";
 
 export type ReservationConfirmationEmailInput = {
   arrivalDate: Date;
@@ -11,6 +14,8 @@ export type ReservationConfirmationEmailInput = {
   guestName: string;
   nights: number;
   propertyDestination: string;
+  propertyImageAlt: string;
+  propertyImageUrl: string;
   propertyName: string;
   reservationCode: string;
   total: string;
@@ -85,35 +90,67 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
   const unitName = escapeHtml(input.unitName);
   const propertyDestination = escapeHtml(input.propertyDestination);
   const reservationCode = escapeHtml(input.reservationCode);
+  const propertyImageUrl = escapeHtml(toPublicAssetUrl(input.propertyImageUrl));
+  const propertyImageAlt = escapeHtml(input.propertyImageAlt || `Vista de ${input.propertyName}`);
 
   return {
     from: env.RESEND_FROM_EMAIL,
     html: `
-      <div style="margin:0;background:#f7f3eb;padding:28px 16px;font-family:Arial,Helvetica,sans-serif;color:#0d2233;">
-        <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #d9e1e7;border-radius:12px;overflow:hidden;box-shadow:0 22px 70px rgba(13,34,51,0.12);">
-          <div style="background:#0d2233;color:#ffffff;padding:30px 32px;">
-            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#2dd4bf;">KUQUBA</div>
-            <h1 style="margin:12px 0 0;font-family:Georgia,Times,serif;font-size:32px;line-height:1.12;font-weight:500;">Tu reserva esta confirmada</h1>
-            <p style="margin:12px 0 0;font-size:16px;line-height:1.6;color:#e6f1ef;">Ya puedes revisar los detalles de llegada y preparar tu estancia.</p>
-          </div>
-          <div style="padding:30px 32px;">
-            <p style="margin:0 0 18px;font-size:16px;line-height:1.6;">Hola ${guestName}, confirmamos tu reserva en <strong>${propertyName}</strong>.</p>
-            <div style="border:1px solid #d9e1e7;border-radius:10px;overflow:hidden;">
-              ${detailRow("Reserva", reservationCode)}
-              ${detailRow("Estancia", propertyName)}
-              ${detailRow("Unidad", unitName)}
-              ${detailRow("Destino", propertyDestination)}
-              ${detailRow("Llegada", arrival)}
-              ${detailRow("Salida", departure)}
-              ${detailRow("Duracion", nightsLabel)}
-              ${detailRow("Monto confirmado", total)}
-            </div>
-            <div style="margin:28px 0 18px;">
-              <a href="${guestPortalUrl}" style="display:inline-block;background:#147869;color:#ffffff;text-decoration:none;border-radius:8px;padding:14px 18px;font-weight:700;">Abrir portal de huespedes</a>
-            </div>
-            <p style="margin:0;font-size:14px;line-height:1.6;color:#435260;">Usa el correo asociado a tu reserva para recibir el codigo de acceso. Si tienes dudas, responde a este correo y el equipo KUQUBA te dara seguimiento.</p>
-          </div>
-        </div>
+      <div style="margin:0;background:#f6f2ea;padding:28px 16px;font-family:Arial,Helvetica,sans-serif;color:#0d2233;">
+        <div style="display:none;max-height:0;overflow:hidden;color:#f6f2ea;opacity:0;">Reserva confirmada: ${propertyName}, ${arrival} a ${departure}.</div>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #d9e1e7;border-radius:14px;overflow:hidden;box-shadow:0 26px 80px rgba(13,34,51,0.14);">
+          <tr>
+            <td style="background:#0d2233;padding:22px 28px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td style="vertical-align:middle;">
+                    <img src="${brandLogoUrl}" width="166" alt="KUQUBA" style="display:block;max-width:166px;height:auto;border:0;" />
+                  </td>
+                  <td align="right" style="vertical-align:middle;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#45d1bf;">Reserva confirmada</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <img src="${propertyImageUrl}" width="680" alt="${propertyImageAlt}" style="display:block;width:100%;max-height:280px;object-fit:cover;border:0;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:30px 32px 10px;">
+              <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#147869;">${reservationCode}</p>
+              <h1 style="margin:0;font-family:Georgia,Times,serif;font-size:34px;line-height:1.12;font-weight:500;color:#0d2233;">Tu estancia esta confirmada.</h1>
+              <p style="margin:16px 0 0;font-size:16px;line-height:1.65;color:#435260;">Hola ${guestName}, ya confirmamos tu reserva en <strong style="color:#0d2233;">${propertyName}</strong>. Estos son los datos principales para preparar tu llegada.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:20px 32px 0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d9e1e7;border-radius:12px;overflow:hidden;">
+                ${detailRow("Estancia", propertyName)}
+                ${detailRow("Unidad", unitName)}
+                ${detailRow("Destino", propertyDestination)}
+                ${detailRow("Llegada", arrival)}
+                ${detailRow("Salida", departure)}
+                ${detailRow("Duracion", nightsLabel)}
+                ${detailRow("Monto confirmado", total)}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:28px 32px 8px;">
+              <a href="${guestPortalUrl}" style="display:block;background:#147869;color:#ffffff;text-align:center;text-decoration:none;border-radius:9px;padding:15px 18px;font-weight:700;font-size:15px;">Abrir portal de huespedes</a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 32px 32px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f2ea;border-radius:10px;">
+                <tr>
+                  <td style="padding:16px 18px;font-size:14px;line-height:1.6;color:#435260;">Usa el correo asociado a tu reserva para recibir el codigo de acceso. Si necesitas coordinar algo antes de llegar, responde a este correo y Operaciones KUQUBA te dara seguimiento.</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </div>
     `,
     reply_to: env.RESEND_REPLY_TO,
@@ -140,11 +177,29 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
 
 function detailRow(label: string, value: string) {
   return `
-    <div style="display:flex;gap:18px;padding:14px 16px;border-bottom:1px solid #edf1f4;">
-      <div style="width:150px;min-width:150px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#147869;">${escapeHtml(label)}</div>
-      <div style="font-size:15px;line-height:1.45;color:#0d2233;">${value}</div>
-    </div>
+    <tr>
+      <td style="width:38%;padding:14px 16px;border-bottom:1px solid #edf1f4;background:#fbfaf6;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#147869;vertical-align:top;">${escapeHtml(label)}</td>
+      <td style="padding:14px 16px;border-bottom:1px solid #edf1f4;font-size:15px;line-height:1.45;color:#0d2233;font-weight:700;vertical-align:top;">${value}</td>
+    </tr>
   `;
+}
+
+function toPublicAssetUrl(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return defaultPropertyImageUrl;
+  }
+
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/")) {
+    return publicSiteUrl + trimmed;
+  }
+
+  return trimmed;
 }
 
 function formatDate(date: Date) {

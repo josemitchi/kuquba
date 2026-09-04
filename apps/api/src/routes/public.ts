@@ -1200,7 +1200,13 @@ async function confirmPublicDevPayment(input: {
       },
       include: {
         guest: true,
-        property: true,
+        property: {
+          include: {
+            images: {
+              orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }]
+            }
+          }
+        },
         stayQuote: true,
         unit: true
       },
@@ -1368,7 +1374,13 @@ async function loadPaymentForCheckoutAction(input: PublicPaymentCheckoutActionBo
       reservation: {
         include: {
           guest: true,
-          property: true,
+          property: {
+            include: {
+              images: {
+                orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }]
+              }
+            }
+          },
           stayQuote: true,
           unit: true
         }
@@ -2178,6 +2190,8 @@ async function deliverReservationConfirmationEmail(input: {
   reservation: PaymentForCheckoutAction["reservation"];
 }): Promise<ReservationConfirmationEmailAudit> {
   try {
+    const propertyImage = input.reservation.property.images[0] ?? null;
+
     const delivery = await sendReservationConfirmationEmail({
       arrivalDate: input.reservation.arrivalDate,
       currency: input.reservation.currency,
@@ -2186,6 +2200,8 @@ async function deliverReservationConfirmationEmail(input: {
       guestName: input.reservation.guest.fullName,
       nights: differenceInNights(input.reservation.arrivalDate, input.reservation.departureDate),
       propertyDestination: input.reservation.property.destination,
+      propertyImageAlt: propertyImage?.alt ?? `Vista de ${input.reservation.property.name}`,
+      propertyImageUrl: propertyImage?.url ?? "/images/hero-villa-atitlan.png",
       propertyName: input.reservation.property.name,
       reservationCode: input.reservation.privateCode,
       total: input.reservation.total?.toString() ?? "0.00",

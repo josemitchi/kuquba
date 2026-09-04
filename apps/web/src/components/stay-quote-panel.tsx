@@ -151,6 +151,8 @@ export function StayQuotePanel({
   const [availability, setAvailability] = useState<StayAvailability | null>(null);
   const [availabilityState, setAvailabilityState] = useState<AvailabilityLoadState>("idle");
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [availabilitySelectionNotice, setAvailabilitySelectionNotice] = useState<string | null>(null);
+  const [isExtendingAvailabilityRange, setIsExtendingAvailabilityRange] = useState(false);
   const [holdError, setHoldError] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [guestEmail, setGuestEmail] = useState("");
@@ -160,6 +162,8 @@ export function StayQuotePanel({
     let isMounted = true;
     setAvailabilityState("loading");
     setAvailabilityError(null);
+    setAvailabilitySelectionNotice(null);
+    setIsExtendingAvailabilityRange(false);
 
     const query = new URLSearchParams({
       days: "60",
@@ -188,7 +192,7 @@ export function StayQuotePanel({
         setAvailabilityState("error");
       });
 
-    return () => {
+  return () => {
       isMounted = false;
     };
   }, [guests, stayId]);
@@ -198,11 +202,46 @@ export function StayQuotePanel({
       return;
     }
 
-    setArrivalDate(day.date);
-    setDepartureDate(addDateOnlyDays(day.date, availability?.recommendedNights ?? 2));
-    resetHoldAndCheckout();
-    setQuote(null);
-    setSubmitState("idle");
+    const availabilityDays = availability?.days ?? [];
+    const recommendedNights = availability?.recommendedNights ?? 2;
+    const recommendedDeparture = addDateOnlyDays(day.date, recommendedNights);
+    const fallbackDeparture = addDateOnlyDays(day.date, 1);
+    const canUseRecommendedRange = isAvailableStayRange(
+      day.date,
+      recommendedDeparture,
+      availabilityDays
+    );
+
+    if (!arrivalDate || !isExtendingAvailabilityRange || day.date <= arrivalDate) {
+      setArrivalDate(day.date);
+      setDepartureDate(canUseRecommendedRange ? recommendedDeparture : fallbackDeparture);
+      setAvailabilitySelectionNotice(
+        canUseRecommendedRange
+          ? null
+          : "La recomendacion cruza fechas ocupadas. Selecciona otra salida disponible."
+      );
+      setIsExtendingAvailabilityRange(true);
+      resetQuoteFlow();
+      return;
+    }
+
+    const extendedDeparture = addDateOnlyDays(day.date, 1);
+
+    if (!isAvailableStayRange(arrivalDate, extendedDeparture, availabilityDays)) {
+      setArrivalDate(day.date);
+      setDepartureDate(canUseRecommendedRange ? recommendedDeparture : fallbackDeparture);
+      setAvailabilitySelectionNotice(
+        "Ese rango cruza fechas ocupadas. Reiniciamos la llegada en la fecha seleccionada."
+      );
+      setIsExtendingAvailabilityRange(true);
+      resetQuoteFlow();
+      return;
+    }
+
+    setDepartureDate(extendedDeparture);
+    setAvailabilitySelectionNotice(null);
+    setIsExtendingAvailabilityRange(true);
+    resetQuoteFlow();
   }
 
   function handleSuggestedRangeSelect() {
@@ -212,9 +251,30 @@ export function StayQuotePanel({
 
     setArrivalDate(availability.nextAvailableRange.arrivalDate);
     setDepartureDate(availability.nextAvailableRange.departureDate);
-    resetHoldAndCheckout();
-    setQuote(null);
-    setSubmitState("idle");
+    setAvailabilitySelectionNotice(null);
+    setIsExtendingAvailabilityRange(true);
+    resetQuoteFlow();
+  }
+
+  function handleAvailabilitySelectionClear() {
+    setArrivalDate("");
+    setDepartureDate("");
+    setAvailabilitySelectionNotice(null);
+    setIsExtendingAvailabilityRange(false);
+    resetQuoteFlow();
+  }
+
+  function handleArrivalInputChange(value: string) {
+    setArrivalDate(value);
+    setAvailabilitySelectionNotice(null);
+    setIsExtendingAvailabilityRange(Boolean(value));
+    resetQuoteFlow();
+  }
+
+  function handleDepartureInputChange(value: string) {
+    setDepartureDate(value);
+    setAvailabilitySelectionNotice(null);
+    resetQuoteFlow();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -387,6 +447,11 @@ export function StayQuotePanel({
     setGuestEmail("");
   }
 
+  function resetQuoteFlow() {
+    resetHoldAndCheckout();
+    setQuote(null);
+    setSubmitState("idle");
+  }
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-panel">
       <div className="flex items-center gap-3">
@@ -406,7 +471,7 @@ export function StayQuotePanel({
             <input
               className="focus-ring min-h-12 w-full rounded-[6px] border border-line px-4 text-sm outline-none transition focus:border-green"
               name="arrivalDate"
-              onChange={(event) => setArrivalDate(event.target.value)}
+              onChange={(event) => handleArrivalInputChange(event.target.value)}
               required
               type="date"
               value={arrivalDate}
@@ -417,7 +482,7 @@ export function StayQuotePanel({
             <input
               className="focus-ring min-h-12 w-full rounded-[6px] border border-line px-4 text-sm outline-none transition focus:border-green"
               name="departureDate"
-              onChange={(event) => setDepartureDate(event.target.value)}
+              onChange={(event) => handleDepartureInputChange(event.target.value)}
               required
               type="date"
               value={departureDate}
@@ -447,8 +512,10 @@ export function StayQuotePanel({
           departureDate={departureDate}
           error={availabilityError}
           loadState={availabilityState}
+          onClearSelection={handleAvailabilitySelectionClear}
           onDaySelect={handleAvailabilityDaySelect}
           onSuggestedRangeSelect={handleSuggestedRangeSelect}
+          selectionNotice={availabilitySelectionNotice}
         />
 
         <button
@@ -509,24 +576,38 @@ function AvailabilityGuide({
   departureDate,
   error,
   loadState,
+  onClearSelection,
   onDaySelect,
-  onSuggestedRangeSelect
+  onSuggestedRangeSelect,
+  selectionNotice
 }: {
   availability: StayAvailability | null;
   arrivalDate: string;
   departureDate: string;
   error: string | null;
   loadState: AvailabilityLoadState;
+  onClearSelection: () => void;
   onDaySelect: (day: StayAvailabilityDay) => void;
   onSuggestedRangeSelect: () => void;
+  selectionNotice: string | null;
 }) {
   const selectedRange = arrivalDate && departureDate ? { arrivalDate, departureDate } : null;
+  const selectedNights = selectedRange
+    ? differenceInDateOnlyDays(selectedRange.arrivalDate, selectedRange.departureDate)
+    : 0;
   const months = availability ? buildAvailabilityMonths(availability.days) : [];
+  const [visibleMonthIndex, setVisibleMonthIndex] = useState(0);
   const firstAvailabilityDay = availability?.days[0];
   const lastAvailabilityDay = availability?.days[availability.days.length - 1];
   const calendarRangeLabel = firstAvailabilityDay && lastAvailabilityDay
     ? `${formatShortDate(firstAvailabilityDay.date)} - ${formatShortDate(lastAvailabilityDay.date)}`
     : null;
+  const boundedMonthIndex = Math.min(visibleMonthIndex, Math.max(months.length - 1, 0));
+  const visibleMonth = months[boundedMonthIndex] ?? null;
+
+  useEffect(() => {
+    setVisibleMonthIndex(0);
+  }, [availability?.days.length, availability?.generatedAt, availability?.stayId]);
 
   return (
     <div className="rounded-[6px] border border-line bg-ivory p-4">
@@ -539,11 +620,11 @@ function AvailabilityGuide({
             <div>
               <p className="text-sm font-semibold text-midnight">Calendario de disponibilidad</p>
               <p className="mt-1 text-xs leading-5 text-ink/62">
-                Selecciona una fecha disponible para rellenar llegada y salida.
+                Primer clic define llegada. Haz clic en otra fecha disponible para extender noches.
               </p>
               {calendarRangeLabel ? (
                 <p className="mt-2 text-[0.7rem] font-semibold uppercase text-green">
-                  Ventana visible: {calendarRangeLabel}
+                  60 dias evaluados: {calendarRangeLabel}
                 </p>
               ) : null}
             </div>
@@ -558,6 +639,31 @@ function AvailabilityGuide({
             ) : null}
           </div>
 
+          {selectedRange ? (
+            <div className="mt-4 rounded-[6px] border border-green/24 bg-green/10 p-3 text-xs leading-5 text-midnight">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p>
+                  <span className="font-semibold text-green">Seleccion:</span>{" "}
+                  {formatDate(selectedRange.arrivalDate)} - {formatDate(selectedRange.departureDate)}
+                  {selectedNights > 0 ? `, ${selectedNights} noche${selectedNights === 1 ? "" : "s"}` : ""}.
+                </p>
+                <button
+                  className="focus-ring inline-flex min-h-8 w-fit items-center justify-center rounded-[6px] border border-green/35 bg-white px-3 font-semibold text-green transition hover:border-green"
+                  onClick={onClearSelection}
+                  type="button"
+                >
+                  Nueva seleccion
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {selectionNotice ? (
+            <div className="mt-3 rounded-[6px] border border-terracotta/30 bg-terracotta/10 p-3 text-xs leading-5 text-midnight">
+              {selectionNotice}
+            </div>
+          ) : null}
+
           {loadState === "loading" ? (
             <div className="mt-4 flex items-center gap-2 text-xs font-semibold text-ink/58">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
@@ -571,60 +677,97 @@ function AvailabilityGuide({
             </div>
           ) : null}
 
-          {availability ? (
+          {availability && visibleMonth ? (
             <>
-              <div className="mt-4 space-y-4">
-                {months.map((month) => (
-                  <section
-                    className="rounded-[8px] border border-line bg-white/78 p-3 shadow-[0_10px_30px_rgba(13,34,51,0.04)]"
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button
+                  className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green disabled:cursor-not-allowed disabled:opacity-45"
+                  disabled={boundedMonthIndex === 0}
+                  onClick={() => setVisibleMonthIndex((current) => Math.max(0, current - 1))}
+                  type="button"
+                >
+                  Anterior
+                </button>
+                <span className="text-xs font-semibold text-ink/58">
+                  {boundedMonthIndex + 1} de {months.length}
+                </span>
+                <button
+                  className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green disabled:cursor-not-allowed disabled:opacity-45"
+                  disabled={boundedMonthIndex >= months.length - 1}
+                  onClick={() =>
+                    setVisibleMonthIndex((current) => Math.min(months.length - 1, current + 1))
+                  }
+                  type="button"
+                >
+                  Siguiente
+                </button>
+              </div>
+
+              <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                {months.map((month, index) => (
+                  <button
+                    className={`focus-ring min-h-9 shrink-0 rounded-[6px] border px-3 text-xs font-semibold capitalize transition ${
+                      index === boundedMonthIndex
+                        ? "border-green bg-green text-white"
+                        : "border-line bg-white text-midnight hover:border-green hover:text-green"
+                    }`}
                     key={month.key}
+                    onClick={() => setVisibleMonthIndex(index)}
+                    type="button"
                   >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold capitalize text-midnight">{month.label}</h3>
-                      <span className="rounded-full bg-green/10 px-2.5 py-1 text-[0.68rem] font-semibold text-green">
-                        {month.availableDays} disponible{month.availableDays === 1 ? "" : "s"}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1 text-center text-[0.65rem] font-semibold uppercase text-ink/45">
-                      {calendarWeekdays.map((weekday, index) => (
-                        <span key={`${month.key}-${weekday}-${index}`}>{weekday}</span>
-                      ))}
-                    </div>
-
-                    <div className="mt-1.5 grid grid-cols-7 gap-1.5">
-                      {Array.from({ length: month.leadingBlanks }, (_, index) => (
-                        <span
-                          aria-hidden
-                          className="aspect-square rounded-[6px] border border-transparent"
-                          key={`${month.key}-blank-${index}`}
-                        />
-                      ))}
-
-                      {month.days.map((day) => {
-                        const isSelected = selectedRange
-                          ? day.date >= selectedRange.arrivalDate &&
-                            day.date < selectedRange.departureDate
-                          : false;
-
-                        return (
-                          <button
-                            aria-label={`${formatFullDate(day.date)}: ${day.statusLabel}`}
-                            className={`focus-ring aspect-square rounded-[6px] border text-[0.72rem] font-semibold transition ${getAvailabilityDayClasses(day, isSelected)}`}
-                            disabled={day.status !== "AVAILABLE"}
-                            key={day.date}
-                            onClick={() => onDaySelect(day)}
-                            title={day.statusLabel}
-                            type="button"
-                          >
-                            {formatDayNumber(day.date)}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
+                    {formatCompactMonthTitle(month.key)}
+                  </button>
                 ))}
               </div>
+
+              <section className="mt-3 rounded-[8px] border border-line bg-white/78 p-3 shadow-[0_10px_30px_rgba(13,34,51,0.04)]">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold capitalize text-midnight">
+                    {visibleMonth.label}
+                  </h3>
+                  <span className="rounded-full bg-green/10 px-2.5 py-1 text-[0.68rem] font-semibold text-green">
+                    {visibleMonth.availableDays} disponible{visibleMonth.availableDays === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 text-center text-[0.65rem] font-semibold uppercase text-ink/45">
+                  {calendarWeekdays.map((weekday, index) => (
+                    <span key={`${visibleMonth.key}-${weekday}-${index}`}>{weekday}</span>
+                  ))}
+                </div>
+
+                <div className="mt-1.5 grid grid-cols-7 gap-1.5">
+                  {Array.from({ length: visibleMonth.leadingBlanks }, (_, index) => (
+                    <span
+                      aria-hidden
+                      className="aspect-square rounded-[6px] border border-transparent"
+                      key={`${visibleMonth.key}-blank-${index}`}
+                    />
+                  ))}
+
+                  {visibleMonth.days.map((day) => {
+                    const isSelected = selectedRange
+                      ? day.date >= selectedRange.arrivalDate &&
+                        day.date < selectedRange.departureDate
+                      : false;
+
+                    return (
+                      <button
+                        aria-label={`${formatFullDate(day.date)}: ${day.statusLabel}`}
+                        aria-pressed={isSelected}
+                        className={`focus-ring aspect-square rounded-[6px] border text-[0.72rem] font-semibold transition ${getAvailabilityDayClasses(day, isSelected)}`}
+                        disabled={day.status !== "AVAILABLE"}
+                        key={day.date}
+                        onClick={() => onDaySelect(day)}
+                        title={day.statusLabel}
+                        type="button"
+                      >
+                        {formatDayNumber(day.date)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
 
               <div className="mt-4 flex flex-wrap gap-2 text-[0.7rem] font-semibold text-ink/62">
                 <AvailabilityLegend
@@ -1047,6 +1190,29 @@ function getCheckoutErrorMessage(error: string) {
   return "No se pudo actualizar el pago. Intenta de nuevo.";
 }
 
+function isAvailableStayRange(
+  arrivalDate: string,
+  departureDate: string,
+  days: StayAvailabilityDay[]
+) {
+  if (!arrivalDate || !departureDate || departureDate <= arrivalDate) {
+    return false;
+  }
+
+  const dayStatuses = new Map(days.map((day) => [day.date, day.status]));
+  let currentDate = arrivalDate;
+
+  while (currentDate < departureDate) {
+    if (dayStatuses.get(currentDate) !== "AVAILABLE") {
+      return false;
+    }
+
+    currentDate = addDateOnlyDays(currentDate, 1);
+  }
+
+  return true;
+}
+
 function getAvailabilityDayClasses(day: StayAvailabilityDay, isSelected: boolean) {
   if (isSelected) {
     return "border-green bg-green text-white shadow-sm";
@@ -1090,6 +1256,13 @@ function buildAvailabilityMonths(days: StayAvailabilityDay[]): AvailabilityMonth
   });
 }
 
+function differenceInDateOnlyDays(arrivalDate: string, departureDate: string) {
+  const arrival = new Date(arrivalDate + "T00:00:00.000Z");
+  const departure = new Date(departureDate + "T00:00:00.000Z");
+
+  return Math.max(0, Math.round((departure.getTime() - arrival.getTime()) / 86_400_000));
+}
+
 function addDateOnlyDays(value: string, days: number) {
   const date = new Date(value + "T00:00:00.000Z");
   date.setUTCDate(date.getUTCDate() + days);
@@ -1109,6 +1282,13 @@ function formatShortDate(value: string) {
     month: "short",
     timeZone: "UTC"
   }).format(new Date(value + "T00:00:00.000Z"));
+}
+
+function formatCompactMonthTitle(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    month: "short",
+    timeZone: "UTC"
+  }).format(new Date(value + "-01T00:00:00.000Z"));
 }
 
 function formatFullDate(value: string) {

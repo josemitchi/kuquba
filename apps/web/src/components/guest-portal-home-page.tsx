@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   getDevPortalApiBaseUrl,
@@ -31,7 +31,7 @@ import type {
   GuestReservationTone
 } from "@/data/guest-portal";
 
-const metricIcons: LucideIcon[] = [CalendarCheck2, Clock3, DoorOpen, CreditCard];
+const metricIcons: LucideIcon[] = [CalendarCheck2, Clock3, CreditCard];
 const protectedPortalSummary =
   "Vista protegida para huespedes verificados. Tus reservas, pagos y datos de llegada se cargan desde una sesion vigente.";
 
@@ -159,7 +159,7 @@ export function GuestPortalHomePage() {
       <section className="container-shell py-8">
         {session ? (
           portal ? (
-            <GuestDashboard session={session} snapshot={portal} />
+            <GuestDashboard snapshot={portal} />
           ) : (
             <PortalLoadState isLoading={isPortalLoading} />
           )
@@ -227,75 +227,44 @@ function AccountMenu({
   );
 }
 
-function GuestDashboard({
-  session,
-  snapshot
-}: {
-  session: DevPortalSession;
-  snapshot: GuestPortalSnapshot;
-}) {
-  const detailPanelRef = useRef<HTMLElement | null>(null);
+function GuestDashboard({ snapshot }: { snapshot: GuestPortalSnapshot }) {
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(
     snapshot.nextStay?.id ?? snapshot.reservations[0]?.id ?? null
   );
-  const selectedReservation = useMemo(
-    () =>
-      snapshot.reservations.find((reservation) => reservation.id === selectedReservationId) ??
-      snapshot.nextStay ??
-      snapshot.reservations[0] ??
-      null,
-    [selectedReservationId, snapshot.nextStay, snapshot.reservations]
-  );
+  const summaryMetrics = snapshot.metrics.filter((metric) => metric.label !== "Proxima llegada");
+
+  useEffect(() => {
+    setSelectedReservationId(snapshot.nextStay?.id ?? snapshot.reservations[0]?.id ?? null);
+  }, [snapshot.nextStay?.id, snapshot.reservations]);
 
   function handleReservationDetail(reservationId: string) {
-    setSelectedReservationId(reservationId);
-    requestAnimationFrame(() => {
-      detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      detailPanelRef.current?.focus({ preventScroll: true });
-    });
+    setSelectedReservationId((current) => (current === reservationId ? null : reservationId));
   }
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {snapshot.metrics.map((metric, index) => (
-          <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
-        ))}
-      </div>
+      <NextStayPanel reservation={snapshot.nextStay} />
 
-      <div className="mt-8 grid gap-8 xl:grid-cols-[minmax(0,1fr)_430px] xl:items-start">
-        <div className="space-y-8">
-          <section>
-            <SectionHeading
-              eyebrow="Mis reservas"
-              title="Reservas y pagos"
-              value={String(snapshot.reservations.length) + " registro(s)"}
-            />
-            <ReservationList
-              onSelect={handleReservationDetail}
-              reservations={snapshot.reservations}
-              selectedReservationId={selectedReservation?.id ?? null}
-            />
-            <div className="mt-6 grid gap-6 xl:hidden">
-              <NextStayPanel reservation={snapshot.nextStay} />
-              <GuestIdentityCard session={session} snapshot={snapshot} />
-              <GovernancePanel snapshot={snapshot} />
-            </div>
-          </section>
+      {summaryMetrics.length > 0 ? (
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {summaryMetrics.map((metric, index) => (
+            <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
+          ))}
         </div>
+      ) : null}
 
-        <aside
-          className="hidden scroll-mt-6 space-y-6 outline-none xl:block"
-          id="guest-reservation-detail"
-          ref={detailPanelRef}
-          tabIndex={-1}
-        >
-          <ReservationDetailPanel reservation={selectedReservation} variant="panel" />
-          <NextStayPanel reservation={snapshot.nextStay} />
-          <GuestIdentityCard session={session} snapshot={snapshot} />
-          <GovernancePanel snapshot={snapshot} />
-        </aside>
-      </div>
+      <section className="mt-8">
+        <SectionHeading
+          eyebrow="Mis reservas"
+          title="Reservas y pagos"
+          value={String(snapshot.reservations.length) + " registro(s)"}
+        />
+        <ReservationList
+          onSelect={handleReservationDetail}
+          reservations={snapshot.reservations}
+          selectedReservationId={selectedReservationId}
+        />
+      </section>
     </>
   );
 }
@@ -363,83 +332,100 @@ function ReservationCard({
 }) {
   return (
     <article
-      className={`rounded-[8px] border bg-white p-6 shadow-soft ${isSelected ? "border-green" : "border-line"}`}
+      className={`overflow-hidden rounded-[8px] border bg-white shadow-soft ${isSelected ? "border-green" : "border-line"}`}
     >
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase text-green">
-            {reservation.reservationCode}
-          </p>
-          <h3 className="mt-2 font-display text-3xl leading-tight text-midnight">
-            {reservation.propertyName}
-          </h3>
-          <p className="mt-2 text-sm leading-6 text-ink/68">{reservation.unitName}</p>
+      <div className="grid gap-5 p-5 lg:grid-cols-[190px_minmax(0,1fr)] lg:p-6">
+        <div className="relative min-h-44 overflow-hidden rounded-[6px] border border-line bg-midnight lg:min-h-full">
+          <Image
+            alt={reservation.propertyImageAlt}
+            className="object-cover"
+            fill
+            sizes="(min-width: 1024px) 190px, 100vw"
+            src={reservation.propertyImageUrl}
+          />
         </div>
-        <span
-          className={
-            "inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold " +
-            reservationToneClasses[reservation.statusTone]
-          }
-        >
-          {reservation.statusLabel}
-        </span>
+
+        <div className="min-w-0">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase text-green">
+                {reservation.reservationCode}
+              </p>
+              <h3 className="mt-2 truncate font-display text-3xl leading-tight text-midnight">
+                {reservation.propertyName}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-ink/68">
+                {reservation.unitName} / {reservation.propertyDestination}
+              </p>
+            </div>
+            <span
+              className={
+                "inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold " +
+                reservationToneClasses[reservation.statusTone]
+              }
+            >
+              {reservation.statusLabel}
+            </span>
+          </div>
+
+          <dl className="mt-5 grid gap-3 text-sm text-ink/72 sm:grid-cols-2 xl:grid-cols-4">
+            <ReservationFact
+              icon={DoorOpen}
+              label="Llegada"
+              value={formatDate(reservation.arrivalDate)}
+            />
+            <ReservationFact
+              icon={CalendarCheck2}
+              label="Salida"
+              value={formatDate(reservation.departureDate)}
+            />
+            <ReservationFact icon={Clock3} label="Noches" value={String(reservation.nights)} />
+            <ReservationFact
+              icon={CreditCard}
+              label="Total"
+              value={formatCurrency(reservation.total, reservation.currency)}
+            />
+          </dl>
+
+          {reservation.payment ? (
+            <div className="mt-5 flex gap-3 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-midnight">
+              <CreditCard aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
+              <div>
+                <p className="font-semibold">Pago asociado</p>
+                <p className="text-ink/68">
+                  {reservation.payment.statusLabel} -{" "}
+                  {formatCurrency(reservation.payment.amount, reservation.payment.currency)}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          {reservation.expiresAt && reservation.isActionable ? (
+            <div className="mt-5 flex gap-3 rounded-[6px] border border-terracotta/26 bg-terracotta/10 p-4 text-sm leading-6 text-midnight">
+              <Clock3 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-terracotta" />
+              <div>
+                <p className="font-semibold">Reserva temporal activa</p>
+                <p className="text-ink/68">Vence {formatDateTime(reservation.expiresAt)}.</p>
+              </div>
+            </div>
+          ) : null}
+
+          <button
+            aria-controls={`guest-reservation-detail-${reservation.id}`}
+            aria-expanded={isSelected}
+            className="focus-ring mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
+            onClick={() => onSelect(reservation.id)}
+            type="button"
+          >
+            <ClipboardList aria-hidden className="h-4 w-4" />
+            {isSelected ? "Ocultar detalle" : "Ver detalle"}
+          </button>
+        </div>
       </div>
 
-      <dl className="mt-6 grid gap-3 text-sm text-ink/72 sm:grid-cols-2 xl:grid-cols-4">
-        <ReservationFact
-          icon={DoorOpen}
-          label="Llegada"
-          value={formatDate(reservation.arrivalDate)}
-        />
-        <ReservationFact
-          icon={CalendarCheck2}
-          label="Salida"
-          value={formatDate(reservation.departureDate)}
-        />
-        <ReservationFact icon={Clock3} label="Noches" value={String(reservation.nights)} />
-        <ReservationFact
-          icon={CreditCard}
-          label="Total"
-          value={formatCurrency(reservation.total, reservation.currency)}
-        />
-      </dl>
-
-      <button
-        aria-controls="guest-reservation-detail"
-        aria-expanded={isSelected}
-        className="focus-ring mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
-        onClick={() => onSelect(reservation.id)}
-        type="button"
-      >
-        <ClipboardList aria-hidden className="h-4 w-4" />
-        {isSelected ? "Detalle visible" : "Ver detalle"}
-      </button>
-
       {isSelected ? (
-        <div className="mt-5 border-t border-line pt-5 xl:hidden">
+        <div className="border-t border-line bg-white p-5 lg:p-6" id={`guest-reservation-detail-${reservation.id}`}>
           <ReservationDetailPanel reservation={reservation} variant="embedded" />
-        </div>
-      ) : null}
-
-      {reservation.payment ? (
-        <div className="mt-5 flex gap-3 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-midnight">
-          <CreditCard aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
-          <div>
-            <p className="font-semibold">Pago asociado</p>
-            <p className="text-ink/68">
-              {reservation.payment.statusLabel} -{" "}
-              {formatCurrency(reservation.payment.amount, reservation.payment.currency)}
-            </p>
-          </div>
-        </div>
-      ) : null}
-      {reservation.expiresAt && reservation.isActionable ? (
-        <div className="mt-5 flex gap-3 rounded-[6px] border border-terracotta/26 bg-terracotta/10 p-4 text-sm leading-6 text-midnight">
-          <Clock3 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-terracotta" />
-          <div>
-            <p className="font-semibold">Reserva temporal activa</p>
-            <p className="text-ink/68">Vence {formatDateTime(reservation.expiresAt)}.</p>
-          </div>
         </div>
       ) : null}
     </article>
@@ -589,75 +575,67 @@ function ReservationFact({
 }
 
 function NextStayPanel({ reservation }: { reservation: GuestReservation | null }) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
-          <DoorOpen aria-hidden className="h-5 w-5" />
+  if (!reservation) {
+    return (
+      <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
+            <DoorOpen aria-hidden className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-green">Proxima llegada</p>
+            <h2 className="text-lg font-semibold text-midnight">Pendiente</h2>
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase text-green">Proxima llegada</p>
-          <h2 className="text-lg font-semibold text-midnight">
-            {reservation ? formatDate(reservation.arrivalDate) : "Pendiente"}
-          </h2>
-        </div>
-      </div>
-      {reservation ? (
-        <div className="mt-5 space-y-3 text-sm text-ink/70">
-          <SessionRow label="Propiedad" value={reservation.propertyName} />
-          <SessionRow label="Unidad" value={reservation.unitName} />
-          <SessionRow label="Estado" value={reservation.statusLabel} />
-        </div>
-      ) : (
         <p className="mt-5 text-sm leading-6 text-ink/68">
           No hay una reserva confirmada futura asociada a esta cuenta.
         </p>
-      )}
-    </section>
-  );
-}
+      </section>
+    );
+  }
 
-function GuestIdentityCard({
-  session,
-  snapshot
-}: {
-  session: DevPortalSession;
-  snapshot: GuestPortalSnapshot;
-}) {
   return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
-          <UserRound aria-hidden className="h-5 w-5" />
+    <section className="overflow-hidden rounded-[8px] border border-line bg-white shadow-soft">
+      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="relative min-h-52 bg-midnight lg:min-h-full">
+          <Image
+            alt={reservation.propertyImageAlt}
+            className="object-cover"
+            fill
+            priority
+            sizes="(min-width: 1024px) 260px, 100vw"
+            src={reservation.propertyImageUrl}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-midnight/45 to-transparent" />
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase text-green">{snapshot.guestName}</p>
-          <h2 className="text-lg font-semibold text-midnight">{session.user.displayName}</h2>
+        <div className="p-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase text-green">Proxima llegada</p>
+              <h2 className="mt-1 font-display text-3xl leading-tight text-midnight">
+                {formatDate(reservation.arrivalDate)}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-ink/68">
+                {reservation.propertyName} / {reservation.unitName}
+              </p>
+            </div>
+            <span
+              className={
+                "inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold " +
+                reservationToneClasses[reservation.statusTone]
+              }
+            >
+              {reservation.statusLabel}
+            </span>
+          </div>
+
+          <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+            <SessionRow label="Destino" value={reservation.propertyDestination} />
+            <SessionRow label="Salida" value={formatDate(reservation.departureDate)} />
+            <SessionRow label="Reserva" value={reservation.reservationCode} />
+          </dl>
         </div>
       </div>
-      <p className="mt-4 text-sm leading-6 text-ink/68">
-        Acceso limitado a tus reservas, codigos privados y estado de llegada visible para el
-        huesped.
-      </p>
-    </section>
-  );
-}
-
-function GovernancePanel({ snapshot }: { snapshot: GuestPortalSnapshot }) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <div className="flex items-center gap-3">
-        <ShieldCheck aria-hidden className="h-5 w-5 text-green" />
-        <h2 className="text-lg font-semibold text-midnight">Privacidad y seguridad</h2>
-      </div>
-      <ul className="mt-5 space-y-3 text-sm leading-6 text-ink/68">
-        {snapshot.governance.map((item) => (
-          <li className="flex gap-3" key={item}>
-            <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }
