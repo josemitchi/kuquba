@@ -38,7 +38,7 @@ export const portalEntries = [
     label: "Mi estancia",
     href: "/stay",
     roleKey: "guest",
-    accessMethod: "OTP por correo o telefono",
+    accessMethod: "OTP por correo",
     mfaRequired: false
   },
   {

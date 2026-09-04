@@ -108,8 +108,8 @@ export default async function BookingConfirmedRoute({
                 </div>
               </div>
               <p className="mt-4 text-sm leading-6 text-ink/68">
-                Usa el mismo correo de la reserva. En dev el codigo OTP es 000000 hasta conectar
-                proveedor real de envio.
+                Usa el mismo correo de la reserva. Te enviaremos un codigo de acceso para
+                entrar al portal de tu estancia.
               </p>
               <a
                 className="focus-ring mt-6 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[6px] bg-green px-5 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"

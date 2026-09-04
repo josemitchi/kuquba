@@ -13,6 +13,13 @@ import {
   getRoleKeysForAudience,
   getRoleProfiles
 } from "./access-policy";
+import {
+  deliverOtp,
+  generateOtpCode,
+  hashOtpCode,
+  OtpDeliveryError,
+  verifyOtpCode
+} from "./otp-provider";
 
 const passwordlessStartSchema = z
   .object({
@@ -47,7 +54,47 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
     const destinationHash = hashDestination(destination);
     const channel = body.email ? "email" : "phone";
     const provider = body.email ? "EMAIL_OTP" : "PHONE_OTP";
+    const purpose = `login:${body.audience}`;
     const normalizedSubject = normalizeDestination(destination);
+
+    if (env.NODE_ENV === "production" && env.OTP_PROVIDER === "dev") {
+      await writeAudit({
+        action: "identity.passwordless.start",
+        request,
+        result: "FAILED",
+        reason: "provider_adapter_required",
+        nextValue: {
+          audience: body.audience,
+          channel,
+          destinationHash
+        }
+      });
+
+      return reply.code(501).send({
+        error: "provider_adapter_required",
+        correlationId: request.id
+      });
+    }
+
+    if (channel === "phone" && env.OTP_PROVIDER !== "dev") {
+      await writeAudit({
+        action: "identity.passwordless.start",
+        request,
+        result: "FAILED",
+        reason: "phone_otp_not_configured",
+        nextValue: {
+          audience: body.audience,
+          channel,
+          destinationHash
+        }
+      });
+
+      return reply.code(501).send({
+        error: "phone_otp_not_configured",
+        correlationId: request.id
+      });
+    }
+
     const identity = await prisma.identity.findUnique({
       where: {
         provider_subject: {
@@ -59,19 +106,94 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
         id: true
       }
     });
-
+    const expiresAt = new Date(Date.now() + env.OTP_CODE_TTL_MINUTES * 60 * 1000);
+    const code = env.OTP_PROVIDER === "dev" ? env.DEV_OTP_CODE : generateOtpCode();
     const challenge = await prisma.authChallenge.create({
       data: {
         identityId: identity?.id,
         channel,
         destinationHash,
-        purpose: `login:${body.audience}`,
-        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        purpose,
+        expiresAt,
         correlationId: request.id
       },
       select: {
         id: true,
         expiresAt: true
+      }
+    });
+    const codeHash = hashOtpCode({
+      challengeId: challenge.id,
+      code,
+      destinationHash,
+      purpose
+    });
+    let deliveredAt: Date | null = null;
+    let deliveryError: string | null = identity ? null : "identity_not_found";
+    let deliveryProvider: string = env.OTP_PROVIDER;
+    let providerMessageId: string | null = null;
+
+    try {
+      if (identity) {
+        const delivery = await deliverOtp({
+          audience: body.audience,
+          challengeId: challenge.id,
+          channel,
+          code,
+          correlationId: request.id,
+          destination,
+          expiresAt: challenge.expiresAt
+        });
+
+        deliveredAt = delivery.sentAt;
+        deliveryProvider = delivery.provider;
+        providerMessageId = delivery.providerMessageId ?? null;
+      }
+    } catch (deliveryFailure) {
+      const errorCode = deliveryFailure instanceof OtpDeliveryError ? deliveryFailure.code : "otp_delivery_failed";
+
+      await prisma.authChallenge.update({
+        data: {
+          codeHash,
+          deliveryError: errorCode,
+          deliveryProvider
+        },
+        where: {
+          id: challenge.id
+        }
+      });
+
+      request.log.error({ errorCode, deliveryFailure }, "identity.otp.delivery_failed");
+
+      await writeAudit({
+        action: "identity.passwordless.start",
+        entityId: challenge.id,
+        request,
+        result: "FAILED",
+        reason: errorCode,
+        nextValue: {
+          audience: body.audience,
+          channel,
+          destinationHash
+        }
+      });
+
+      return reply.code(deliveryFailure instanceof OtpDeliveryError ? deliveryFailure.statusCode : 502).send({
+        error: errorCode,
+        correlationId: request.id
+      });
+    }
+
+    await prisma.authChallenge.update({
+      data: {
+        codeHash,
+        deliveredAt,
+        deliveryError,
+        deliveryProvider,
+        providerMessageId
+      },
+      where: {
+        id: challenge.id
       }
     });
 
@@ -82,12 +204,14 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       nextValue: {
         audience: body.audience,
         channel,
-        destinationHash
+        deliveryProvider,
+        destinationHash,
+        providerMessageId
       },
       ipAddress: request.ip,
       correlationId: request.id,
       result: "PENDING",
-      reason: "provider_adapter_pending"
+      reason: identity ? (deliveryProvider === "dev_otp_log" ? "dev_otp_ready" : "otp_sent") : "identity_not_found"
     });
 
     await prisma.auditEvent.create({
@@ -107,7 +231,7 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.code(202).send({
       challengeId: challenge.id,
-      status: "pending_provider_adapter",
+      status: deliveryProvider === "dev_otp_log" ? "dev_code_ready" : "sent",
       delivery: {
         channel,
         destinationMasked: maskDestination(destination)
@@ -116,7 +240,6 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       correlationId: request.id
     });
   });
-
   app.post("/passwordless/verify", async (request, reply) => {
     const body = passwordlessVerifySchema.parse(request.body);
     const challenge = await prisma.authChallenge.findUnique({
@@ -208,7 +331,17 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    if (env.NODE_ENV === "production" || body.code !== env.DEV_OTP_CODE) {
+    const isValidCode = challenge.codeHash
+      ? verifyOtpCode({
+          challengeId: challenge.id,
+          code: body.code,
+          destinationHash: challenge.destinationHash,
+          expectedHash: challenge.codeHash,
+          purpose: challenge.purpose
+        })
+      : env.NODE_ENV !== "production" && body.code === env.DEV_OTP_CODE;
+
+    if (!isValidCode) {
       await prisma.authChallenge.update({
         where: {
           id: challenge.id
@@ -225,11 +358,11 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
         entityId: challenge.id,
         request,
         result: "DENIED",
-        reason: env.NODE_ENV === "production" ? "provider_adapter_required" : "invalid_code"
+        reason: "invalid_code"
       });
 
       return reply.code(401).send({
-        error: env.NODE_ENV === "production" ? "provider_adapter_required" : "invalid_code",
+        error: "invalid_code",
         correlationId: request.id
       });
     }
@@ -299,7 +432,7 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       entityId: challenge.id,
       request,
       result: "SUCCESS",
-      reason: "dev_otp_accepted",
+      reason: "otp_accepted",
       nextValue: {
         audience: body.audience,
         roleKey: userRole.role.key,

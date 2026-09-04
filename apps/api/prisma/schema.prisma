@@ -277,17 +277,22 @@ model UserRole {
 }
 
 model AuthChallenge {
-  id              String    @id @default(uuid())
-  identityId      String?
-  channel         String
-  destinationHash String
-  purpose         String
-  expiresAt       DateTime
-  consumedAt      DateTime?
-  attempts        Int       @default(0)
-  correlationId   String
-  createdAt       DateTime  @default(now())
-  identity        Identity? @relation(fields: [identityId], references: [id])
+  id                String    @id @default(uuid())
+  identityId        String?
+  channel           String
+  destinationHash   String
+  purpose           String
+  codeHash          String?
+  deliveryProvider  String?
+  providerMessageId String?
+  deliveredAt       DateTime?
+  deliveryError     String?
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  attempts          Int       @default(0)
+  correlationId     String
+  createdAt         DateTime  @default(now())
+  identity          Identity? @relation(fields: [identityId], references: [id])
 
   @@index([destinationHash, purpose, createdAt])
   @@index([correlationId])

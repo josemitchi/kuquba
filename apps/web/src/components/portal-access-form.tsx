@@ -202,6 +202,8 @@ function getErrorMessage(error: unknown) {
     challenge_not_found: "No encontramos esa verificacion. Solicita un nuevo codigo.",
     identity_not_allowed_for_audience: "Ese usuario no tiene acceso a este portal.",
     invalid_code: "El codigo no es valido.",
+    otp_delivery_failed: "No se pudo enviar el codigo. Intenta de nuevo.",
+    phone_otp_not_configured: "Por ahora el codigo solo se envia por correo.",
     provider_adapter_required: "El proveedor OTP productivo aun no esta configurado.",
     request_failed: fallback,
     too_many_attempts: "Demasiados intentos. Solicita un nuevo codigo."

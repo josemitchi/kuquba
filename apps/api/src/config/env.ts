@@ -15,6 +15,12 @@ const envSchema = z
     CORS_ORIGIN: z.string().default("http://localhost:3000,http://127.0.0.1:3000"),
     DATABASE_URL: z.string().optional(),
     DEV_OTP_CODE: z.string().min(4).max(12).default("000000"),
+    OTP_CODE_TTL_MINUTES: z.coerce.number().int().min(5).max(30).default(10),
+    OTP_PROVIDER: z.enum(["dev", "resend"]).default("dev"),
+    OTP_SIGNING_SECRET: optionalSecretSchema,
+    RESEND_API_KEY: optionalSecretSchema,
+    RESEND_FROM_EMAIL: z.preprocess(emptyToUndefined, z.string().min(3).optional()),
+    RESEND_REPLY_TO: z.preprocess(emptyToUndefined, z.string().email().optional()),
     FORMAL_DELIVERY_API_KEY: optionalSecretSchema,
     FORMAL_DELIVERY_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
     FORMAL_DELIVERY_PROVIDER: z.enum(["dev", "webhook"]).default("dev"),
@@ -41,6 +47,32 @@ const envSchema = z
         message: "OBSERVABILITY_METRICS_TOKEN is required in production",
         path: ["OBSERVABILITY_METRICS_TOKEN"]
       });
+    }
+
+    if (value.OTP_PROVIDER === "resend") {
+      if (!value.OTP_SIGNING_SECRET || value.OTP_SIGNING_SECRET.length < 32) {
+        context.addIssue({
+          code: "custom",
+          message: "OTP_SIGNING_SECRET must be at least 32 characters when OTP_PROVIDER=resend",
+          path: ["OTP_SIGNING_SECRET"]
+        });
+      }
+
+      if (!value.RESEND_API_KEY) {
+        context.addIssue({
+          code: "custom",
+          message: "RESEND_API_KEY is required when OTP_PROVIDER=resend",
+          path: ["RESEND_API_KEY"]
+        });
+      }
+
+      if (!value.RESEND_FROM_EMAIL) {
+        context.addIssue({
+          code: "custom",
+          message: "RESEND_FROM_EMAIL is required when OTP_PROVIDER=resend",
+          path: ["RESEND_FROM_EMAIL"]
+        });
+      }
     }
 
     if (value.FORMAL_DELIVERY_PROVIDER !== "webhook") {
