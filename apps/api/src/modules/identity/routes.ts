@@ -129,7 +129,7 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       purpose
     });
     let deliveredAt: Date | null = null;
-    let deliveryError: string | null = identity ? null : "identity_not_found";
+    const deliveryError: string | null = identity ? null : "identity_not_found";
     let deliveryProvider: string = env.OTP_PROVIDER;
     let providerMessageId: string | null = null;
 
