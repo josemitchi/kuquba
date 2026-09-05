@@ -107,7 +107,7 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
 
               <div className="mt-6 grid gap-5">
                 {visibleStays.length > 0 ? (
-                  visibleStays.map((stay) => <StayCard key={stay.id} stay={stay} />)
+                  visibleStays.map((stay) => <StayCard criteria={criteria} key={stay.id} stay={stay} />)
                 ) : (
                   <EmptyResults />
                 )}
@@ -155,7 +155,7 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
   );
 }
 
-function StayCard({ stay }: { stay: PublicStay }) {
+function StayCard({ criteria, stay }: { criteria: StaySearchCriteria; stay: PublicStay }) {
   return (
     <article className="overflow-hidden rounded-[8px] border border-line bg-white shadow-soft md:grid md:grid-cols-[300px_1fr]">
       <div className="relative min-h-[260px] md:min-h-full">
@@ -224,7 +224,7 @@ function StayCard({ stay }: { stay: PublicStay }) {
 
           <a
             className="focus-ring inline-flex min-h-12 items-center justify-center gap-2 rounded-[6px] bg-green px-5 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
-            href={`/stay/properties/${stay.id}`}
+            href={buildStayDetailHref(stay.id, criteria)}
           >
             Reservar
             <ArrowRight aria-hidden className="h-4 w-4" />
@@ -233,6 +233,30 @@ function StayCard({ stay }: { stay: PublicStay }) {
       </div>
     </article>
   );
+}
+
+function buildStayDetailHref(stayId: string, criteria: StaySearchCriteria) {
+  const params = new URLSearchParams();
+
+  if (criteria.destination) {
+    params.set("destination", criteria.destination);
+  }
+
+  if (criteria.arrival) {
+    params.set("arrival", criteria.arrival);
+  }
+
+  if (criteria.departure) {
+    params.set("departure", criteria.departure);
+  }
+
+  if (criteria.guests) {
+    params.set("guests", criteria.guests);
+  }
+
+  const query = params.toString();
+
+  return query ? `/stay/properties/${stayId}?${query}` : `/stay/properties/${stayId}`;
 }
 
 function HeroMetric({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {

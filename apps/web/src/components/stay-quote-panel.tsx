@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type QuoteSubmitState = "idle" | "submitting" | "success" | "error";
 type HoldSubmitState = "idle" | "submitting" | "success" | "error";
@@ -131,10 +131,14 @@ const calendarWeekdays = ["L", "M", "M", "J", "V", "S", "D"];
 type AvailabilityLoadState = "idle" | "loading" | "success" | "error";
 
 export function StayQuotePanel({
+  defaultArrivalDate,
+  defaultDepartureDate,
   defaultGuests,
   maxGuests,
   stayId
 }: {
+  defaultArrivalDate?: string;
+  defaultDepartureDate?: string;
   defaultGuests: number;
   maxGuests: number;
   stayId: string;
@@ -145,9 +149,14 @@ export function StayQuotePanel({
   const [quote, setQuote] = useState<StayQuote | null>(null);
   const [hold, setHold] = useState<ReservationHold | null>(null);
   const [checkout, setCheckout] = useState<PaymentCheckout | null>(null);
-  const [arrivalDate, setArrivalDate] = useState("");
-  const [departureDate, setDepartureDate] = useState("");
-  const [guests, setGuests] = useState(defaultGuests);
+  const initialArrivalDate = normalizeDateOnly(defaultArrivalDate);
+  const requestedDepartureDate = normalizeDateOnly(defaultDepartureDate);
+  const initialDepartureDate =
+    initialArrivalDate && requestedDepartureDate > initialArrivalDate ? requestedDepartureDate : "";
+  const initialGuests = Math.min(maxGuests, Math.max(1, defaultGuests));
+  const [arrivalDate, setArrivalDate] = useState(initialArrivalDate);
+  const [departureDate, setDepartureDate] = useState(initialDepartureDate);
+  const [guests, setGuests] = useState(initialGuests);
   const [availability, setAvailability] = useState<StayAvailability | null>(null);
   const [availabilityState, setAvailabilityState] = useState<AvailabilityLoadState>("idle");
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -595,8 +604,9 @@ function AvailabilityGuide({
   const selectedNights = selectedRange
     ? differenceInDateOnlyDays(selectedRange.arrivalDate, selectedRange.departureDate)
     : 0;
-  const months = availability ? buildAvailabilityMonths(availability.days) : [];
+  const months = useMemo(() => (availability ? buildAvailabilityMonths(availability.days) : []), [availability]);
   const [visibleMonthIndex, setVisibleMonthIndex] = useState(0);
+  const selectedArrivalDate = selectedRange?.arrivalDate ?? "";
   const firstAvailabilityDay = availability?.days[0];
   const lastAvailabilityDay = availability?.days[availability.days.length - 1];
   const calendarRangeLabel = firstAvailabilityDay && lastAvailabilityDay
@@ -606,8 +616,12 @@ function AvailabilityGuide({
   const visibleMonth = months[boundedMonthIndex] ?? null;
 
   useEffect(() => {
-    setVisibleMonthIndex(0);
-  }, [availability?.days.length, availability?.generatedAt, availability?.stayId]);
+    const selectedMonthIndex = selectedArrivalDate
+      ? months.findIndex((month) => selectedArrivalDate.startsWith(month.key))
+      : -1;
+
+    setVisibleMonthIndex(selectedMonthIndex >= 0 ? selectedMonthIndex : 0);
+  }, [months, selectedArrivalDate]);
 
   return (
     <div className="rounded-[6px] border border-line bg-ivory p-4">
@@ -798,6 +812,7 @@ function AvailabilityGuide({
 function AvailabilityLegend({ className, label }: { className: string; label: string }) {
   return <span className={`rounded-full border px-2 py-1 ${className}`}>{label}</span>;
 }
+
 function QuoteResult({ quote }: { quote: StayQuote }) {
   if (!quote.available) {
     return (
@@ -1188,6 +1203,20 @@ function getCheckoutErrorMessage(error: string) {
   }
 
   return "No se pudo actualizar el pago. Intenta de nuevo.";
+}
+
+function normalizeDateOnly(value?: string) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "";
+  }
+
+  const date = new Date(value + "T00:00:00.000Z");
+
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    return "";
+  }
+
+  return value;
 }
 
 function isAvailableStayRange(

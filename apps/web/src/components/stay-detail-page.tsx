@@ -17,7 +17,25 @@ import { StayQuotePanel } from "./stay-quote-panel";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 
-export function StayDetailPage({ stay }: { stay: PublicStay }) {
+export type StayDetailSearchParams = Record<string, string | string[] | undefined>;
+
+type StayDetailCriteria = {
+  arrival: string;
+  departure: string;
+  destination: string;
+  guests: string;
+  guestsNumber: number;
+};
+export function StayDetailPage({
+  searchParams,
+  stay
+}: {
+  searchParams?: StayDetailSearchParams;
+  stay: PublicStay;
+}) {
+  const criteria = buildCriteria(searchParams ?? {});
+  const resultsHref = buildStaySearchHref(criteria);
+  const initialGuests = Math.min(stay.maxGuests, Math.max(1, criteria.guestsNumber));
   return (
     <>
       <main className="min-h-screen bg-ivory text-ink">
@@ -38,7 +56,7 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
           <div className="container-shell pb-16 pt-8 md:pb-20 md:pt-14">
             <a
               className="focus-ring inline-flex items-center gap-2 rounded-[6px] border border-white/24 bg-white/8 px-4 py-2 text-sm font-semibold text-white/86 transition hover:border-white hover:text-white"
-              href="/stay/search"
+              href={resultsHref}
             >
               <ArrowLeft aria-hidden className="h-4 w-4" />
               Volver a resultados
@@ -137,7 +155,9 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
 
             <aside className="space-y-4 lg:sticky lg:top-6">
               <StayQuotePanel
-                defaultGuests={Math.min(stay.maxGuests, 2)}
+                defaultArrivalDate={criteria.arrival || undefined}
+                defaultDepartureDate={criteria.departure || undefined}
+                defaultGuests={initialGuests}
                 maxGuests={stay.maxGuests}
                 stayId={stay.id}
               />
@@ -148,6 +168,55 @@ export function StayDetailPage({ stay }: { stay: PublicStay }) {
       <SiteFooter />
     </>
   );
+}
+
+function buildCriteria(searchParams: StayDetailSearchParams): StayDetailCriteria {
+  const destination = readParam(searchParams.destination).trim();
+  const arrival = readParam(searchParams.arrival);
+  const departure = readParam(searchParams.departure);
+  const guests = readParam(searchParams.guests) || "2";
+  const parsedGuests = Number.parseInt(guests, 10);
+  const guestsNumber = Number.isFinite(parsedGuests) && parsedGuests > 0 ? parsedGuests : 2;
+
+  return {
+    arrival,
+    departure,
+    destination,
+    guests: String(guestsNumber),
+    guestsNumber
+  };
+}
+
+function buildStaySearchHref(criteria: StayDetailCriteria) {
+  const params = new URLSearchParams();
+
+  if (criteria.destination) {
+    params.set("destination", criteria.destination);
+  }
+
+  if (criteria.arrival) {
+    params.set("arrival", criteria.arrival);
+  }
+
+  if (criteria.departure) {
+    params.set("departure", criteria.departure);
+  }
+
+  if (criteria.guests) {
+    params.set("guests", criteria.guests);
+  }
+
+  const query = params.toString();
+
+  return query ? `/stay/search?${query}` : "/stay/search";
+}
+
+function readParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
 }
 
 function HeroMetric({

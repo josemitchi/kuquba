@@ -206,16 +206,32 @@ function AccountMenu({
           className="h-4 w-4 text-white/64 transition group-open:rotate-180"
         />
       </summary>
-      <div className="absolute right-0 z-40 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-[8px] border border-line bg-white p-4 text-sm text-ink shadow-soft">
-        <p className="text-xs font-semibold uppercase text-green">Cuenta</p>
-        <p className="mt-2 truncate font-semibold text-midnight">{session.user.displayName}</p>
-        <p className="mt-1 truncate text-ink/62">{session.user.emailMasked}</p>
-        <dl className="mt-4 space-y-2 border-t border-line pt-3">
-          <SessionRow label="Rol" value={session.role.name} />
-          <SessionRow label="Expira" value={formatSessionExpiry(session.expiresAt)} />
+      <div className="absolute right-0 z-40 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[8px] border border-line bg-white text-sm text-ink shadow-soft">
+        <div className="flex items-start gap-3 border-b border-line bg-ivory px-4 py-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-green/10 text-green">
+            <UserRound aria-hidden className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-midnight">{session.user.displayName}</p>
+                <p className="mt-1 truncate text-xs text-ink/62">{session.user.emailMasked}</p>
+              </div>
+              <span className="shrink-0 rounded-full bg-green/10 px-2 py-1 text-[0.68rem] font-semibold uppercase text-green">
+                {session.role.name}
+              </span>
+            </div>
+          </div>
+        </div>
+        <dl className="grid gap-2 px-4 py-4">
+          <AccountSessionRow
+            icon={Clock3}
+            label="Sesion activa hasta"
+            value={formatSessionExpiry(session.expiresAt)}
+          />
         </dl>
         <button
-          className="focus-ring mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[6px] bg-midnight px-4 text-sm font-semibold text-white transition hover:bg-green"
+          className="focus-ring mx-4 mb-4 inline-flex min-h-10 w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:bg-green/5 hover:text-green"
           onClick={onLogout}
           type="button"
         >
@@ -268,6 +284,7 @@ function GuestDashboard({ snapshot }: { snapshot: GuestPortalSnapshot }) {
     </>
   );
 }
+
 function MetricCard({
   icon: Icon,
   metric
@@ -554,6 +571,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
 function ReservationFact({
   icon: Icon,
   label,
@@ -699,6 +717,26 @@ function SectionHeading({
       <span className="inline-flex w-fit items-center rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-midnight/72">
         {value}
       </span>
+    </div>
+  );
+}
+
+function AccountSessionRow({
+  icon: Icon,
+  label,
+  value
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-[6px] border border-line bg-white px-3 py-3">
+      <Icon aria-hidden className="h-4 w-4 shrink-0 text-green" />
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold uppercase text-ink/45">{label}</dt>
+        <dd className="mt-1 font-semibold text-midnight">{value}</dd>
+      </div>
     </div>
   );
 }
