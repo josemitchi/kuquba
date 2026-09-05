@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
+import { z } from "zod";
 
 import { prisma } from "../lib/prisma";
 import { createAuditEventEnvelope } from "../modules/audit/audit-event";
@@ -9,6 +10,11 @@ import {
 } from "../modules/identity/dev-session";
 
 const guestPortalPermissions = ["reservation:self:read"];
+const guestProfileUpdateSchema = z.object({
+  dateOfBirth: z.string().trim().max(10).nullable().optional(),
+  fullName: z.string().trim().min(2).max(120),
+  phone: z.string().trim().max(32).nullable().optional()
+});
 const monthLabels = [
   "Ene",
   "Feb",
@@ -103,6 +109,125 @@ export const registerGuestRoutes: FastifyPluginAsync = async (app) => {
       correlationId: request.id
     });
   });
+
+  app.patch("/profile", async (request, reply) => {
+    const rawSessionToken = request.headers["x-kuquba-dev-session"]?.toString();
+    const authorization = await authorizeDevPortalSession({
+      audience: "guest",
+      rawSessionToken,
+      requiredPermissions: guestPortalPermissions
+    });
+
+    if (!authorization.ok) {
+      await writeGuestAudit({
+        action: "guest.profile.update",
+        request,
+        result: "DENIED",
+        reason: authorization.error
+      });
+
+      return reply.code(authorization.statusCode).send({
+        error: authorization.error,
+        correlationId: request.id
+      });
+    }
+
+    const parsed = guestProfileUpdateSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      await writeGuestAudit({
+        action: "guest.profile.update",
+        actorUserId: authorization.session.user.id,
+        request,
+        result: "DENIED",
+        reason: "guest_profile_invalid_payload"
+      });
+
+      return reply.code(400).send({
+        error: "guest_profile_invalid_payload",
+        details: parsed.error.flatten(),
+        correlationId: request.id
+      });
+    }
+
+    const guest = await loadGuestPortalRecord({
+      email: authorization.session.user.email,
+      userId: authorization.session.user.id
+    });
+
+    if (!guest) {
+      await writeGuestAudit({
+        action: "guest.profile.update",
+        actorUserId: authorization.session.user.id,
+        request,
+        result: "DENIED",
+        reason: "guest_profile_not_found"
+      });
+
+      return reply.code(404).send({
+        error: "guest_profile_not_found",
+        correlationId: request.id
+      });
+    }
+
+    const dateOfBirth = parseNullableDateOnly(parsed.data.dateOfBirth);
+
+    if (dateOfBirth === undefined) {
+      return reply.code(400).send({
+        error: "guest_profile_invalid_date_of_birth",
+        correlationId: request.id
+      });
+    }
+
+    const phone = normalizeNullableText(parsed.data.phone);
+
+    const updatedGuest = await prisma.$transaction(async (tx) => {
+      const updated = await tx.guest.update({
+        data: {
+          dateOfBirth,
+          fullName: parsed.data.fullName,
+          phone
+        },
+        where: {
+          id: guest.id
+        }
+      });
+
+      if (guest.userId) {
+        await tx.user.update({
+          data: {
+            displayName: parsed.data.fullName
+          },
+          where: {
+            id: guest.userId
+          }
+        });
+      }
+
+      return updated;
+    });
+
+    const profile = mapGuestProfile(updatedGuest);
+
+    await writeGuestAudit({
+      action: "guest.profile.update",
+      actorUserId: authorization.session.user.id,
+      entityId: guest.id,
+      nextValue: {
+        dateOfBirthProvided: Boolean(profile.dateOfBirth),
+        fullName: profile.fullName,
+        phoneProvided: Boolean(profile.phone)
+      },
+      request,
+      result: "SUCCESS",
+      reason: "guest_profile_updated"
+    });
+
+    return reply.send({
+      profile,
+      correlationId: request.id
+    });
+  });
 };
 
 async function loadGuestPortalRecord(input: { email: string; userId: string }) {
@@ -156,7 +281,12 @@ async function loadGuestPortalRecord(input: { email: string; userId: string }) {
 
   return {
     id: primaryGuest.id,
+    countryCode: primaryGuest.countryCode,
+    dateOfBirth: primaryGuest.dateOfBirth,
+    email: primaryGuest.email,
     fullName: primaryGuest.fullName,
+    phone: primaryGuest.phone,
+    userId: primaryGuest.userId,
     guestIds: guests.map((guest) => guest.id),
     reservations
   };
@@ -232,6 +362,7 @@ function buildGuestPortal(
 
   return {
     guestName: guest.fullName,
+    profile: mapGuestProfile(guest),
     summary: "Consulta tus reservas, pagos, codigos privados y datos de llegada en un solo lugar.",
     metrics: [
       {
@@ -270,6 +401,22 @@ function buildGuestPortal(
       "Las reservas temporales vencidas se retiran de disponibilidad antes de mostrar esta vista.",
       "Lectura auditada para sesion " + session.sessionId.slice(0, 8) + "."
     ]
+  };
+}
+
+function mapGuestProfile(guest: {
+  countryCode: string | null;
+  dateOfBirth: Date | null;
+  email: string;
+  fullName: string;
+  phone: string | null;
+}) {
+  return {
+    countryCode: guest.countryCode ?? "",
+    dateOfBirth: guest.dateOfBirth ? toDateOnly(guest.dateOfBirth) : "",
+    email: guest.email,
+    fullName: guest.fullName,
+    phone: guest.phone ?? ""
   };
 }
 
@@ -348,6 +495,7 @@ function buildGuestConfirmationInfo(
     statusLabel: isConfirmed ? "Confirmada para consulta" : "Pendiente de confirmacion"
   };
 }
+
 function getLatestPayment(reservation: GuestReservationRecord) {
   return reservation.payments[0] ?? null;
 }
@@ -441,6 +589,32 @@ function reservationStatusTone(status: string, holdExpiresAt: Date | null, now: 
   }
 
   return "neutral";
+}
+
+function normalizeNullableText(value: string | null | undefined) {
+  const normalized = value?.trim();
+
+  return normalized ? normalized : null;
+}
+
+function parseNullableDateOnly(value: string | null | undefined) {
+  const normalized = normalizeNullableText(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return undefined;
+  }
+
+  const date = new Date(normalized + "T00:00:00.000Z");
+
+  if (Number.isNaN(date.getTime()) || toDateOnly(date) !== normalized) {
+    return undefined;
+  }
+
+  return date;
 }
 
 function toDateOnly(date: Date) {

@@ -76,7 +76,7 @@ export function StayDetailPage({
               <HeroMetric
                 icon={UsersRound}
                 label="Capacidad"
-                value={`${stay.maxGuests} huespedes`}
+                value={`${stay.maxGuests} huéspedes`}
               />
               <HeroMetric icon={CalendarCheck2} label="Estado" value={stay.availabilityLabel} />
             </div>
@@ -129,13 +129,13 @@ export function StayDetailPage({
               </section>
 
               <section className="grid gap-3 sm:grid-cols-3">
-                <StayFact icon={UsersRound} label="Huespedes" value={`${stay.maxGuests}`} />
+                <StayFact icon={UsersRound} label="Huéspedes" value={`${stay.maxGuests}`} />
                 <StayFact icon={BedDouble} label="Habitaciones" value={`${stay.bedrooms}`} />
-                <StayFact icon={DoorOpen} label="Banos" value={`${stay.bathrooms}`} />
+                <StayFact icon={DoorOpen} label="Baños" value={`${stay.bathrooms}`} />
               </section>
 
               <InfoSection title="Amenidades" items={stay.amenities} />
-              <InfoSection title="Operacion KUQUBA" items={stay.operations} />
+              <InfoSection title="Operación KUQUBA" items={stay.operations} />
               <InfoSection title="Condiciones de reserva" items={stay.houseRules} />
 
               <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">

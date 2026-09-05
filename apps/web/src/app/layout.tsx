@@ -1,11 +1,11 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "KUQUBA | Estancias y administracion profesional",
+  title: "KUQUBA | Estancias y administración profesional",
   description:
-    "Propiedades seleccionadas y experiencias administradas con atencion personalizada en Guatemala.",
+    "Propiedades seleccionadas y experiencias administradas con atención personalizada en Guatemala.",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg"

@@ -21,15 +21,10 @@ import {
   verifyOtpCode
 } from "./otp-provider";
 
-const passwordlessStartSchema = z
-  .object({
-    audience: z.enum(["guest", "owner", "ops"]),
-    email: z.string().email().optional(),
-    phone: z.string().min(8).max(24).optional()
-  })
-  .refine((value) => value.email || value.phone, {
-    message: "email_or_phone_required"
-  });
+const passwordlessStartSchema = z.object({
+  audience: z.enum(["guest", "owner", "ops"]),
+  email: z.string().email()
+});
 
 const passwordlessVerifySchema = z.object({
   audience: z.enum(["guest", "owner", "ops"]),
@@ -50,10 +45,10 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
 
   app.post("/passwordless/start", async (request, reply) => {
     const body = passwordlessStartSchema.parse(request.body);
-    const destination = body.email ?? body.phone ?? "";
+    const destination = body.email;
     const destinationHash = hashDestination(destination);
-    const channel = body.email ? "email" : "phone";
-    const provider = body.email ? "EMAIL_OTP" : "PHONE_OTP";
+    const channel = "email" as const;
+    const provider = "EMAIL_OTP";
     const purpose = `login:${body.audience}`;
     const normalizedSubject = normalizeDestination(destination);
 
@@ -76,24 +71,6 @@ export const registerIdentityRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    if (channel === "phone" && env.OTP_PROVIDER !== "dev") {
-      await writeAudit({
-        action: "identity.passwordless.start",
-        request,
-        result: "FAILED",
-        reason: "phone_otp_not_configured",
-        nextValue: {
-          audience: body.audience,
-          channel,
-          destinationHash
-        }
-      });
-
-      return reply.code(501).send({
-        error: "phone_otp_not_configured",
-        correlationId: request.id
-      });
-    }
 
     const identity = await prisma.identity.findUnique({
       where: {

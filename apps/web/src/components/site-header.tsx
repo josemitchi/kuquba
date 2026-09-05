@@ -1,6 +1,8 @@
 import { accessOptions, publicNavigation } from "@kuquba/config";
-import { ChevronDown, Menu, UserRound } from "lucide-react";
+import { Building2, CalendarCheck2, ChevronDown, Menu, ShieldCheck, UserRound } from "lucide-react";
 import Image from "next/image";
+
+const accessOptionIcons = [CalendarCheck2, Building2, ShieldCheck] as const;
 
 export function SiteHeader({
   homeHref = "#",
@@ -49,22 +51,32 @@ export function SiteHeader({
         <details className="group relative">
           <summary className="focus-ring flex cursor-pointer items-center gap-2 rounded-[8px] border border-white/45 px-4 py-3 text-sm font-semibold text-white transition hover:border-white">
             <UserRound aria-hidden className="h-5 w-5" />
-            <span className="hidden sm:inline">Acceder</span>
+            <span className="hidden sm:inline">Acceso</span>
             <ChevronDown
               aria-hidden
               className="h-4 w-4 transition duration-200 group-open:rotate-180"
             />
           </summary>
-          <div className="absolute right-0 mt-3 w-64 overflow-hidden rounded-[8px] border border-white/15 bg-midnight/95 p-2 shadow-panel backdrop-blur">
-            {accessOptions.map((option) => (
-              <a
-                className="focus-ring block rounded-[6px] px-3 py-3 text-sm text-white/90 transition hover:bg-white/10 hover:text-white"
-                href={option.href}
-                key={option.href}
-              >
-                {option.label}
-              </a>
-            ))}
+          <div className="absolute right-0 z-50 mt-3 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[8px] border border-white/15 bg-midnight p-2 shadow-panel">
+            {accessOptions.map((option, index) => {
+              const Icon = accessOptionIcons[index] ?? UserRound;
+
+              return (
+                <a
+                  className="focus-ring flex items-center gap-3 rounded-[6px] px-3 py-3 text-sm text-white/90 transition hover:bg-white/10 hover:text-white"
+                  href={option.href}
+                  key={option.href}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-white/8 text-beige">
+                    <Icon aria-hidden className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold leading-5">{option.label}</span>
+                    <span className="mt-0.5 block text-xs leading-4 text-white/58">{option.description}</span>
+                  </span>
+                </a>
+              );
+            })}
           </div>
         </details>
         <button

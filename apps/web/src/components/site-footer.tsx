@@ -1,11 +1,30 @@
-import { accessOptions, publicNavigation } from "@kuquba/config";
+import { accessOptions } from "@kuquba/config";
 import { Camera, MessageCircle, ShieldCheck } from "lucide-react";
 import Image from "next/image";
+
+const footerNavigation = [
+  { label: "Estancias", href: "/#estancias" },
+  { label: "Administra tu propiedad", href: "/#propietarios" },
+  { label: "Nosotros", href: "/#experiencia" },
+  { label: "Contacto", href: "/contact" }
+] as const;
+
+const resourceLinks = [
+  { label: "Preguntas frecuentes", href: "/faq" },
+  { label: "Términos y condiciones", href: "/terms" },
+  { label: "Políticas de privacidad", href: "/privacy" }
+] as const;
+
+const footerActions = [
+  { label: "Buscar estancia", href: "/stay/search", icon: Camera },
+  { label: "Contactar KUQUBA", href: "/contact", icon: MessageCircle },
+  { label: "Privacidad y seguridad", href: "/privacy", icon: ShieldCheck }
+] as const;
 
 export function SiteFooter() {
   return (
     <footer className="bg-midnight text-white" id="contacto">
-      <div className="container-shell grid gap-10 py-12 md:grid-cols-[1.25fr_1fr_1fr_1fr]">
+      <div className="container-shell grid gap-10 py-12 md:grid-cols-[1.35fr_0.8fr_0.8fr_0.8fr]">
         <div>
           <div className="flex items-center gap-3">
             <Image
@@ -23,32 +42,29 @@ export function SiteFooter() {
             </div>
           </div>
           <p className="mt-5 max-w-xs text-sm leading-6 text-white/70">
-            Administramos propiedades y creamos estancias excepcionales en los destinos mas
+            Administramos propiedades y creamos estancias excepcionales en los destinos más
             especiales de Guatemala.
           </p>
           <div className="mt-6 flex gap-3">
-            {[Camera, MessageCircle, ShieldCheck].map((Icon, index) => (
-              <a
-                aria-label={`Canal KUQUBA ${index + 1}`}
-                className="focus-ring flex h-10 w-10 items-center justify-center rounded-full border border-white/28 text-white transition hover:border-white"
-                href="#"
-                key={index}
-              >
-                <Icon aria-hidden className="h-5 w-5" />
-              </a>
-            ))}
+            {footerActions.map((action) => {
+              const Icon = action.icon;
+
+              return (
+                <a
+                  aria-label={action.label}
+                  className="focus-ring flex h-11 w-11 items-center justify-center rounded-full border border-white/40 text-white transition hover:border-white hover:bg-white/8"
+                  href={action.href}
+                  key={action.href}
+                >
+                  <Icon aria-hidden className="h-5 w-5" />
+                </a>
+              );
+            })}
           </div>
         </div>
 
-        <FooterGroup title="Enlaces" items={publicNavigation} />
-        <FooterGroup
-          title="Recursos"
-          items={[
-            { label: "Preguntas frecuentes", href: "#" },
-            { label: "Terminos y condiciones", href: "#" },
-            { label: "Politicas de privacidad", href: "#" }
-          ]}
-        />
+        <FooterGroup title="Enlaces" items={footerNavigation} />
+        <FooterGroup title="Recursos" items={resourceLinks} />
         <FooterGroup title="Acceso" items={accessOptions} />
       </div>
 

@@ -30,11 +30,11 @@ export type PublicStay = {
 export const publicStays: PublicStay[] = [
   {
     id: "atitlan-villa-luz",
-    name: "Villa Luz de Atitlan",
-    destination: "Lago de Atitlan",
+    name: "Villa Luz de Atitlán",
+    destination: "Lago de Atitlán",
     neighborhood: "Panajachel y pueblos cercanos",
     image: "/images/hero-villa-atitlan.png",
-    imageAlt: "Villa con terraza abierta frente al Lago de Atitlan",
+    imageAlt: "Villa con terraza abierta frente al Lago de Atitlán",
     summary:
       "Casa privada para viajes tranquilos, desayunos largos y vistas abiertas hacia lago y volcanes.",
     maxGuests: 6,
@@ -46,22 +46,22 @@ export const publicStays: PublicStay[] = [
     highlights: ["Vista al lago", "Ideal familias", "Soporte local"],
     amenities: ["Cocina equipada", "Terraza", "WiFi", "Parqueo coordinado"],
     gallery: [
-      { src: "/images/hero-villa-atitlan.png", alt: "Terraza abierta frente al Lago de Atitlan" },
+      { src: "/images/hero-villa-atitlan.png", alt: "Terraza abierta frente al Lago de Atitlán" },
       { src: "/images/guest-suite.png", alt: "Dormitorio preparado para llegada privada" }
     ],
-    houseRules: ["Llegada coordinada", "Tarifa visible tras cotizacion", "Ocupacion segun reserva"],
-    operations: ["Preparacion previa", "Soporte local", "Revision de salida"],
+    houseRules: ["Llegada coordinada", "Tarifa visible tras cotización", "Ocupación según reserva"],
+    operations: ["Preparación previa", "Soporte local", "Revisión de salida"],
     bookingNote: "Disponibilidad, tarifa y bloqueo temporal se validan antes de pago."
   },
   {
     id: "antigua-suite-jardin",
     name: "Suite Jardin Colonial",
     destination: "Antigua Guatemala",
-    neighborhood: "Centro historico",
+    neighborhood: "Centro histórico",
     image: "/images/guest-suite.png",
-    imageAlt: "Suite elegante con luz natural y acabados calidos",
+    imageAlt: "Suite elegante con luz natural y acabados cálidos",
     summary:
-      "Suite para escapadas de pareja o viajes de trabajo con acceso rapido a restaurantes y caminatas.",
+      "Suite para escapadas de pareja o viajes de trabajo con acceso rápido a restaurantes y caminatas.",
     maxGuests: 2,
     bedrooms: 1,
     bathrooms: 1,
@@ -69,39 +69,39 @@ export const publicStays: PublicStay[] = [
     availability: "available",
     availabilityLabel: "Lista para reservar",
     highlights: ["Caminable", "Check-in guiado", "Ambiente silencioso"],
-    amenities: ["Cama queen", "Cafe local", "WiFi", "Limpieza programada"],
+    amenities: ["Cama queen", "Café local", "WiFi", "Limpieza programada"],
     gallery: [
-      { src: "/images/guest-suite.png", alt: "Suite con luz natural y textiles calidos" },
+      { src: "/images/guest-suite.png", alt: "Suite con luz natural y textiles cálidos" },
       { src: "/images/hero-villa-atitlan.png", alt: "Referencia de estancia seleccionada KUQUBA" }
     ],
-    houseRules: ["Estancia tranquila", "Acceso con verificacion", "Servicios segun reserva"],
-    operations: ["Check-in guiado", "Recomendaciones locales", "Atencion durante estancia"],
-    bookingNote: "Fechas y tarifa se validan en la cotizacion antes de continuar a pago."
+    houseRules: ["Estancia tranquila", "Acceso con verificación", "Servicios según reserva"],
+    operations: ["Check-in guiado", "Recomendaciones locales", "Atención durante estancia"],
+    bookingNote: "Fechas y tarifa se validan en la cotización antes de continuar a pago."
   },
   {
     id: "atitlan-casa-terraza",
     name: "Casa Terraza del Lago",
-    destination: "Lago de Atitlan",
+    destination: "Lago de Atitlán",
     neighborhood: "San Antonio Palopo y alrededores",
     image: "/images/hero-villa-atitlan.png",
-    imageAlt: "Casa con terraza abierta y vista hacia volcanes en Atitlan",
+    imageAlt: "Casa con terraza abierta y vista hacia volcanes en Atitlán",
     summary:
-      "Casa completa para grupos pequenos que buscan privacidad, cocina equipada y atencion local coordinada.",
+      "Casa completa para grupos pequeños que buscan privacidad, cocina equipada y atención local coordinada.",
     maxGuests: 4,
     bedrooms: 2,
     bathrooms: 2,
     stayStyle: "Casa completa",
     availability: "request",
     availabilityLabel: "Bajo validacion",
-    highlights: ["Terraza privada", "Grupo pequeno", "Llegada asistida"],
+    highlights: ["Terraza privada", "Grupo pequeño", "Llegada asistida"],
     amenities: ["Area social", "Cocina", "WiFi", "Limpieza previa"],
     gallery: [
-      { src: "/images/hero-villa-atitlan.png", alt: "Casa con terraza y vista abierta en Atitlan" },
+      { src: "/images/hero-villa-atitlan.png", alt: "Casa con terraza y vista abierta en Atitlán" },
       { src: "/images/guest-suite.png", alt: "Habitacion preparada para grupo pequeno" }
     ],
-    houseRules: ["Grupo pequeno", "Coordinacion de llegada", "Politicas por propiedad"],
+    houseRules: ["Grupo pequeño", "Coordinación de llegada", "Políticas por propiedad"],
     operations: ["Limpieza previa", "Anfitrion coordinado", "Seguimiento post-estancia"],
-    bookingNote: "La cotizacion valida tarifa y politicas antes de abrir el checkout."
+    bookingNote: "La cotización valida tarifa y políticas antes de abrir el checkout."
   }
 ];
 

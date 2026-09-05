@@ -38,6 +38,13 @@ export type GuestConfirmationInfo = {
   statusLabel: string;
 };
 
+export type GuestProfile = {
+  countryCode: string;
+  dateOfBirth: string;
+  email: string;
+  fullName: string;
+  phone: string;
+};
 export type GuestReservation = {
   arrival: GuestArrivalInfo;
   arrivalDate: string;
@@ -67,6 +74,7 @@ export type GuestPortalSnapshot = {
   guestName: string;
   metrics: GuestMetric[];
   nextStay: GuestReservation | null;
+  profile: GuestProfile;
   reservations: GuestReservation[];
   summary: string;
 };

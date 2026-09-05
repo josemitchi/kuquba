@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
+import { publicCoverageDestinations, publicGuestOptions } from "@kuquba/config";
+
 import { type PublicStay, type StayAvailability } from "@/data/public-stays";
 
 import { SearchPanel, type SearchPanelDefaults } from "./search-panel";
@@ -36,10 +38,10 @@ const availabilityClasses: Record<StayAvailability, string> = {
 export function StaySearchPage({ searchParams, stays }: { searchParams: StaySearchParams; stays: PublicStay[] }) {
   const criteria = buildCriteria(searchParams);
   const visibleStays = filterStays(criteria, stays);
-  const destinationLabel = criteria.destination || "Guatemala";
+  const destinationLabel = criteria.destination || "Zonas activas";
   const dateLabel = buildDateLabel(criteria.arrival, criteria.departure);
   const resultTitle =
-    visibleStays.length === 1 ? "1 opcion para revisar" : `${visibleStays.length} opciones para revisar`;
+    visibleStays.length === 1 ? "1 opción para revisar" : `${visibleStays.length} opciones para revisar`;
 
   return (
     <>
@@ -72,7 +74,7 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
                 Encuentra el lugar correcto para tu viaje.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] md:text-xl">
-                Explora propiedades curadas por KUQUBA, valida disponibilidad y continua a pago
+                Explora propiedades curadas por KUQUBA, valida disponibilidad y continúa a pago
                 desde el detalle de cada estancia.
               </p>
             </div>
@@ -80,7 +82,7 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
             <div className="mt-9 grid max-w-5xl gap-3 sm:grid-cols-3">
               <HeroMetric icon={MapPin} label="Destino" value={destinationLabel} />
               <HeroMetric icon={CalendarDays} label="Fechas" value={dateLabel} />
-              <HeroMetric icon={UsersRound} label="Viajeros" value={`${criteria.guestsNumber} huespedes`} />
+              <HeroMetric icon={UsersRound} label="Viajeros" value={`${criteria.guestsNumber} huéspedes`} />
             </div>
           </div>
         </section>
@@ -94,13 +96,13 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
             <div>
               <div className="flex flex-col gap-3 border-b border-line pb-5 md:flex-row md:items-end md:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase text-green">Resultados publicos</p>
+                  <p className="text-xs font-semibold uppercase text-green">Resultados públicos</p>
                   <h2 className="mt-2 font-display text-3xl leading-tight text-midnight md:text-4xl">
                     {resultTitle}
                   </h2>
                 </div>
                 <p className="max-w-xl text-sm leading-6 text-ink/66">
-                  Selecciona una propiedad, valida fechas y continua a pago para confirmar la
+                  Selecciona una propiedad, valida fechas y continúa a pago para confirmar la
                   reserva con disponibilidad protegida durante checkout.
                 </p>
               </div>
@@ -121,14 +123,14 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase text-green">Criterios actuales</p>
-                  <h2 className="text-lg font-semibold text-midnight">Busqueda curada</h2>
+                  <h2 className="text-lg font-semibold text-midnight">Búsqueda curada</h2>
                 </div>
               </div>
 
               <dl className="mt-6 space-y-4 text-sm">
                 <CriteriaRow label="Destino" value={destinationLabel} />
                 <CriteriaRow label="Fechas" value={dateLabel} />
-                <CriteriaRow label="Huespedes" value={`${criteria.guestsNumber}`} />
+                <CriteriaRow label="Huéspedes" value={`${criteria.guestsNumber}`} />
               </dl>
 
               <div className="mt-7 border-t border-line pt-6">
@@ -189,9 +191,9 @@ function StayCard({ criteria, stay }: { criteria: StaySearchCriteria; stay: Publ
         </div>
 
         <div className="mt-5 grid gap-3 text-sm text-ink/72 sm:grid-cols-3">
-          <StayStat icon={UsersRound} label={`${stay.maxGuests} huespedes`} />
+          <StayStat icon={UsersRound} label={`${stay.maxGuests} huéspedes`} />
           <StayStat icon={BedDouble} label={`${stay.bedrooms} habitaciones`} />
-          <StayStat icon={DoorOpen} label={`${stay.bathrooms} banos`} />
+          <StayStat icon={DoorOpen} label={`${stay.bathrooms} baños`} />
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2">
@@ -295,7 +297,7 @@ function EmptyResults() {
       <ShieldCheck aria-hidden className="mx-auto h-10 w-10 text-green" />
       <h3 className="mt-4 text-xl font-semibold text-midnight">No hay coincidencias con esos criterios.</h3>
       <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-ink/68">
-        Amplia destino o reduce cantidad de huespedes para revisar opciones conceptuales disponibles
+        Elige otra zona activa o reduce la cantidad de huéspedes para revisar opciones disponibles
         en esta etapa.
       </p>
       <a
@@ -309,12 +311,15 @@ function EmptyResults() {
 }
 
 function buildCriteria(searchParams: StaySearchParams): StaySearchCriteria {
-  const destination = readParam(searchParams.destination).trim();
+  const rawDestination = readParam(searchParams.destination).trim();
+  const destination =
+    publicCoverageDestinations.find((option) => normalizeText(option) === normalizeText(rawDestination)) ?? "";
   const arrival = readParam(searchParams.arrival);
   const departure = readParam(searchParams.departure);
   const guests = readParam(searchParams.guests) || "2";
   const parsedGuests = Number.parseInt(guests, 10);
-  const guestsNumber = Number.isFinite(parsedGuests) && parsedGuests > 0 ? parsedGuests : 2;
+  const maxPublicGuests = publicGuestOptions[publicGuestOptions.length - 1] ?? 6;
+  const guestsNumber = Number.isFinite(parsedGuests) && parsedGuests > 0 ? Math.min(parsedGuests, maxPublicGuests) : 2;
 
   return {
     arrival,
@@ -326,18 +331,25 @@ function buildCriteria(searchParams: StaySearchParams): StaySearchCriteria {
 }
 
 function filterStays(criteria: StaySearchCriteria, stays: PublicStay[]) {
-  const destinationQuery = criteria.destination.toLowerCase();
+  const destinationQuery = normalizeText(criteria.destination);
 
   return stays.filter((stay) => {
     const matchesDestination =
       !destinationQuery ||
       [stay.destination, stay.name, stay.neighborhood].some((value) =>
-        value.toLowerCase().includes(destinationQuery)
+        normalizeText(value).includes(destinationQuery)
       );
     const matchesGuests = criteria.guestsNumber <= stay.maxGuests;
 
     return matchesDestination && matchesGuests;
   });
+}
+
+function normalizeText(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 function readParam(value: string | string[] | undefined) {

@@ -1,0 +1,1 @@
+ALTER TABLE "Guest" ADD COLUMN "dateOfBirth" TIMESTAMP(3);

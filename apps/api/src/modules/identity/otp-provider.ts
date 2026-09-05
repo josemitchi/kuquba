@@ -6,7 +6,7 @@ const resendEmailsUrl = "https://api.resend.com/emails";
 const developmentOtpSigningSecret = "kuquba-development-otp-signing-secret-v1";
 
 type Audience = "guest" | "owner" | "ops";
-type Channel = "email" | "phone";
+type Channel = "email";
 
 export class OtpDeliveryError extends Error {
   code: string;
@@ -80,10 +80,6 @@ export async function deliverOtp(input: OtpDeliveryInput): Promise<OtpDeliveryRe
     };
   }
 
-  if (input.channel !== "email") {
-    throw new OtpDeliveryError("phone_otp_not_configured", "Phone OTP delivery is not configured.", 501);
-  }
-
   return sendResendOtpEmail(input);
 }
 
@@ -131,9 +127,9 @@ async function sendResendOtpEmail(input: OtpDeliveryInput): Promise<OtpDeliveryR
 
 function buildResendEmailBody(input: OtpDeliveryInput) {
   const ttlMinutes = Math.max(1, Math.ceil((input.expiresAt.getTime() - Date.now()) / 60000));
-  const subject = "Codigo de acceso KUQUBA";
+  const subject = "Código de acceso KUQUBA";
   const text = [
-    `Tu codigo de acceso KUQUBA es ${input.code}.`,
+    `Tu código de acceso KUQUBA es ${input.code}.`,
     `Vence en ${ttlMinutes} minutos.`,
     "Si no solicitaste este acceso, puedes ignorar este correo."
   ].join("\n");
@@ -154,10 +150,10 @@ function buildOtpHtml(code: string, ttlMinutes: number) {
   return `
     <div style="font-family: Arial, sans-serif; color: #101828; line-height: 1.5; max-width: 560px; margin: 0 auto; padding: 24px;">
       <p style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #0F766E; font-weight: 700;">KUQUBA</p>
-      <h1 style="font-size: 24px; margin: 8px 0 16px;">Codigo de acceso</h1>
-      <p>Usa este codigo para entrar de forma segura a tu portal.</p>
+      <h1 style="font-size: 24px; margin: 8px 0 16px;">Código de acceso</h1>
+      <p>Usa este código para entrar de forma segura a tu portal.</p>
       <div style="font-size: 32px; font-weight: 700; letter-spacing: 0.16em; background: #F7F3EB; border: 1px solid #D9E1E7; border-radius: 8px; padding: 18px 20px; text-align: center; margin: 24px 0;">${escapedCode}</div>
-      <p style="font-size: 14px; color: #475467;">Este codigo vence en ${ttlMinutes} minutos. Si no solicitaste este acceso, puedes ignorar este correo.</p>
+      <p style="font-size: 14px; color: #475467;">Este código vence en ${ttlMinutes} minutos. Si no solicitaste este acceso, puedes ignorar este correo.</p>
     </div>
   `;
 }

@@ -14,28 +14,32 @@ export const kuqubaBrand = {
 
 export const publicNavigation = [
   { label: "Estancias", href: "#estancias" },
-  { label: "Administra tu propiedad", href: "#propietarios" },
-  { label: "Nosotros", href: "#nosotros" },
-  { label: "Contacto", href: "#contacto" }
+  { label: "Propietarios", href: "#propietarios" },
+  { label: "Experiencia", href: "#experiencia" },
+  { label: "Contacto", href: "/contact" }
 ] as const;
 
+export const publicCoverageDestinations = ["Lago de Atitlán", "Antigua Guatemala"] as const;
+
+export const publicGuestOptions = [1, 2, 3, 4, 5, 6] as const;
+
 export const accessOptions = [
-  { label: "Huespedes", href: "/stay" },
-  { label: "Propietarios", href: "/owner" },
-  { label: "Operaciones", href: "/ops" }
+  { label: "Huéspedes", href: "/stay", description: "Consulta tu reserva" },
+  { label: "Propietarios", href: "/owner", description: "Gestiona tu propiedad" },
+  { label: "Operaciones", href: "/ops", description: "Equipo KUQUBA" }
 ] as const;
 
 export const trustPillars = [
   "Procesos seguros y transparentes",
-  "Atencion personalizada",
+  "Atención personalizada",
   "Propiedades seleccionadas",
-  "Gestion profesional"
+  "Gestión profesional"
 ] as const;
 
 export const portalEntries = [
   {
     key: "guest",
-    label: "Huespedes",
+    label: "Huéspedes",
     href: "/stay",
     roleKey: "guest",
     accessMethod: "OTP por correo",
@@ -54,7 +58,7 @@ export const portalEntries = [
     label: "Operaciones",
     href: "/ops",
     roleKey: "ops_admin",
-    accessMethod: "MFA obligatorio y privilegio minimo",
+    accessMethod: "MFA obligatorio y privilegio mínimo",
     mfaRequired: true
   }
 ] as const;
@@ -81,7 +85,7 @@ export const permissionKeys = [
 export const roleProfiles = [
   {
     key: "guest",
-    label: "Huesped",
+    label: "Huésped",
     permissions: ["reservation:self:read", "reservation:self:update"]
   },
   {

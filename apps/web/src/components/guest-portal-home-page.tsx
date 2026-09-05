@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   BadgeCheck,
+  Cake,
   CalendarCheck2,
   CheckCircle2,
   ChevronDown,
@@ -12,13 +13,16 @@ import {
   DoorOpen,
   FileText,
   LogOut,
+  Mail,
+  Phone,
+  Save,
   ShieldCheck,
   UserRound,
   type LucideIcon
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import {
   getDevPortalApiBaseUrl,
@@ -27,6 +31,7 @@ import {
 } from "@/components/use-dev-portal-session";
 import type {
   GuestPortalSnapshot,
+  GuestProfile,
   GuestReservation,
   GuestReservationTone
 } from "@/data/guest-portal";
@@ -46,6 +51,13 @@ type GuestPortalResponse = {
   correlationId: string;
   portal: GuestPortalSnapshot;
 };
+
+type GuestProfileResponse = {
+  correlationId: string;
+  profile: GuestProfile;
+};
+
+type ProfileSaveState = "idle" | "saving" | "success" | "error";
 
 export function GuestPortalHomePage() {
   const { isValidating, logout, session } = useDevPortalSession("guest");
@@ -106,6 +118,10 @@ export function GuestPortalHomePage() {
     router.push("/stay");
   }
 
+  function handleProfileUpdated(profile: GuestProfile) {
+    setPortal((current) => (current ? { ...current, guestName: profile.fullName, profile } : current));
+  }
+
   return (
     <main className="min-h-screen bg-ivory text-ink">
       <header className="border-b border-white/10 bg-midnight text-white">
@@ -134,7 +150,7 @@ export function GuestPortalHomePage() {
               <ArrowLeft aria-hidden className="h-4 w-4" />
               Acceso
             </a>
-            <AccountMenu isValidating={isValidating} onLogout={handleLogout} session={session} />
+            <AccountMenu isValidating={isValidating} onLogout={handleLogout} profile={portal?.profile} session={session} />
           </div>
         </div>
       </header>
@@ -159,7 +175,7 @@ export function GuestPortalHomePage() {
       <section className="container-shell py-8">
         {session ? (
           portal ? (
-            <GuestDashboard snapshot={portal} />
+            <GuestDashboard onProfileUpdated={handleProfileUpdated} sessionToken={session.sessionToken} snapshot={portal} />
           ) : (
             <PortalLoadState isLoading={isPortalLoading} />
           )
@@ -174,10 +190,12 @@ export function GuestPortalHomePage() {
 function AccountMenu({
   isValidating,
   onLogout,
+  profile,
   session
 }: {
   isValidating: boolean;
   onLogout: () => void;
+  profile?: GuestProfile;
   session: DevPortalSession | null;
 }) {
   if (!session) {
@@ -189,6 +207,9 @@ function AccountMenu({
     );
   }
 
+  const displayName = profile?.fullName || session.user.displayName;
+  const email = profile?.email ?? "";
+
   return (
     <details className="group relative">
       <summary className="focus-ring flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-[6px] border border-white/25 px-3 text-left text-sm text-white/90 transition hover:border-white">
@@ -196,10 +217,8 @@ function AccountMenu({
           <UserRound aria-hidden className="h-4 w-4" />
         </span>
         <span className="min-w-0">
-          <span className="block max-w-36 truncate font-semibold text-white">
-            {session.user.displayName}
-          </span>
-          <span className="block text-xs text-white/62">{session.role.name}</span>
+          <span className="block max-w-36 truncate font-semibold text-white">{displayName}</span>
+          <span className="block text-xs text-white/62">Cuenta de huesped</span>
         </span>
         <ChevronDown
           aria-hidden
@@ -214,8 +233,8 @@ function AccountMenu({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="truncate font-semibold text-midnight">{session.user.displayName}</p>
-                <p className="mt-1 truncate text-xs text-ink/62">{session.user.emailMasked}</p>
+                <p className="truncate font-semibold text-midnight">{displayName}</p>
+                {email ? <p className="mt-1 truncate text-xs text-ink/62">{email}</p> : null}
               </div>
               <span className="shrink-0 rounded-full bg-green/10 px-2 py-1 text-[0.68rem] font-semibold uppercase text-green">
                 {session.role.name}
@@ -223,15 +242,8 @@ function AccountMenu({
             </div>
           </div>
         </div>
-        <dl className="grid gap-2 px-4 py-4">
-          <AccountSessionRow
-            icon={Clock3}
-            label="Sesion activa hasta"
-            value={formatSessionExpiry(session.expiresAt)}
-          />
-        </dl>
         <button
-          className="focus-ring mx-4 mb-4 inline-flex min-h-10 w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:bg-green/5 hover:text-green"
+          className="focus-ring m-4 inline-flex min-h-10 w-[calc(100%-2rem)] items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:bg-green/5 hover:text-green"
           onClick={onLogout}
           type="button"
         >
@@ -243,15 +255,32 @@ function AccountMenu({
   );
 }
 
-function GuestDashboard({ snapshot }: { snapshot: GuestPortalSnapshot }) {
+function GuestDashboard({
+  onProfileUpdated,
+  sessionToken,
+  snapshot
+}: {
+  onProfileUpdated: (profile: GuestProfile) => void;
+  sessionToken: string;
+  snapshot: GuestPortalSnapshot;
+}) {
+  const activeReservations = snapshot.reservations.filter(isPendingOrCurrentReservation);
+  const historyReservations = snapshot.reservations.filter(
+    (reservation) => !isPendingOrCurrentReservation(reservation)
+  );
+  const defaultSelectedReservationId = getDefaultSelectedReservationId(
+    snapshot,
+    activeReservations,
+    historyReservations
+  );
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(
-    snapshot.nextStay?.id ?? snapshot.reservations[0]?.id ?? null
+    defaultSelectedReservationId
   );
   const summaryMetrics = snapshot.metrics.filter((metric) => metric.label !== "Proxima llegada");
 
   useEffect(() => {
-    setSelectedReservationId(snapshot.nextStay?.id ?? snapshot.reservations[0]?.id ?? null);
-  }, [snapshot.nextStay?.id, snapshot.reservations]);
+    setSelectedReservationId(defaultSelectedReservationId);
+  }, [defaultSelectedReservationId]);
 
   function handleReservationDetail(reservationId: string) {
     setSelectedReservationId((current) => (current === reservationId ? null : reservationId));
@@ -259,30 +288,89 @@ function GuestDashboard({ snapshot }: { snapshot: GuestPortalSnapshot }) {
 
   return (
     <>
-      <NextStayPanel reservation={snapshot.nextStay} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
+        <div className="space-y-6">
+          <NextStayPanel reservation={snapshot.nextStay} />
 
-      {summaryMetrics.length > 0 ? (
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {summaryMetrics.map((metric, index) => (
-            <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
-          ))}
+          {summaryMetrics.length > 0 ? (
+            <div className="grid gap-4 md:grid-cols-3">
+              {summaryMetrics.map((metric, index) => (
+                <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
+              ))}
+            </div>
+          ) : null}
         </div>
-      ) : null}
 
-      <section className="mt-8">
+        <GuestProfilePanel
+          onProfileUpdated={onProfileUpdated}
+          profile={snapshot.profile}
+          sessionToken={sessionToken}
+        />
+      </div>
+
+      <section className="mt-10">
         <SectionHeading
-          eyebrow="Mis reservas"
-          title="Reservas y pagos"
-          value={String(snapshot.reservations.length) + " registro(s)"}
+          eyebrow="Reservas activas"
+          title="Estadias pendientes o en curso"
+          value={String(activeReservations.length) + " estancia(s)"}
         />
         <ReservationList
+          emptyDescription="Aqui apareceran tus reservas temporales, pagos pendientes y estadias confirmadas por realizar."
+          emptyTitle="Sin estadias activas"
           onSelect={handleReservationDetail}
-          reservations={snapshot.reservations}
+          reservations={activeReservations}
+          selectedReservationId={selectedReservationId}
+        />
+      </section>
+
+      <section className="mt-10">
+        <SectionHeading
+          eyebrow="Historial"
+          title="Historial de estadias"
+          value={String(historyReservations.length) + " registro(s)"}
+        />
+        <ReservationList
+          emptyDescription="Cuando una estancia finalice o una reserva quede vencida, se movera a este historial."
+          emptyTitle="Historial pendiente"
+          onSelect={handleReservationDetail}
+          reservations={historyReservations}
           selectedReservationId={selectedReservationId}
         />
       </section>
     </>
   );
+}
+
+function getDefaultSelectedReservationId(
+  snapshot: GuestPortalSnapshot,
+  activeReservations: GuestReservation[],
+  historyReservations: GuestReservation[]
+) {
+  return snapshot.nextStay?.id ?? activeReservations[0]?.id ?? historyReservations[0]?.id ?? null;
+}
+
+function isPendingOrCurrentReservation(reservation: GuestReservation) {
+  if (reservation.status === "HOLD" || reservation.status === "PENDING_PAYMENT") {
+    return reservation.isActionable;
+  }
+
+  if (reservation.status === "CONFIRMED") {
+    return reservation.departureDate >= getTodayDateKey();
+  }
+
+  return false;
+}
+
+function getTodayDateKey() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "America/Guatemala",
+    year: "numeric"
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function MetricCard({
@@ -302,11 +390,173 @@ function MetricCard({
   );
 }
 
+function GuestProfilePanel({
+  onProfileUpdated,
+  profile,
+  sessionToken
+}: {
+  onProfileUpdated: (profile: GuestProfile) => void;
+  profile: GuestProfile;
+  sessionToken: string;
+}) {
+  const [form, setForm] = useState({
+    dateOfBirth: profile.dateOfBirth,
+    fullName: profile.fullName,
+    phone: profile.phone
+  });
+  const [saveState, setSaveState] = useState<ProfileSaveState>("idle");
+  const isSaving = saveState === "saving";
+
+  useEffect(() => {
+    setForm({
+      dateOfBirth: profile.dateOfBirth,
+      fullName: profile.fullName,
+      phone: profile.phone
+    });
+  }, [profile.dateOfBirth, profile.fullName, profile.phone]);
+
+  function updateField(field: keyof typeof form, value: string) {
+    setForm((current) => ({ ...current, [field]: value }));
+    setSaveState("idle");
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (form.fullName.trim().length < 2) {
+      setSaveState("error");
+      return;
+    }
+
+    setSaveState("saving");
+
+    try {
+      const response = await fetch(`${getDevPortalApiBaseUrl()}/api/guest/profile`, {
+        body: JSON.stringify({
+          dateOfBirth: form.dateOfBirth || null,
+          fullName: form.fullName.trim(),
+          phone: form.phone.trim() || null
+        }),
+        headers: {
+          "content-type": "application/json",
+          "x-kuquba-dev-session": sessionToken
+        },
+        method: "PATCH"
+      });
+
+      if (!response.ok) {
+        throw new Error("guest_profile_update_failed");
+      }
+
+      const payload = (await response.json()) as GuestProfileResponse;
+      onProfileUpdated(payload.profile);
+      setSaveState("success");
+    } catch {
+      setSaveState("error");
+    }
+  }
+
+  return (
+    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
+          <UserRound aria-hidden className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-green">Perfil del huesped</p>
+          <h2 className="mt-1 truncate text-lg font-semibold text-midnight">{profile.fullName}</h2>
+          <p className="mt-1 truncate text-sm text-ink/62">Datos para llegada y confirmaciones.</p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex gap-3 rounded-[6px] border border-line bg-ivory p-3 text-sm">
+        <Mail aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-green" />
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase text-ink/45">Correo de acceso</p>
+          <p className="mt-1 break-words font-semibold text-midnight">{profile.email}</p>
+        </div>
+      </div>
+
+      <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
+        <label className="block">
+          <span className="mb-2 block text-xs font-semibold uppercase text-ink/48">
+            Nombres y apellidos
+          </span>
+          <input
+            className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none"
+            name="fullName"
+            onChange={(event) => updateField("fullName", event.target.value)}
+            required
+            type="text"
+            value={form.fullName}
+          />
+        </label>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          <label className="block">
+            <span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+              <Phone aria-hidden className="h-3.5 w-3.5 text-green" />
+              Telefono
+            </span>
+            <input
+              className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none"
+              inputMode="tel"
+              name="phone"
+              onChange={(event) => updateField("phone", event.target.value)}
+              placeholder="+502 5555 0000"
+              type="tel"
+              value={form.phone}
+            />
+          </label>
+
+          <label className="block">
+            <span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+              <Cake aria-hidden className="h-3.5 w-3.5 text-green" />
+              Fecha de nacimiento
+            </span>
+            <input
+              className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none [color-scheme:light]"
+              name="dateOfBirth"
+              onChange={(event) => updateField("dateOfBirth", event.target.value)}
+              type="date"
+              value={form.dateOfBirth}
+            />
+          </label>
+        </div>
+
+        <button
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={isSaving || form.fullName.trim().length < 2}
+          type="submit"
+        >
+          <Save aria-hidden className="h-4 w-4" />
+          {isSaving ? "Guardando" : "Guardar perfil"}
+        </button>
+
+        {saveState === "success" ? (
+          <p className="rounded-[6px] border border-green/24 bg-green/10 px-3 py-2 text-xs font-semibold text-green">
+            Perfil actualizado.
+          </p>
+        ) : null}
+        {saveState === "error" ? (
+          <p className="rounded-[6px] border border-terracotta/30 bg-terracotta/10 px-3 py-2 text-xs font-semibold text-terracotta">
+            No se pudo actualizar el perfil. Revisa los datos e intenta de nuevo.
+          </p>
+        ) : null}
+      </form>
+    </section>
+  );
+}
+
 function ReservationList({
+  emptyDescription,
+  emptyTitle,
   onSelect,
   reservations,
   selectedReservationId
 }: {
+  emptyDescription: string;
+  emptyTitle: string;
   onSelect: (reservationId: string) => void;
   reservations: GuestReservation[];
   selectedReservationId: string | null;
@@ -315,10 +565,9 @@ function ReservationList({
     return (
       <section className="mt-5 rounded-[8px] border border-line bg-white p-8 text-center shadow-soft">
         <CalendarCheck2 aria-hidden className="mx-auto h-10 w-10 text-green" />
-        <h2 className="mt-4 text-xl font-semibold text-midnight">Sin reservas registradas</h2>
+        <h2 className="mt-4 text-xl font-semibold text-midnight">{emptyTitle}</h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-ink/68">
-          Cuando una cotizacion genere una reserva temporal o una reserva confirmada, aparecera
-          aqui.
+          {emptyDescription}
         </p>
       </section>
     );
@@ -648,9 +897,9 @@ function NextStayPanel({ reservation }: { reservation: GuestReservation | null }
           </div>
 
           <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
-            <SessionRow label="Destino" value={reservation.propertyDestination} />
-            <SessionRow label="Salida" value={formatDate(reservation.departureDate)} />
-            <SessionRow label="Reserva" value={reservation.reservationCode} />
+            <DetailRow label="Destino" value={reservation.propertyDestination} />
+            <DetailRow label="Salida" value={formatDate(reservation.departureDate)} />
+            <DetailRow label="Reserva" value={reservation.reservationCode} />
           </dl>
         </div>
       </div>
@@ -721,41 +970,6 @@ function SectionHeading({
   );
 }
 
-function AccountSessionRow({
-  icon: Icon,
-  label,
-  value
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-[6px] border border-line bg-white px-3 py-3">
-      <Icon aria-hidden className="h-4 w-4 shrink-0 text-green" />
-      <div className="min-w-0">
-        <dt className="text-xs font-semibold uppercase text-ink/45">{label}</dt>
-        <dd className="mt-1 font-semibold text-midnight">{value}</dd>
-      </div>
-    </div>
-  );
-}
-
-function SessionRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-line pb-3 last:border-0 last:pb-0">
-      <dt className="text-ink/52">{label}</dt>
-      <dd className="text-right font-semibold text-midnight">{value}</dd>
-    </div>
-  );
-}
-
-function formatSessionExpiry(value: string) {
-  return new Intl.DateTimeFormat("es-GT", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  }).format(new Date(value));
-}
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("es-GT", {
