@@ -21,7 +21,7 @@ const faqItems = [
   {
     question: "¿En qué zonas opera KUQUBA?",
     answer:
-      "Actualmente mostramos solo destinos donde podemos coordinar soporte, llegada y seguimiento. Las zonas activas aparecen en el buscador público."
+      "Actualmente mostramos El Paredón, Monterrico y Puerto San José, zonas donde podemos coordinar soporte, llegada y seguimiento."
   },
   {
     question: "¿Puedo buscar estancias en otra ubicación?",
@@ -41,80 +41,173 @@ const faqItems = [
   {
     question: "Soy propietario, ¿cómo inicio?",
     answer:
-      "Puedes solicitar una evaluación de propiedad. Revisamos ubicación, condiciones, disponibilidad y operacion antes de publicarla."
+      "Puedes solicitar una evaluación de propiedad. Revisamos ubicación, condiciones, disponibilidad y operación antes de publicarla."
   }
 ] as const;
 
 const termsSections = [
   {
-    title: "Uso del sitio",
+    title: "Alcance del servicio",
     body:
-      "KUQUBA permite explorar estancias seleccionadas, solicitar evaluación de propiedades y acceder a portales privados de huéspedes, propietarios y operaciones."
+      "KUQUBA administra estancias seleccionadas y facilita reservas directas, acceso privado, coordinación de llegada y soporte operativo. El uso del sitio implica aceptar estas condiciones y la información específica de cada reserva."
   },
   {
-    title: "Disponibilidad y tarifas",
+    title: "Cobertura y propiedades",
     body:
-      "La disponibilidad, tarifa, noches y bloqueo temporal se validan antes del pago. Una cotizacion inicial no garantiza reserva hasta que el pago sea aprobado y la reserva quede confirmada."
+      "Mostramos únicamente destinos y propiedades donde existe cobertura operativa activa. Las fotografías, descripciones, amenidades, reglas y capacidades pueden actualizarse para reflejar cambios de operación o mantenimiento."
   },
   {
-    title: "Reservas y pagos",
+    title: "Cotizaciones y disponibilidad",
     body:
-      "Los pagos se procesan mediante proveedores externos. KUQUBA registra el estado de pago y habilita el acceso del huesped cuando la reserva queda confirmada."
+      "Las tarifas, noches, impuestos, cargos aplicables y disponibilidad se validan antes del pago. Una cotización inicial es informativa y no garantiza una reserva hasta que el sistema confirme el bloqueo temporal y el pago correspondiente."
   },
   {
-    title: "Llegada y estancia",
+    title: "Confirmación de reserva",
     body:
-      "El huesped debe usar la propiedad segun las reglas indicadas en la reserva. Los horarios, instrucciones de llegada y condiciones pueden variar por propiedad."
+      "La reserva queda confirmada cuando KUQUBA registra el pago aprobado y emite la confirmación asociada. Mientras el pago esté pendiente, la disponibilidad puede estar protegida solo durante el tiempo indicado en el proceso de checkout."
+  },
+  {
+    title: "Pagos y comprobantes",
+    body:
+      "Los pagos pueden procesarse mediante proveedores externos. KUQUBA registra el estado de la transacción, referencia, monto y reserva asociada; los datos completos de tarjetas u otros instrumentos de pago no se almacenan en el portal público."
+  },
+  {
+    title: "Cambios, cancelaciones y reembolsos",
+    body:
+      "Las solicitudes de cambio, cancelación o reembolso se atienden según las condiciones informadas para cada estancia, la fecha de solicitud, los costos ya comprometidos y las políticas de los proveedores de pago o servicios involucrados."
+  },
+  {
+    title: "Llegada, estancia y reglas de uso",
+    body:
+      "El huésped debe respetar horarios, capacidad, reglas de casa, instrucciones de llegada y condiciones comunicadas para la propiedad. Incidentes, daños, ocupación no autorizada o uso indebido pueden generar cargos o restricciones adicionales."
+  },
+  {
+    title: "Acceso privado",
+    body:
+      "Los portales privados usan verificación por correo y permisos por rol. Cada usuario es responsable de usar únicamente el acceso que le corresponde y de no compartir códigos, enlaces o información privada de reservas, propiedades u operaciones."
   },
   {
     title: "Propietarios",
     body:
-      "La solicitud de evaluación no publica una propiedad de forma automatica. KUQUBA revisa operacion, disponibilidad, condiciones y documentacion antes de avanzar."
+      "Solicitar una evaluación no implica aceptación ni publicación automática de una propiedad. KUQUBA revisa ubicación, documentación, disponibilidad, estándares mínimos, condiciones comerciales y viabilidad operativa antes de avanzar."
   },
   {
-    title: "Cambios del servicio",
+    title: "Actualizaciones y contacto",
     body:
-      "Podemos ajustar contenido, disponibilidad, zonas de cobertura y flujos operativos para mejorar la experiencia y proteger la calidad del servicio."
+      "KUQUBA puede actualizar contenido, cobertura, procesos y estas condiciones para mantener claridad operativa y calidad de servicio. Para dudas sobre una reserva, propiedad o acceso, utiliza el canal de contacto correspondiente."
   }
 ] as const;
 
 const privacySections = [
   {
-    title: "Datos que usamos",
+    title: "Responsable y alcance",
     body:
-      "Podemos procesar datos de contacto, perfil de huesped, reserva, propiedad, estado de pago, actividad de acceso y comunicaciones necesarias para operar el servicio."
+      "KUQUBA trata información relacionada con estancias, reservas, propietarios, huéspedes, accesos privados y solicitudes recibidas por medio del sitio o canales operativos vinculados al servicio."
   },
   {
-    title: "Para qué usamos la información",
+    title: "Datos que recopilamos",
     body:
-      "Usamos la información para validar disponibilidad, confirmar reservas, enviar códigos de acceso, coordinar llegada, dar soporte y mantener registros operativos."
+      "Podemos procesar nombre, correo, teléfono, datos de perfil, fechas de estancia, número de huéspedes, preferencias, propiedad reservada, estado de pago, solicitudes, mensajes y actividad básica de acceso al portal."
   },
   {
-    title: "Proveedores",
+    title: "Uso de la información",
     body:
-      "Podemos apoyarnos en proveedores de hosting, base de datos, correo transaccional, analítica técnica y pagos. Cada proveedor recibe solo la información necesaria para su función."
+      "Usamos la información para validar disponibilidad, preparar cotizaciones, confirmar reservas, enviar códigos de acceso por correo, coordinar llegada, brindar soporte, administrar propiedades y mantener trazabilidad operativa."
   },
   {
-    title: "Seguridad",
+    title: "Pagos y proveedores",
     body:
-      "Protegemos portales privados con verificación y control de acceso por rol. Las acciones sensibles pueden quedar registradas para auditoría operativa."
+      "Cuando un pago se procesa con terceros, KUQUBA recibe datos necesarios para identificar la transacción, como estado, referencia, monto y reserva asociada. Los proveedores de pago gestionan la información sensible bajo sus propios controles."
+  },
+  {
+    title: "Correos y comunicaciones",
+    body:
+      "Podemos enviar mensajes transaccionales sobre códigos de acceso, confirmaciones, pagos, llegada, cambios relevantes y soporte. Estos mensajes son necesarios para operar correctamente la reserva o la relación con la propiedad."
+  },
+  {
+    title: "Seguridad y acceso",
+    body:
+      "Protegemos los portales con verificación por correo, permisos por rol y registros de actividad. Aun así, ningún sistema es absoluto; por eso limitamos el acceso a la información necesaria para cada perfil."
   },
   {
     title: "Conservación",
     body:
-      "Conservamos información mientras sea necesaria para operar reservas, cumplir obligaciones, atender soporte y mantener trazabilidad razonable del servicio."
+      "Conservamos información mientras sea necesaria para operar reservas, atender solicitudes, cumplir obligaciones, resolver incidencias, prevenir uso indebido y mantener registros razonables del servicio."
   },
   {
     title: "Solicitudes de datos",
     body:
-      "Si necesitas corregir o consultar información vinculada a una reserva o propiedad, utiliza el canal de acceso correspondiente para iniciar la solicitud."
+      "Puedes solicitar revisión, corrección o actualización de información vinculada a tu reserva, propiedad o perfil. Para proteger el acceso, podremos validar tu identidad antes de atender la solicitud."
+  },
+  {
+    title: "Cookies y analítica técnica",
+    body:
+      "El sitio puede usar tecnologías necesarias para funcionamiento, seguridad, medición técnica y mejora de experiencia. Evitamos recolectar más información de la necesaria para operar y mejorar el servicio."
+  },
+  {
+    title: "Actualizaciones de privacidad",
+    body:
+      "Podemos actualizar esta política cuando cambien procesos, proveedores o funcionalidades. La versión publicada en el sitio será la referencia vigente para usuarios, huéspedes y propietarios."
+  }
+] as const;
+
+const stayRulesSections = [
+  {
+    title: "Uso permitido",
+    body:
+      "La propiedad debe utilizarse únicamente como alojamiento temporal para los huéspedes incluidos en la reserva. No se permite subarrendar, organizar eventos, sesiones comerciales, fiestas o actividades no autorizadas por KUQUBA o el propietario."
+  },
+  {
+    title: "Capacidad y visitantes",
+    body:
+      "La ocupación no puede exceder la capacidad aprobada ni el número de huéspedes indicado en la reserva. Cualquier visitante, cambio de huésped o solicitud especial debe coordinarse antes de la llegada y puede estar sujeto a aprobación o cargos adicionales."
+  },
+  {
+    title: "Llegada y salida",
+    body:
+      "Los horarios de check-in, check-out e instrucciones de acceso se informan en el portal de huéspedes o por el equipo KUQUBA. Llegadas tardías, salidas después del horario o cambios de coordinación pueden requerir confirmación operativa previa."
+  },
+  {
+    title: "Cuidado de la propiedad",
+    body:
+      "El huésped debe cuidar mobiliario, equipo, llaves, amenidades, áreas comunes y elementos de seguridad. Daños, faltantes, limpieza extraordinaria, uso indebido o pérdida de accesos pueden generar cobros según evidencia y costos aplicables."
+  },
+  {
+    title: "Convivencia y ruido",
+    body:
+      "Se debe respetar la tranquilidad del entorno, vecinos, personal y normas de la propiedad. Ruido excesivo, conducta riesgosa, consumo indebido, molestias recurrentes o incumplimiento de instrucciones pueden provocar restricciones, cargos o terminación anticipada de la estancia."
+  },
+  {
+    title: "Pagos, cargos y garantías",
+    body:
+      "La reserva se confirma cuando el pago es aprobado. KUQUBA puede solicitar pagos pendientes, cargos por daños, penalidades informadas, extensiones, limpieza extraordinaria, reposiciones o costos derivados del incumplimiento del reglamento o condiciones específicas de la estancia."
+  },
+  {
+    title: "Seguridad y accesos",
+    body:
+      "Los códigos, llaves, enlaces e instrucciones de acceso son privados. El huésped debe mantenerlos bajo resguardo, no compartirlos con personas no autorizadas y reportar de inmediato cualquier pérdida, incidente, emergencia o condición insegura."
+  },
+  {
+    title: "Mantenimiento e incidencias",
+    body:
+      "Si ocurre una falla, daño o situación que afecte la estancia, el huésped debe reportarla por los canales indicados. KUQUBA coordinará seguimiento razonable según disponibilidad, urgencia, proveedores y condiciones de la propiedad."
+  },
+  {
+    title: "Limitación de responsabilidad",
+    body:
+      "KUQUBA no responde por objetos personales, servicios externos, eventos de fuerza mayor, actos de terceros, interrupciones fuera de su control o uso de la propiedad contrario a las instrucciones. La responsabilidad se limita al alcance operativo de la reserva confirmada."
+  },
+  {
+    title: "Reglas específicas",
+    body:
+      "Cada propiedad puede tener reglas adicionales sobre parqueo, mascotas, piscina, cocina, áreas compartidas, acceso, depósitos, documentación o restricciones locales. Cuando existan reglas específicas, prevalecen para esa estancia y forman parte de la reserva."
   }
 ] as const;
 
 const contactChannels = [
   {
     title: "Quiero reservar una estancia",
-    body: "Explora zonas activas, fechas disponibles y capacidad antes de continuar a cotizacion.",
+    body: "Explora zonas activas, fechas disponibles y capacidad antes de continuar a cotización.",
     href: "/stay/search",
     action: "Buscar estancia",
     icon: CalendarCheck2
@@ -140,7 +233,7 @@ export function FaqPageContent() {
     <PublicInfoLayout
       eyebrow="Ayuda"
       title="Preguntas frecuentes"
-      description="Respuestas directas sobre cobertura, reservas, acceso y propiedades dentro del MVP de KUQUBA."
+      description="Respuestas directas sobre cobertura, reservas, acceso y propiedades de KUQUBA."
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="grid gap-4">
@@ -169,7 +262,7 @@ export function TermsPageContent() {
     <PublicInfoLayout
       eyebrow="Legal"
       title="Términos y condiciones"
-      description="Condiciones base para usar el sitio, consultar estancias, solicitar evaluaciónes y acceder a portales KUQUBA."
+      description="Condiciones base para usar el sitio, consultar estancias, solicitar evaluaciones y acceder a portales KUQUBA."
     >
       <PolicyArticle sections={termsSections} />
     </PublicInfoLayout>
@@ -188,6 +281,18 @@ export function PrivacyPageContent() {
   );
 }
 
+export function StayRulesPageContent() {
+  return (
+    <PublicInfoLayout
+      eyebrow="Reglas de estancia"
+      title="Reglamento de estancia"
+      description="Condiciones de uso de la propiedad, convivencia, cobros operativos y responsabilidades aplicables a cada reserva."
+    >
+      <PolicyArticle sections={stayRulesSections} />
+    </PublicInfoLayout>
+  );
+}
+
 export function ContactPageContent() {
   return (
     <PublicInfoLayout
@@ -195,39 +300,12 @@ export function ContactPageContent() {
       title="¿Cómo podemos ayudarte?"
       description="Elige el canal correcto según lo que necesitas. Así mantenemos cada solicitud vinculada al flujo adecuado."
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <div className="grid gap-4 md:grid-cols-3">
-          {contactChannels.map((channel) => (
-            <ContactCard key={channel.title} {...channel} />
-          ))}
-        </div>
-
-        <aside className="grid gap-5">
-          <CoverageAside />
-          <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
-                <ShieldCheck aria-hidden className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase text-green">Soporte ordenado</p>
-                <h2 className="text-lg font-semibold text-midnight">Antes de escribirnos</h2>
-              </div>
-            </div>
-            <ul className="mt-5 space-y-3 text-sm leading-6 text-ink/68">
-              {[
-                "Si ya tienes reserva, usa el portal de huéspedes.",
-                "Si quieres reservar, empieza por destino y fechas.",
-                "Si tienes propiedad, solicita evaluación antes de enviar documentos."
-              ].map((item) => (
-                <li className="flex gap-3" key={item}>
-                  <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </aside>
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        {contactChannels.map((channel) => (
+          <ContactCard key={channel.title} {...channel} />
+        ))}
+        <CoverageAside sticky={false} />
+        <SupportGuidanceCard className="md:col-span-2 xl:col-span-4" />
       </div>
     </PublicInfoLayout>
   );
@@ -254,7 +332,7 @@ function PublicInfoLayout({
             fill
             priority
             sizes="100vw"
-            src="/images/hero-villa-atitlan.png"
+            src="/images/hero-pacific-beach.png"
           />
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.94)_0%,rgba(13,34,51,0.76)_56%,rgba(13,34,51,0.52)_100%)]" />
           <div className="absolute inset-x-0 bottom-0 -z-10 h-36 bg-gradient-to-t from-ivory to-transparent" />
@@ -286,9 +364,11 @@ function PublicInfoLayout({
   );
 }
 
-function CoverageAside() {
+function CoverageAside({ className = "", sticky = true }: { className?: string; sticky?: boolean }) {
+  const stickyClassName = sticky ? " lg:sticky lg:top-6" : "";
+
   return (
-    <aside className="rounded-[8px] border border-line bg-white p-6 shadow-soft lg:sticky lg:top-6">
+    <aside className={`h-full rounded-[8px] border border-line bg-white p-6 shadow-soft${stickyClassName} ${className}`}>
       <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
           <MapPin aria-hidden className="h-5 w-5" />
@@ -325,9 +405,41 @@ function PolicyArticle({ sections }: { sections: readonly { body: string; title:
         ))}
       </div>
       <p className="mt-6 border-t border-line pt-5 text-sm leading-6 text-ink/60">
-        Este contenido es una base operativa para el MVP y puede actualizarse conforme avance el servicio.
+        Última actualización: septiembre de 2026.
       </p>
     </article>
+  );
+}
+
+function SupportGuidanceCard({ className = "" }: { className?: string }) {
+  const guidanceItems = [
+    "Si ya tienes reserva, usa el portal de huéspedes.",
+    "Si quieres reservar, empieza por destino y fechas.",
+    "Si tienes propiedad, solicita evaluación antes de enviar documentos."
+  ];
+
+  return (
+    <section className={`rounded-[8px] border border-line bg-white p-6 shadow-soft md:p-7 ${className}`}>
+      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:items-center">
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
+            <ShieldCheck aria-hidden className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-green">Soporte ordenado</p>
+            <h2 className="mt-1 text-xl font-semibold leading-7 text-midnight">Antes de escribirnos</h2>
+          </div>
+        </div>
+        <ul className="grid gap-4 text-sm leading-6 text-ink/68 md:grid-cols-3">
+          {guidanceItems.map((item) => (
+            <li className="flex gap-3" key={item}>
+              <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }
 
@@ -345,14 +457,14 @@ function ContactCard({
   title: string;
 }) {
   return (
-    <article className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
+    <article className="flex h-full flex-col rounded-[8px] border border-line bg-white p-6 shadow-soft">
       <div className="flex h-12 w-12 items-center justify-center rounded-[6px] bg-green/10 text-green">
         <Icon aria-hidden className="h-6 w-6" />
       </div>
       <h2 className="mt-5 text-xl font-semibold leading-7 text-midnight">{title}</h2>
-      <p className="mt-3 text-sm leading-6 text-ink/68">{body}</p>
+      <p className="mb-6 mt-3 text-sm leading-6 text-ink/68">{body}</p>
       <a
-        className="focus-ring mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-[6px] bg-green px-5 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
+        className="focus-ring mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-[6px] bg-green px-5 text-sm font-semibold text-white transition hover:bg-[#0f5c50]"
         href={href}
       >
         {action}

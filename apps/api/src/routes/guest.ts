@@ -436,7 +436,7 @@ function mapGuestReservation(reservation: GuestReservationRecord, now: Date) {
     propertyDestination: reservation.property.destination,
     propertyName: reservation.property.name,
     propertyImageAlt: propertyImage?.alt ?? `Vista de ${reservation.property.name}`,
-    propertyImageUrl: propertyImage?.url ?? "/images/hero-villa-atitlan.png",
+    propertyImageUrl: propertyImage?.url ?? "/images/hero-pacific-beach.png",
     reservationCode: reservation.privateCode,
     source: reservation.confirmationSource ?? reservation.stayQuote?.source ?? "manual",
     arrival: buildGuestArrivalInfo(reservation),

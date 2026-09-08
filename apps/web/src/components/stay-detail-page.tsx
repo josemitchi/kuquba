@@ -146,8 +146,15 @@ export function StayDetailPage({
                     <p className="mt-2 text-sm leading-6 text-ink/68">
                       KUQUBA valida disponibilidad, tarifa aplicable y reglas de propiedad antes
                       de pago. Al continuar a checkout se protege la disponibilidad de forma
-                      temporal; cuando el pago se confirma, la reserva queda confirmada.
+                      temporal; cuando el pago se confirma, la reserva queda confirmada bajo las
+                      condiciones aceptadas por el huésped.
                     </p>
+                    <a
+                      className="focus-ring mt-4 inline-flex w-fit rounded-[6px] text-sm font-semibold text-green underline-offset-4 transition hover:underline"
+                      href="/reglamento-de-estancia"
+                    >
+                      Ver reglamento de estancia
+                    </a>
                   </div>
                 </div>
               </section>

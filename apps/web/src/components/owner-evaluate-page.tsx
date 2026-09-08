@@ -56,7 +56,7 @@ export function OwnerEvaluatePage() {
             fill
             priority
             sizes="100vw"
-            src="/images/hero-villa-atitlan.png"
+            src="/images/hero-pacific-beach.png"
           />
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.95)_0%,rgba(13,34,51,0.84)_48%,rgba(20,104,90,0.54)_100%)]" />
           <div className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-ivory to-transparent" />
@@ -79,8 +79,8 @@ export function OwnerEvaluatePage() {
                   Evaluacion inicial de propiedad.
                 </h1>
                 <p className="mt-5 max-w-2xl text-base leading-7 text-white/82 md:text-lg">
-                  Comparte informacion basica de tu propiedad para que KUQUBA revise si encaja con
-                  una operacion administrada, curada y responsable.
+                  Comparte información básica de tu propiedad en la costa del Pacífico para que KUQUBA revise si encaja con
+                  una operación administrada, curada y responsable.
                 </p>
               </div>
 
@@ -105,8 +105,7 @@ export function OwnerEvaluatePage() {
                 Lo que se valida antes de avanzar.
               </h2>
               <p className="mt-4 text-sm leading-6 text-ink/68">
-                Este flujo no reemplaza el portal del propietario. Es una entrada publica para
-                iniciar una conversacion documentada y separar captacion de operacion activa.
+                Este flujo es para propiedades nuevas. Revisamos ubicación, estado y condiciones antes de avanzar a operación activa.
               </p>
             </div>
 
@@ -133,7 +132,7 @@ export function OwnerEvaluatePage() {
             <div>
               <p className="text-xs font-semibold uppercase text-green">Separacion de flujos</p>
               <h2 className="mt-3 font-display text-3xl leading-tight text-midnight md:text-4xl">
-                Captacion primero, portal despues.
+                Primero evaluamos, después operamos.
               </h2>
               <ol className="mt-6 space-y-4">
                 {processSteps.map((step, index) => (

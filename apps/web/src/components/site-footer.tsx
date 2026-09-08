@@ -12,7 +12,8 @@ const footerNavigation = [
 const resourceLinks = [
   { label: "Preguntas frecuentes", href: "/faq" },
   { label: "Términos y condiciones", href: "/terms" },
-  { label: "Políticas de privacidad", href: "/privacy" }
+  { label: "Políticas de privacidad", href: "/privacy" },
+  { label: "Reglamento de estancia", href: "/reglamento-de-estancia" }
 ] as const;
 
 const footerActions = [
@@ -42,8 +43,7 @@ export function SiteFooter() {
             </div>
           </div>
           <p className="mt-5 max-w-xs text-sm leading-6 text-white/70">
-            Administramos propiedades y creamos estancias excepcionales en los destinos más
-            especiales de Guatemala.
+            Administramos estancias seleccionadas en la costa del Pacífico de Guatemala, con operación y soporte KUQUBA.
           </p>
           <div className="mt-6 flex gap-3">
             {footerActions.map((action) => {

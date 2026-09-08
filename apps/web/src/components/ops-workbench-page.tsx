@@ -9,6 +9,7 @@ import {
   Inbox,
   LogOut,
   RefreshCw,
+  Receipt,
   Send,
   ShieldCheck,
   SlidersHorizontal,
@@ -19,6 +20,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { OpsBillingPanel } from "./ops-billing-panel";
 import { OpsCasePanel } from "./ops-case-panel";
 import { OpsPropertyEditorPanel } from "./ops-property-editor-panel";
 import { OpsReservationsPanel } from "./ops-reservations-panel";
@@ -28,7 +30,8 @@ import { getDevPortalApiBaseUrl, useDevPortalSession } from "./use-dev-portal-se
 type ReviewStatus = "NEW" | "REVIEWING" | "CONTACTED" | "CLOSED";
 type StatusFilter = ReviewStatus | "ALL";
 type QueueKey = "ownerLeads" | "proposalRequests";
-type OpsModuleKey = "requests" | "reservations" | "properties" | "operations" | "iam" | "audit";
+type OpsModuleKey =
+  "requests" | "reservations" | "properties" | "billing" | "operations" | "iam" | "audit";
 
 type WorkbenchMetric = {
   hint: string;
@@ -208,6 +211,7 @@ const opsModuleOptions: Array<{ key: OpsModuleKey; label: string; icon: LucideIc
   { key: "requests", label: "Solicitudes", icon: ClipboardList },
   { key: "reservations", label: "Reservas", icon: CalendarDays },
   { key: "properties", label: "Propiedades", icon: Building2 },
+  { key: "billing", label: "Cobros", icon: Receipt },
   { key: "operations", label: "Operaciones", icon: CalendarDays },
   { key: "iam", label: "IAM", icon: ShieldCheck },
   { key: "audit", label: "Auditoria", icon: SlidersHorizontal }
@@ -306,6 +310,7 @@ export function OpsWorkbenchPage() {
 
     return {
       audit: `${auditCount} eventos`,
+      billing: "Config financiera",
       iam: canManageIam ? "Gestion activa" : "Sin permiso",
       operations: `${operationCount} tareas`,
       properties: "Catalogo activo",
@@ -600,6 +605,10 @@ export function OpsWorkbenchPage() {
 
           {session && activeModule === "properties" ? (
             <OpsPropertyEditorPanel sessionToken={session.sessionToken} />
+          ) : null}
+
+          {session && activeModule === "billing" ? (
+            <OpsBillingPanel sessionToken={session.sessionToken} />
           ) : null}
 
           {session && activeModule === "operations" ? (

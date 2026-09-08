@@ -178,7 +178,7 @@ export function PortalEntryPage({ audience }: { audience: PortalAudience }) {
     <main className="min-h-screen bg-ivory text-ink">
       <section className="relative isolate overflow-hidden bg-midnight text-white">
         <Image
-          src="/images/hero-villa-atitlan.png"
+          src="/images/hero-pacific-beach.png"
           alt=""
           fill
           priority

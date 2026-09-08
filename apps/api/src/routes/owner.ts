@@ -493,9 +493,7 @@ function buildPropertySummary(contract: OwnerContractRecord, tasks: OwnerPortalR
       status === "active" ? "Visibilidad publica" : "Inventario privado"
     ],
     id: property.id,
-    image: property.destination.toLowerCase().includes("atitlan")
-      ? "/images/hero-villa-atitlan.png"
-      : "/images/owner-dashboard.png",
+    image: buildOwnerPropertyImage(property.destination),
     imageAlt: `Vista operativa de ${property.name}`,
     location: property.destination,
     name: property.name,
@@ -534,6 +532,19 @@ function buildPropertySummary(contract: OwnerContractRecord, tasks: OwnerPortalR
   };
 }
 
+function buildOwnerPropertyImage(destination: string) {
+  const normalizedDestination = destination.toLowerCase();
+
+  if (normalizedDestination.includes("paredon")) {
+    return "/images/pacific-paredon-beach-house.png";
+  }
+
+  if (normalizedDestination.includes("monterrico") || normalizedDestination.includes("puerto san jose")) {
+    return "/images/pacific-family-villa.png";
+  }
+
+  return "/images/owner-dashboard.png";
+}
 function mapOwnerReservation(reservation: ReservationWithProperty | OwnerReservationRecord) {
   const latestPayment = reservation.payments[0] ?? null;
 

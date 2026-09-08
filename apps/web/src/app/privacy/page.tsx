@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PrivacyPageContent } from "@/components/public-info-pages";
 
 export const metadata: Metadata = {
-  title: "Politicas de privacidad | KUQUBA"
+  title: "Políticas de privacidad | KUQUBA"
 };
 
 export default function PrivacyRoute() {

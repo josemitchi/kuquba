@@ -180,8 +180,8 @@ export function OwnerLeadForm() {
           <div className="flex gap-3">
             <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
             <p>
-              Solicitud recibida para revision inicial. Referencia {leadId?.slice(0, 8)}. KUQUBA
-              validara encaje operativo antes de proponer condiciones.
+              Solicitud recibida para revisión inicial. Referencia {leadId?.slice(0, 8)}. Te enviamos
+              un correo con el resumen y los próximos pasos del proceso KUQUBA.
             </p>
           </div>
         </div>

@@ -29,78 +29,93 @@ export type PublicStay = {
 
 export const publicStays: PublicStay[] = [
   {
-    id: "atitlan-villa-luz",
-    name: "Villa Luz de Atitlán",
-    destination: "Lago de Atitlán",
-    neighborhood: "Panajachel y pueblos cercanos",
-    image: "/images/hero-villa-atitlan.png",
-    imageAlt: "Villa con terraza abierta frente al Lago de Atitlán",
+    id: "paredon-casa-brisa",
+    name: "Casa Brisa del Paredón",
+    destination: "El Paredón",
+    neighborhood: "Playa El Paredón",
+    image: "/images/pacific-paredon-beach-house.png",
+    imageAlt: "Casa de playa con terraza, palmeras y arena volcánica en El Paredón",
     summary:
-      "Casa privada para viajes tranquilos, desayunos largos y vistas abiertas hacia lago y volcanes.",
+      "Casa privada cerca del surf, arena volcánica y atardeceres del Pacífico, preparada para descansar con soporte KUQUBA.",
     maxGuests: 6,
     bedrooms: 3,
     bathrooms: 2.5,
-    stayStyle: "Villa privada",
+    stayStyle: "Casa frente al mar",
     availability: "limited",
     availabilityLabel: "Ventanas limitadas",
-    highlights: ["Vista al lago", "Ideal familias", "Soporte local"],
+    highlights: ["Playa activa", "Ideal familias", "Soporte local"],
     amenities: ["Cocina equipada", "Terraza", "WiFi", "Parqueo coordinado"],
     gallery: [
-      { src: "/images/hero-villa-atitlan.png", alt: "Terraza abierta frente al Lago de Atitlán" },
-      { src: "/images/guest-suite.png", alt: "Dormitorio preparado para llegada privada" }
+      {
+        src: "/images/pacific-paredon-beach-house.png",
+        alt: "Terraza frente a la playa en El Paredón"
+      },
+      { src: "/images/hero-pacific-beach.png", alt: "Villa con vista abierta hacia el Pacífico" }
     ],
     houseRules: ["Llegada coordinada", "Tarifa visible tras cotización", "Ocupación según reserva"],
     operations: ["Preparación previa", "Soporte local", "Revisión de salida"],
     bookingNote: "Disponibilidad, tarifa y bloqueo temporal se validan antes de pago."
   },
   {
-    id: "antigua-suite-jardin",
-    name: "Suite Jardin Colonial",
-    destination: "Antigua Guatemala",
-    neighborhood: "Centro histórico",
-    image: "/images/guest-suite.png",
-    imageAlt: "Suite elegante con luz natural y acabados cálidos",
+    id: "monterrico-villa-arena",
+    name: "Villa Arena Negra",
+    destination: "Monterrico",
+    neighborhood: "Zona costera de Monterrico",
+    image: "/images/pacific-family-villa.png",
+    imageAlt: "Villa familiar con piscina y terraza cerca de la playa en Monterrico",
     summary:
-      "Suite para escapadas de pareja o viajes de trabajo con acceso rápido a restaurantes y caminatas.",
-    maxGuests: 2,
-    bedrooms: 1,
-    bathrooms: 1,
-    stayStyle: "Suite curada",
+      "Villa familiar con piscina, terraza sombreada y acceso coordinado a playa para escapadas tranquilas en el Pacífico.",
+    maxGuests: 6,
+    bedrooms: 3,
+    bathrooms: 3,
+    stayStyle: "Villa familiar",
     availability: "available",
     availabilityLabel: "Lista para reservar",
-    highlights: ["Caminable", "Check-in guiado", "Ambiente silencioso"],
-    amenities: ["Cama queen", "Café local", "WiFi", "Limpieza programada"],
+    highlights: ["Piscina privada", "Cerca de playa", "Llegada guiada"],
+    amenities: ["Piscina", "Rancho social", "WiFi", "Limpieza programada"],
     gallery: [
-      { src: "/images/guest-suite.png", alt: "Suite con luz natural y textiles cálidos" },
-      { src: "/images/hero-villa-atitlan.png", alt: "Referencia de estancia seleccionada KUQUBA" }
+      {
+        src: "/images/pacific-family-villa.png",
+        alt: "Villa familiar con piscina en la costa del Pacífico"
+      },
+      {
+        src: "/images/hero-pacific-beach.png",
+        alt: "Vista costera del Pacífico con terraza privada"
+      }
     ],
     houseRules: ["Estancia tranquila", "Acceso con verificación", "Servicios según reserva"],
     operations: ["Check-in guiado", "Recomendaciones locales", "Atención durante estancia"],
     bookingNote: "Fechas y tarifa se validan en la cotización antes de continuar a pago."
   },
   {
-    id: "atitlan-casa-terraza",
-    name: "Casa Terraza del Lago",
-    destination: "Lago de Atitlán",
-    neighborhood: "San Antonio Palopo y alrededores",
-    image: "/images/hero-villa-atitlan.png",
-    imageAlt: "Casa con terraza abierta y vista hacia volcanes en Atitlán",
+    id: "puerto-san-jose-casa-costa",
+    name: "Casa Costa San José",
+    destination: "Puerto San José",
+    neighborhood: "Puerto San José y alrededores",
+    image: "/images/hero-pacific-beach.png",
+    imageAlt: "Casa de playa con piscina y terraza frente al Pacífico",
     summary:
-      "Casa completa para grupos pequeños que buscan privacidad, cocina equipada y atención local coordinada.",
-    maxGuests: 4,
+      "Casa de playa cómoda para escapadas cortas, con patio, piscina y llegada coordinada cerca de la ciudad.",
+    maxGuests: 5,
     bedrooms: 2,
     bathrooms: 2,
     stayStyle: "Casa completa",
     availability: "request",
-    availabilityLabel: "Bajo validacion",
-    highlights: ["Terraza privada", "Grupo pequeño", "Llegada asistida"],
-    amenities: ["Area social", "Cocina", "WiFi", "Limpieza previa"],
+    availabilityLabel: "Bajo validación",
+    highlights: ["Escapada corta", "Piscina", "Llegada asistida"],
+    amenities: ["Área social", "Cocina", "WiFi", "Limpieza previa"],
     gallery: [
-      { src: "/images/hero-villa-atitlan.png", alt: "Casa con terraza y vista abierta en Atitlán" },
-      { src: "/images/guest-suite.png", alt: "Habitacion preparada para grupo pequeno" }
+      {
+        src: "/images/hero-pacific-beach.png",
+        alt: "Casa con terraza abierta hacia la costa del Pacífico"
+      },
+      {
+        src: "/images/pacific-family-villa.png",
+        alt: "Piscina y terraza preparada para grupo pequeño"
+      }
     ],
     houseRules: ["Grupo pequeño", "Coordinación de llegada", "Políticas por propiedad"],
-    operations: ["Limpieza previa", "Anfitrion coordinado", "Seguimiento post-estancia"],
+    operations: ["Limpieza previa", "Anfitrión coordinado", "Seguimiento post-estancia"],
     bookingNote: "La cotización valida tarifa y políticas antes de abrir el checkout."
   }
 ];
@@ -136,9 +151,12 @@ export async function loadPublicStays() {
 
 export async function loadPublicStayById(id: string) {
   try {
-    const response = await fetch(`${getPublicApiBaseUrl()}/api/public/stays/${encodeURIComponent(id)}`, {
-      cache: "no-store"
-    });
+    const response = await fetch(
+      `${getPublicApiBaseUrl()}/api/public/stays/${encodeURIComponent(id)}`,
+      {
+        cache: "no-store"
+      }
+    );
 
     if (!response.ok) {
       return findPublicStayById(id) ?? null;

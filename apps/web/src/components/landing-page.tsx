@@ -62,7 +62,7 @@ export function LandingPage() {
             fill
             priority
             sizes="100vw"
-            src="/images/hero-villa-atitlan.png"
+            src="/images/hero-pacific-beach.png"
           />
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.62)_0%,rgba(13,34,51,0.34)_46%,rgba(13,34,51,0.08)_100%)]" />
           <div className="absolute inset-x-0 bottom-0 -z-10 h-32 bg-gradient-to-t from-midnight/35 to-transparent" />
@@ -72,13 +72,13 @@ export function LandingPage() {
           <div className="container-shell pb-8 pt-5 md:pb-10 md:pt-9">
             <div className="max-w-4xl">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-beige">
-                Estancias administradas en Guatemala
+                Estancias en el Pacífico de Guatemala
               </p>
               <h1 className="mt-3 max-w-4xl font-display text-[clamp(2.6rem,5.35vw,5.1rem)] leading-[1.02] text-white drop-shadow-[0_3px_18px_rgba(0,0,0,0.55)]">
                 Encuentra una estancia excepcional.
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] md:text-lg">
-                Propiedades seleccionadas en zonas activas, con disponibilidad validada y acompañamiento KUQUBA.
+                Propiedades seleccionadas en El Paredón, Monterrico y Puerto San José, con disponibilidad validada y acompañamiento KUQUBA.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <a
@@ -141,11 +141,11 @@ export function LandingPage() {
 
             <div className="relative min-h-[420px] overflow-hidden rounded-[8px] border border-line bg-midnight shadow-panel">
               <Image
-                alt="Suite preparada para una estancia KUQUBA"
+                alt="Casa de playa preparada para una estancia KUQUBA"
                 className="object-cover"
                 fill
                 sizes="(min-width: 1024px) 54vw, 100vw"
-                src="/images/guest-suite.png"
+                src="/images/pacific-family-villa.png"
               />
               <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(13,34,51,0.74)_0%,rgba(13,34,51,0.08)_56%)]" />
               <div className="absolute inset-x-0 bottom-0 p-6 text-white md:p-8">
@@ -183,7 +183,7 @@ export function LandingPage() {
                 ¿Tienes una propiedad para recibir huéspedes?
               </h2>
               <p className="mt-4 text-sm leading-6 text-ink/70 md:text-base md:leading-7">
-                Cuéntanos sobre tu propiedad y revisamos si puede operar con el nivel de cuidado, disponibilidad y soporte que ofrecemos.
+                Cuéntanos sobre tu propiedad en nuestras zonas de cobertura y revisamos si puede operar con el nivel de cuidado, disponibilidad y soporte que ofrecemos.
               </p>
               <ul className="mt-6 grid gap-3">
                 {ownerBenefits.map((benefit) => (

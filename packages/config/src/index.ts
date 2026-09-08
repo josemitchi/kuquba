@@ -19,7 +19,7 @@ export const publicNavigation = [
   { label: "Contacto", href: "/contact" }
 ] as const;
 
-export const publicCoverageDestinations = ["Lago de Atitlán", "Antigua Guatemala"] as const;
+export const publicCoverageDestinations = ["El Paredón", "Monterrico", "Puerto San José"] as const;
 
 export const publicGuestOptions = [1, 2, 3, 4, 5, 6] as const;
 
@@ -64,7 +64,7 @@ export const portalEntries = [
 ] as const;
 
 export type PortalAudience = (typeof portalEntries)[number]["key"];
-export const opsPortalRoleKeys = ['ops_admin', 'iam_admin'] as const;
+export const opsPortalRoleKeys = ["ops_admin", "iam_admin"] as const;
 
 export const permissionKeys = [
   "reservation:self:read",
@@ -109,18 +109,18 @@ export const roleProfiles = [
     ]
   },
   {
-    key: 'iam_admin',
-    label: 'Administrador IAM',
+    key: "iam_admin",
+    label: "Administrador IAM",
     permissions: [
-      'property:assigned:read',
-      'property:assigned:update',
-      'operation:calendar:read',
-      'operation:task:update',
-      'operation:formal:update',
-      'operation:formal:approve',
-      'finance:ledger:read',
-      'audit:event:read',
-      'identity:user:manage'
+      "property:assigned:read",
+      "property:assigned:update",
+      "operation:calendar:read",
+      "operation:task:update",
+      "operation:formal:update",
+      "operation:formal:approve",
+      "finance:ledger:read",
+      "audit:event:read",
+      "identity:user:manage"
     ]
   }
 ] as const;

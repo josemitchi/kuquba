@@ -3,8 +3,11 @@ import { env } from "../../config/env";
 const resendEmailsUrl = "https://api.resend.com/emails";
 const publicSiteUrl = "https://kuquba.com";
 const guestPortalUrl = publicSiteUrl + "/stay";
+const termsUrl = publicSiteUrl + "/terms";
+const privacyUrl = publicSiteUrl + "/privacy";
+const stayRulesUrl = publicSiteUrl + "/reglamento-de-estancia";
 const brandLogoUrl = publicSiteUrl + "/brand/kuquba-logo.svg";
-const defaultPropertyImageUrl = publicSiteUrl + "/images/hero-villa-atitlan.png";
+const defaultPropertyImageUrl = publicSiteUrl + "/images/hero-pacific-beach.png";
 
 export type ReservationConfirmationEmailInput = {
   arrivalDate: Date;
@@ -119,7 +122,7 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
           <tr>
             <td style="padding:30px 32px 10px;">
               <p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#147869;">${reservationCode}</p>
-              <h1 style="margin:0;font-family:Georgia,Times,serif;font-size:34px;line-height:1.12;font-weight:500;color:#0d2233;">Tu estancia esta confirmada.</h1>
+              <h1 style="margin:0;font-family:Georgia,Times,serif;font-size:34px;line-height:1.12;font-weight:500;color:#0d2233;">Tu estancia está confirmada.</h1>
               <p style="margin:16px 0 0;font-size:16px;line-height:1.65;color:#435260;">Hola ${guestName}, ya confirmamos tu reserva en <strong style="color:#0d2233;">${propertyName}</strong>. Estos son los datos principales para preparar tu llegada.</p>
             </td>
           </tr>
@@ -131,21 +134,21 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
                 ${detailRow("Destino", propertyDestination)}
                 ${detailRow("Llegada", arrival)}
                 ${detailRow("Salida", departure)}
-                ${detailRow("Duracion", nightsLabel)}
+                ${detailRow("Duración", nightsLabel)}
                 ${detailRow("Monto confirmado", total)}
               </table>
             </td>
           </tr>
           <tr>
             <td style="padding:28px 32px 8px;">
-              <a href="${guestPortalUrl}" style="display:block;background:#147869;color:#ffffff;text-align:center;text-decoration:none;border-radius:9px;padding:15px 18px;font-weight:700;font-size:15px;">Abrir portal de huespedes</a>
+              <a href="${guestPortalUrl}" style="display:block;background:#147869;color:#ffffff;text-align:center;text-decoration:none;border-radius:9px;padding:15px 18px;font-weight:700;font-size:15px;">Abrir portal de huéspedes</a>
             </td>
           </tr>
           <tr>
             <td style="padding:12px 32px 32px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f2ea;border-radius:10px;">
                 <tr>
-                  <td style="padding:16px 18px;font-size:14px;line-height:1.6;color:#435260;">Usa el correo asociado a tu reserva para recibir el codigo de acceso. Si necesitas coordinar algo antes de llegar, responde a este correo y Operaciones KUQUBA te dara seguimiento.</td>
+                  <td style="padding:16px 18px;font-size:14px;line-height:1.6;color:#435260;">Usa el correo asociado a tu reserva para recibir el código de acceso. Si necesitas coordinar algo antes de llegar, responde a este correo y Operaciones KUQUBA te dará seguimiento.<div style="margin-top:12px;padding-top:12px;border-top:1px solid #d9e1e7;color:#435260;">Esta reserva queda sujeta a los <a href="${termsUrl}" style="color:#147869;font-weight:700;text-decoration:none;">términos</a>, la <a href="${privacyUrl}" style="color:#147869;font-weight:700;text-decoration:none;">política de privacidad</a> y el <a href="${stayRulesUrl}" style="color:#147869;font-weight:700;text-decoration:none;">reglamento de estancia</a> vigentes.</div></td>
                 </tr>
               </table>
             </td>
@@ -158,16 +161,19 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
     text: [
       `Hola ${input.guestName},`,
       "",
-      `Tu reserva ${input.reservationCode} esta confirmada.`,
+      `Tu reserva ${input.reservationCode} está confirmada.`,
       `Estancia: ${input.propertyName}`,
       `Unidad: ${input.unitName}`,
       `Destino: ${input.propertyDestination}`,
       `Llegada: ${arrival}`,
       `Salida: ${departure}`,
-      `Duracion: ${nightsLabel}`,
+      `Duración: ${nightsLabel}`,
       `Monto confirmado: ${total}`,
       "",
-      `Portal de huespedes: ${guestPortalUrl}`,
+      `Portal de huéspedes: ${guestPortalUrl}`,
+      `Reglamento de estancia: ${stayRulesUrl}`,
+      `Términos y condiciones: ${termsUrl}`,
+      `Política de privacidad: ${privacyUrl}`,
       "",
       "KUQUBA"
     ].join("\n"),

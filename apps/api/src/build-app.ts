@@ -9,7 +9,8 @@ import { registerGuestRoutes } from "./routes/guest";
 import { registerMetricsRoutes } from "./routes/metrics";
 import { registerOwnerRoutes } from "./routes/owner";
 import { registerOpsRoutes } from "./routes/ops";
-import { registerOpsIamRoutes } from './routes/ops-iam';
+import { registerOpsBillingRoutes } from "./routes/ops-billing";
+import { registerOpsIamRoutes } from "./routes/ops-iam";
 import { registerErrorHandler } from "./plugins/error-handler";
 import { registerObservability } from "./plugins/observability";
 import { registerRequestContext } from "./plugins/request-context";
@@ -23,15 +24,14 @@ export function getFastifyOptions(): FastifyServerOptions {
       redact: [
         "req.headers.authorization",
         "req.headers.cookie",
-        "req.headers[\"x-api-key\"]",
-        "req.headers[\"x-kuquba-dev-session\"]",
-        "req.headers[\"x-kuquba-metrics-token\"]",
-        "req.headers[\"x-kuquba-signature\"]",
-        "req.headers[\"x-resend-signature\"]"
+        'req.headers["x-api-key"]',
+        'req.headers["x-kuquba-dev-session"]',
+        'req.headers["x-kuquba-metrics-token"]',
+        'req.headers["x-kuquba-signature"]',
+        'req.headers["x-resend-signature"]'
       ]
     },
-    genReqId: (request) =>
-      request.headers["x-request-id"]?.toString() ?? crypto.randomUUID()
+    genReqId: (request) => request.headers["x-request-id"]?.toString() ?? crypto.randomUUID()
   };
 }
 
@@ -42,7 +42,9 @@ export async function configureApp(app: FastifyInstance) {
     global: true
   });
 
-  const corsOrigins = env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean);
+  const corsOrigins = env.CORS_ORIGIN.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 
   await app.register(cors, {
     origin: corsOrigins,
@@ -57,7 +59,8 @@ export async function configureApp(app: FastifyInstance) {
   await app.register(registerGuestRoutes, { prefix: "/api/guest" });
   await app.register(registerOwnerRoutes, { prefix: "/api/owner" });
   await app.register(registerOpsRoutes, { prefix: "/api/ops" });
-  await app.register(registerOpsIamRoutes, { prefix: '/api/ops' });
+  await app.register(registerOpsBillingRoutes, { prefix: "/api/ops" });
+  await app.register(registerOpsIamRoutes, { prefix: "/api/ops" });
   await app.register(registerPublicRoutes, { prefix: "/api/public" });
 
   return app;

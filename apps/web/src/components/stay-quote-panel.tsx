@@ -127,6 +127,7 @@ type AvailabilityMonth = {
 };
 
 const calendarWeekdays = ["L", "M", "M", "J", "V", "S", "D"];
+const legalAcceptanceVersion = "2026-09";
 
 type AvailabilityLoadState = "idle" | "loading" | "success" | "error";
 
@@ -315,19 +316,30 @@ export function StayQuotePanel({
       return;
     }
 
+    const formData = new FormData(event.currentTarget);
+
+    if (formData.get("legalAcceptance") !== "accepted") {
+      setHoldError("Debes aceptar los términos, la política de privacidad y el reglamento de estancia para continuar.");
+      setHoldSubmitState("error");
+      return;
+    }
+
     setHoldSubmitState("submitting");
     setHold(null);
     setCheckout(null);
     setHoldError(null);
     setCheckoutError(null);
     setCheckoutActionState("idle");
-
-    const formData = new FormData(event.currentTarget);
     const payload = {
       email: getFormValue(formData, "email"),
       guestName: getFormValue(formData, "guestName"),
       phone: getFormValue(formData, "phone") || undefined,
-      quoteId: quote.id
+      privacyVersion: legalAcceptanceVersion,
+      quoteId: quote.id,
+      stayRulesAccepted: true,
+      stayRulesVersion: legalAcceptanceVersion,
+      termsAccepted: true,
+      termsVersion: legalAcceptanceVersion
     };
     setGuestEmail(payload.email);
 
@@ -509,7 +521,7 @@ export function StayQuotePanel({
           >
             {Array.from({ length: maxGuests }, (_, index) => index + 1).map((count) => (
               <option key={count} value={count}>
-                {count} {count === 1 ? "huesped" : "huespedes"}
+                {count} {count === 1 ? "huésped" : "huéspedes"}
               </option>
             ))}
           </select>
@@ -537,7 +549,7 @@ export function StayQuotePanel({
           ) : (
             <Calculator aria-hidden className="h-4 w-4" />
           )}
-          {submitState === "submitting" ? "Calculando" : "Calcular cotizacion"}
+          {submitState === "submitting" ? "Calculando" : "Calcular cotización"}
         </button>
       </form>
 
@@ -567,7 +579,7 @@ export function StayQuotePanel({
 
       {submitState === "error" ? (
         <div className="mt-5 rounded-[6px] border border-terracotta/30 bg-terracotta/10 p-4 text-sm text-midnight">
-          No se pudo calcular la cotizacion. Revisa las fechas o intenta de nuevo.
+          No se pudo calcular la cotización. Revisa las fechas o intenta de nuevo.
         </div>
       ) : null}
 
@@ -840,7 +852,7 @@ function QuoteResult({ quote }: { quote: StayQuote }) {
               <p className="font-semibold">Disponible para reservar</p>
               <p className="text-ink/64">
                 {quote.nights} {quote.nights === 1 ? "noche" : "noches"} - {quote.guests}{" "}
-                {quote.guests === 1 ? "huesped" : "huespedes"}
+                {quote.guests === 1 ? "huésped" : "huéspedes"}
               </p>
             </div>
             <p className="text-xl font-semibold text-midnight">
@@ -908,12 +920,37 @@ function PaymentRequestForm({
           />
         </label>
         <label className="block">
-          <span className="mb-2 block text-sm font-semibold text-midnight">Telefono</span>
+          <span className="mb-2 block text-sm font-semibold text-midnight">Teléfono</span>
           <input
             className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-4 text-sm outline-none transition focus:border-green"
             name="phone"
             type="tel"
           />
+        </label>
+
+        <label className="flex items-start gap-3 rounded-[6px] border border-line bg-white p-3 text-xs leading-5 text-ink/68">
+          <input
+            className="mt-0.5 h-4 w-4 shrink-0 accent-green"
+            name="legalAcceptance"
+            required
+            type="checkbox"
+            value="accepted"
+          />
+          <span>
+            He leído y acepto los{" "}
+            <a className="font-semibold text-green underline-offset-4 hover:underline" href="/terms" rel="noreferrer" target="_blank">
+              Términos y condiciones
+            </a>
+            , la{" "}
+            <a className="font-semibold text-green underline-offset-4 hover:underline" href="/privacy" rel="noreferrer" target="_blank">
+              Política de privacidad
+            </a>{" "}
+            y el{" "}
+            <a className="font-semibold text-green underline-offset-4 hover:underline" href="/reglamento-de-estancia" rel="noreferrer" target="_blank">
+              Reglamento de estancia
+            </a>{" "}
+            aplicables a esta reserva.
+          </span>
         </label>
 
         <button
@@ -950,7 +987,7 @@ function HoldResult({ hold }: { hold: ReservationHold }) {
           <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="font-semibold">{title}</p>
-              <p className="text-ink/64">Codigo {hold.reservationCode}</p>
+              <p className="text-ink/64">Código {hold.reservationCode}</p>
             </div>
             <p className="text-xl font-semibold text-midnight">
               {formatCurrency(hold.total, hold.currency)}
@@ -973,7 +1010,7 @@ function HoldResult({ hold }: { hold: ReservationHold }) {
               <dd className="font-semibold">{hold.unitName}</dd>
             </div>
             <div>
-              <dt className="text-ink/58">Proteccion vence</dt>
+              <dt className="text-ink/58">Protección vence</dt>
               <dd className="font-semibold">
                 {hold.expiresAt ? formatDateTime(hold.expiresAt) : "Sin vencimiento"}
               </dd>
@@ -1014,7 +1051,7 @@ function CheckoutPanel({
         <div className="w-full">
           <p className="font-semibold">Pago de reserva</p>
           <p className="mt-1 text-xs leading-5 text-ink/62">
-            Procesaremos la confirmacion de pago en un entorno seguro.
+            Procesaremos la confirmación de pago en un entorno seguro.
           </p>
 
           {checkout ? (
@@ -1097,7 +1134,7 @@ function CheckoutPanel({
 
           {checkout?.status === "FAILED" || checkout?.status === "EXPIRED" ? (
             <p className="mt-4 rounded-[6px] border border-terracotta/30 bg-terracotta/10 p-3 text-sm font-semibold text-terracotta">
-              El pago no confirmo la reserva. La disponibilidad queda sujeta al vencimiento del
+              El pago no confirmó la reserva. La disponibilidad queda sujeta al vencimiento del
               bloqueo temporal.
             </p>
           ) : null}
@@ -1171,15 +1208,15 @@ function buildBookingConfirmationPath(reservation: ReservationHold, email: strin
 
 function getHoldErrorMessage(error: string) {
   if (error === "quote_expired") {
-    return "La cotizacion vencio. Calcula una nueva antes de continuar a pago.";
+    return "La cotización venció. Calcula una nueva antes de continuar a pago.";
   }
 
   if (error === "quote_dates_no_longer_available") {
-    return "Las fechas ya no estan disponibles. Calcula una nueva cotizacion.";
+    return "Las fechas ya no están disponibles. Calcula una nueva cotización.";
   }
 
   if (error === "quote_not_available") {
-    return "Esta cotizacion no esta disponible para pago.";
+    return "Esta cotización no está disponible para pago.";
   }
 
   return "No se pudo preparar la reserva para pago. Revisa tus datos o intenta de nuevo.";
@@ -1187,11 +1224,11 @@ function getHoldErrorMessage(error: string) {
 
 function getCheckoutErrorMessage(error: string) {
   if (error === "reservation_hold_expired_or_not_checkoutable") {
-    return "La reserva temporal ya no esta disponible para pago.";
+    return "La reserva temporal ya no está disponible para pago.";
   }
 
   if (error === "payment_checkout_expired") {
-    return "El proceso de pago vencio. Inicia uno nuevo si la reserva temporal sigue vigente.";
+    return "El proceso de pago venció. Inicia uno nuevo si la reserva temporal sigue vigente.";
   }
 
   if (error === "payment_already_succeeded" || error === "reservation_already_confirmed") {
@@ -1199,7 +1236,7 @@ function getCheckoutErrorMessage(error: string) {
   }
 
   if (error === "reservation_amount_missing") {
-    return "La reserva no tiene monto valido para pago.";
+    return "La reserva no tiene monto válido para pago.";
   }
 
   return "No se pudo actualizar el pago. Intenta de nuevo.";

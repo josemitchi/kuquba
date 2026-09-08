@@ -238,10 +238,10 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
   properties: [
     {
       id: "atitlan-villa-luz",
-      name: "Villa Luz de Atitlan",
-      location: "Lago de Atitlan",
-      image: "/images/hero-villa-atitlan.png",
-      imageAlt: "Villa con terraza abierta frente al Lago de Atitlan",
+      name: "Casa Brisa del Paredon",
+      location: "El Paredon",
+      image: "/images/pacific-paredon-beach-house.png",
+      imageAlt: "Casa de playa con terraza frente a El Paredon",
       status: "active",
       statusLabel: "Operativa",
       contract: {
@@ -249,8 +249,8 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         currentVersion: 1,
         status: "ACTIVE",
         statusLabel: "Contrato activo",
-        title: "Contrato KUQUBA v1 - Villa Luz de Atitlan",
-        summary: "Administracion profesional para Villa Luz de Atitlan en Lago de Atitlan.",
+        title: "Contrato KUQUBA v1 - Casa Brisa del Paredon",
+        summary: "Administracion profesional para Casa Brisa del Paredon en El Paredon.",
         startsOn: "2026-01-01T00:00:00.000Z",
         issuedAt: "2025-12-15T00:00:00.000Z",
         signedAt: "2025-12-20T00:00:00.000Z",
@@ -266,8 +266,8 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
           {
             id: "contract-version-atitlan-v1",
             version: 1,
-            title: "Contrato KUQUBA v1 - Villa Luz de Atitlan",
-            summary: "Administracion profesional para Villa Luz de Atitlan en Lago de Atitlan.",
+            title: "Contrato KUQUBA v1 - Casa Brisa del Paredon",
+            summary: "Administracion profesional para Casa Brisa del Paredon en El Paredon.",
             createdAt: "2025-12-15T00:00:00.000Z",
             issuedAt: "2025-12-15T00:00:00.000Z"
           }
@@ -298,10 +298,10 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
     },
     {
       id: "antigua-casa-patio",
-      name: "Casa Patio Antigua",
-      location: "Antigua Guatemala",
-      image: "/images/owner-dashboard.png",
-      imageAlt: "Dashboard conceptual de administracion para propietario",
+      name: "Villa Arena Negra",
+      location: "Monterrico",
+      image: "/images/pacific-family-villa.png",
+      imageAlt: "Villa familiar con piscina y terraza en Monterrico",
       status: "attention",
       statusLabel: "Atencion",
       contract: {
@@ -309,8 +309,8 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         currentVersion: 1,
         status: "ISSUED",
         statusLabel: "Pendiente de firma",
-        title: "Contrato KUQUBA v1 - Casa Patio Antigua",
-        summary: "Administracion profesional para Casa Patio Antigua en Antigua Guatemala.",
+        title: "Contrato KUQUBA v1 - Villa Arena Negra",
+        summary: "Administracion profesional para Villa Arena Negra en Monterrico.",
         startsOn: "2026-08-01T00:00:00.000Z",
         issuedAt: "2026-08-15T00:00:00.000Z",
         signedAt: null,
@@ -326,8 +326,8 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
           {
             id: "contract-version-antigua-v1",
             version: 1,
-            title: "Contrato KUQUBA v1 - Casa Patio Antigua",
-            summary: "Administracion profesional para Casa Patio Antigua en Antigua Guatemala.",
+            title: "Contrato KUQUBA v1 - Villa Arena Negra",
+            summary: "Administracion profesional para Villa Arena Negra en Monterrico.",
             createdAt: "2026-08-15T00:00:00.000Z",
             issuedAt: "2026-08-15T00:00:00.000Z"
           }
@@ -360,19 +360,19 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
   upcomingStays: [
     {
       date: "24 Ago",
-      property: "Villa Luz de Atitlan",
+      property: "Casa Brisa del Paredon",
       status: "Preparacion previa",
       traveler: "Familia Rivera"
     },
     {
       date: "28 Ago",
-      property: "Villa Luz de Atitlan",
+      property: "Casa Brisa del Paredon",
       status: "Propuesta aceptada",
       traveler: "Grupo privado"
     },
     {
       date: "02 Sep",
-      property: "Villa Luz de Atitlan",
+      property: "Casa Brisa del Paredon",
       status: "Solicitud en validacion",
       traveler: "Huesped por confirmar"
     }
@@ -389,7 +389,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
     {
       id: "task-inventory-antigua",
       title: "Confirmar inventario sensible",
-      property: "Casa Patio Antigua",
+      property: "Villa Arena Negra",
       due: "Esta semana",
       priority: "medium",
       ownerAction: true
@@ -397,7 +397,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
     {
       id: "task-maintenance-atitlan",
       title: "Revisar mantenimiento preventivo de terraza",
-      property: "Villa Luz de Atitlan",
+      property: "Casa Brisa del Paredon",
       due: "Programado por KUQUBA",
       priority: "medium",
       ownerAction: false
@@ -405,7 +405,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
     {
       id: "task-photo-antigua",
       title: "Preparar sesion de fotografia",
-      property: "Casa Patio Antigua",
+      property: "Villa Arena Negra",
       due: "Sin fecha final",
       priority: "low",
       ownerAction: false
@@ -415,7 +415,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
   settlements: [
     {
       id: "settlement-atitlan-2026-08",
-      propertyName: "Villa Luz de Atitlan",
+      propertyName: "Casa Brisa del Paredon",
       periodLabel: "01 Ago - 31 Ago 2026",
       periodStart: "2026-08-01T00:00:00.000Z",
       periodEnd: "2026-08-31T00:00:00.000Z",
@@ -437,13 +437,13 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
       lineItems: [
         {
           id: "settlement-line-accommodation",
-          label: "Alojamiento confirmado KQB-ATITLAN-20260824",
+          label: "Alojamiento confirmado KQB-PAREDON-20260824",
           type: "ACCOMMODATION",
           typeLabel: "Ingreso alojamiento",
           amount: "6200.00",
           currency: "GTQ",
           occurredAt: "2026-08-24T00:00:00.000Z",
-          reservationCode: "KQB-ATITLAN-20260824",
+          reservationCode: "KQB-PAREDON-20260824",
           sourceMemo: "seed owner finance"
         },
         {
@@ -454,7 +454,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
           amount: "496.00",
           currency: "GTQ",
           occurredAt: "2026-08-24T00:00:00.000Z",
-          reservationCode: "KQB-ATITLAN-20260824",
+          reservationCode: "KQB-PAREDON-20260824",
           sourceMemo: "seed owner finance"
         },
         {

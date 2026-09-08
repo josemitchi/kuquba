@@ -5,7 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "KUQUBA | Estancias y administración profesional",
   description:
-    "Propiedades seleccionadas y experiencias administradas con atención personalizada en Guatemala.",
+    "Propiedades seleccionadas y experiencias administradas con atención personalizada en la costa del Pacífico de Guatemala.",
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg"

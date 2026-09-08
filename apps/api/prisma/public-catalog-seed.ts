@@ -6,43 +6,306 @@ const defaultDevDatabaseUrl =
 
 process.env.DATABASE_URL ??= defaultDevDatabaseUrl;
 
-const ids = {
-  organization: "00000000-0000-4000-8000-000000000001",
-  owner: "00000000-0000-4000-8000-000000000101",
-  property: "00000000-0000-4000-8000-000000000201",
-  unit: "00000000-0000-4000-8000-000000000301",
-  stayCode: "00000000-0000-4000-8000-000000000331",
-  ratePlan: "00000000-0000-4000-8000-000000000341",
-  availabilityBlock: "00000000-0000-4000-8000-000000000351",
-  contract: "00000000-0000-4000-8000-000000000401",
-  contractVersion: "00000000-0000-4000-8000-000000000411",
-  imageCover: "00000000-0000-4000-8000-000000000421",
-  imageSuite: "00000000-0000-4000-8000-000000000422"
-} as const;
+const organizationId = "00000000-0000-4000-8000-000000000001";
+const ownerId = "00000000-0000-4000-8000-000000000101";
 
-const stay = {
-  amenities: ["Cocina equipada", "Terraza", "WiFi", "Parqueo coordinado"],
-  bookingNote: "Disponibilidad, tarifa y bloqueo temporal se validan antes de pago.",
-  code: "atitlan-villa-luz",
-  contractSummary: "Administracion profesional para Villa Luz de Atitlan en Lago de Atitlan.",
-  contractTitle: "Contrato KUQUBA v1 - Villa Luz de Atitlan",
-  destination: "Lago de Atitlan",
-  houseRules: ["Llegada coordinada", "Tarifa visible tras cotizacion", "Ocupacion segun reserva"],
-  name: "Villa Luz de Atitlan",
-  neighborhood: "Panajachel y pueblos cercanos",
-  operations: ["Preparacion previa", "Soporte local", "Revision de salida"],
-  stayStyle: "Villa privada",
-  summary:
-    "Casa privada para viajes tranquilos, desayunos largos y vistas abiertas hacia lago y volcanes."
-} as const;
+const defaultOwnerShareBps = 6500;
+const defaultKuqubaShareBps = 3500;
+
+const financialChargeDefinitions = [
+  {
+    id: "00000000-0000-4000-8000-000000800001",
+    code: "ACCOMMODATION",
+    label: "Hospedaje",
+    description:
+      "Valor principal de la estancia. Se distribuye entre propietario y KUQUBA segun contrato.",
+    category: "ACCOMMODATION" as const,
+    calculationMethod: "PER_NIGHT" as const,
+    amount: null,
+    rateBps: null,
+    taxable: true,
+    guestVisible: true,
+    distribution: {
+      strategy: "active_contract_split",
+      fallback: {
+        OWNER: defaultOwnerShareBps,
+        KUQUBA: defaultKuqubaShareBps
+      }
+    }
+  },
+  {
+    id: "00000000-0000-4000-8000-000000800002",
+    code: "CLEANING",
+    label: "Limpieza",
+    description: "Servicio adicional operativo asociado a la preparacion y salida de la estancia.",
+    category: "SERVICE" as const,
+    calculationMethod: "FIXED" as const,
+    amount: null,
+    rateBps: null,
+    taxable: true,
+    guestVisible: true,
+    distribution: {
+      OWNER: 10000
+    }
+  },
+  {
+    id: "00000000-0000-4000-8000-000000800003",
+    code: "DIGITAL_PLATFORM_FEE",
+    label: "Uso de plataforma",
+    description:
+      "Cargo por plataforma, gestion digital de la estancia y servicios tecnologicos KUQUBA.",
+    category: "DIGITAL_PLATFORM" as const,
+    calculationMethod: "PERCENTAGE" as const,
+    amount: null,
+    rateBps: 800,
+    taxable: true,
+    guestVisible: true,
+    distribution: {
+      KUQUBA: 10000
+    }
+  },
+  {
+    id: "00000000-0000-4000-8000-000000800004",
+    code: "PAYMENT_PROCESSING_FEE",
+    label: "Procesamiento electronico",
+    description: "Costo interno asociado a la pasarela de pago o adquirente.",
+    category: "PAYMENT_PROCESSING" as const,
+    calculationMethod: "PERCENTAGE" as const,
+    amount: null,
+    rateBps: 0,
+    taxable: false,
+    guestVisible: false,
+    distribution: {
+      PAYMENT_PROCESSOR: 10000
+    }
+  }
+] as const;
+
+const financialTaxRules = [
+  {
+    id: "00000000-0000-4000-8000-000000800051",
+    code: "GT_IVA_ESTIMATED",
+    label: "IVA estimado",
+    rateBps: 1200,
+    appliesToCategories: ["ACCOMMODATION", "SERVICE", "DIGITAL_PLATFORM"],
+    appliesToChargeCodes: null,
+    responsibleParty: "TAX_AUTHORITY" as const,
+    active: true,
+    metadata: {
+      country: "GT",
+      note: "Regla inicial operativa. Validar tratamiento fiscal final con asesoria tributaria."
+    }
+  },
+  {
+    id: "00000000-0000-4000-8000-000000800052",
+    code: "GT_INGUAT_PREPARED",
+    label: "INGUAT preparado",
+    rateBps: 0,
+    appliesToCategories: ["ACCOMMODATION"],
+    appliesToChargeCodes: null,
+    responsibleParty: "TAX_AUTHORITY" as const,
+    active: false,
+    metadata: {
+      country: "GT",
+      note: "Regla preparada para activar cuando se confirme base, tasa y responsable fiscal."
+    }
+  }
+] as const;
+const catalogStays = [
+  {
+    ids: {
+      property: "00000000-0000-4000-8000-000000000201",
+      unit: "00000000-0000-4000-8000-000000000301",
+      stayCode: "00000000-0000-4000-8000-000000000331",
+      ratePlan: "00000000-0000-4000-8000-000000000341",
+      availabilityBlock: "00000000-0000-4000-8000-000000000351",
+      contract: "00000000-0000-4000-8000-000000000401",
+      contractVersion: "00000000-0000-4000-8000-000000000411",
+      imageCover: "00000000-0000-4000-8000-000000000421",
+      imageSecondary: "00000000-0000-4000-8000-000000000422"
+    },
+    amenities: ["Cocina equipada", "Terraza", "WiFi", "Parqueo coordinado"],
+    availabilityBlock: {
+      endsOn: "2026-09-20",
+      note: "Mantenimiento preventivo de piscina",
+      reason: "MAINTENANCE" as const,
+      startsOn: "2026-09-18"
+    },
+    bookingNote: "Disponibilidad, tarifa y bloqueo temporal se validan antes de pago.",
+    code: "paredon-casa-brisa",
+    contractSummary: "Administracion profesional para Casa Brisa del Paredon en El Paredon.",
+    contractTitle: "Contrato KUQUBA v1 - Casa Brisa del Paredon",
+    destination: "El Paredon",
+    houseRules: ["Llegada coordinada", "Tarifa visible tras cotizacion", "Ocupacion segun reserva"],
+    images: [
+      {
+        alt: "Casa de playa con terraza, palmeras y arena volcanica en El Paredon",
+        id: "00000000-0000-4000-8000-000000000421",
+        isCover: true,
+        sortOrder: 0,
+        url: "/images/pacific-paredon-beach-house.png"
+      },
+      {
+        alt: "Villa con vista abierta hacia el Pacifico",
+        id: "00000000-0000-4000-8000-000000000422",
+        isCover: false,
+        sortOrder: 1,
+        url: "/images/hero-pacific-beach.png"
+      }
+    ],
+    name: "Casa Brisa del Paredon",
+    neighborhood: "Playa El Paredon",
+    operations: ["Preparacion previa", "Soporte local", "Revision de salida"],
+    ratePlan: {
+      baseNightlyRate: "1650.00",
+      cleaningFee: "450.00",
+      minNights: 2,
+      name: "Tarifa base El Paredon",
+      weekendNightlyRate: "1850.00"
+    },
+    stayStyle: "Casa frente al mar",
+    summary:
+      "Casa privada cerca del surf, arena volcanica y atardeceres del Pacifico, preparada para descansar con soporte KUQUBA.",
+    unit: {
+      bathrooms: "2.50",
+      bedrooms: 3,
+      maxGuests: 6,
+      name: "Casa completa"
+    }
+  },
+  {
+    ids: {
+      property: "00000000-0000-4000-8000-000000900201",
+      unit: "00000000-0000-4000-8000-000000900301",
+      stayCode: "00000000-0000-4000-8000-000000900331",
+      ratePlan: "00000000-0000-4000-8000-000000900341",
+      availabilityBlock: "00000000-0000-4000-8000-000000900351",
+      contract: "00000000-0000-4000-8000-000000900401",
+      contractVersion: "00000000-0000-4000-8000-000000900411",
+      imageCover: "00000000-0000-4000-8000-000000900421",
+      imageSecondary: "00000000-0000-4000-8000-000000900422"
+    },
+    amenities: ["Piscina", "Rancho social", "WiFi", "Limpieza programada"],
+    availabilityBlock: {
+      endsOn: "2026-10-05",
+      note: "Bloqueo operativo de temporada",
+      reason: "OWNER_HOLD" as const,
+      startsOn: "2026-10-03"
+    },
+    bookingNote: "Fechas y tarifa se validan en la cotizacion antes de continuar a pago.",
+    code: "monterrico-villa-arena",
+    contractSummary: "Administracion profesional para Villa Arena Negra en Monterrico.",
+    contractTitle: "Contrato KUQUBA v1 - Villa Arena Negra",
+    destination: "Monterrico",
+    houseRules: ["Estancia tranquila", "Acceso con verificacion", "Servicios segun reserva"],
+    images: [
+      {
+        alt: "Villa familiar con piscina y terraza cerca de la playa en Monterrico",
+        id: "00000000-0000-4000-8000-000000900421",
+        isCover: true,
+        sortOrder: 0,
+        url: "/images/pacific-family-villa.png"
+      },
+      {
+        alt: "Vista costera del Pacifico con terraza privada",
+        id: "00000000-0000-4000-8000-000000900422",
+        isCover: false,
+        sortOrder: 1,
+        url: "/images/hero-pacific-beach.png"
+      }
+    ],
+    name: "Villa Arena Negra",
+    neighborhood: "Zona costera de Monterrico",
+    operations: ["Check-in guiado", "Recomendaciones locales", "Atencion durante estancia"],
+    ratePlan: {
+      baseNightlyRate: "1450.00",
+      cleaningFee: "400.00",
+      minNights: 2,
+      name: "Tarifa base Monterrico",
+      weekendNightlyRate: "1700.00"
+    },
+    stayStyle: "Villa familiar",
+    summary:
+      "Villa familiar con piscina, terraza sombreada y acceso coordinado a playa para escapadas tranquilas en el Pacifico.",
+    unit: {
+      bathrooms: "3.00",
+      bedrooms: 3,
+      maxGuests: 6,
+      name: "Villa completa"
+    }
+  },
+  {
+    ids: {
+      property: "00000000-0000-4000-8000-000000900202",
+      unit: "00000000-0000-4000-8000-000000900302",
+      stayCode: "00000000-0000-4000-8000-000000900332",
+      ratePlan: "00000000-0000-4000-8000-000000900342",
+      availabilityBlock: "00000000-0000-4000-8000-000000900352",
+      contract: "00000000-0000-4000-8000-000000900402",
+      contractVersion: "00000000-0000-4000-8000-000000900412",
+      imageCover: "00000000-0000-4000-8000-000000900423",
+      imageSecondary: "00000000-0000-4000-8000-000000900424"
+    },
+    amenities: ["Area social", "Cocina", "WiFi", "Limpieza previa"],
+    availabilityBlock: {
+      endsOn: "2026-09-28",
+      note: "Salida privada previamente coordinada",
+      reason: "OWNER_HOLD" as const,
+      startsOn: "2026-09-26"
+    },
+    bookingNote: "La cotizacion valida tarifa y politicas antes de abrir el checkout.",
+    code: "puerto-san-jose-casa-costa",
+    contractSummary: "Administracion profesional para Casa Costa San Jose en Puerto San Jose.",
+    contractTitle: "Contrato KUQUBA v1 - Casa Costa San Jose",
+    destination: "Puerto San Jose",
+    houseRules: ["Grupo pequeno", "Coordinacion de llegada", "Politicas por propiedad"],
+    images: [
+      {
+        alt: "Casa de playa con piscina y terraza frente al Pacifico",
+        id: "00000000-0000-4000-8000-000000900423",
+        isCover: true,
+        sortOrder: 0,
+        url: "/images/hero-pacific-beach.png"
+      },
+      {
+        alt: "Piscina y terraza preparada para grupo pequeno",
+        id: "00000000-0000-4000-8000-000000900424",
+        isCover: false,
+        sortOrder: 1,
+        url: "/images/pacific-family-villa.png"
+      }
+    ],
+    name: "Casa Costa San Jose",
+    neighborhood: "Puerto San Jose y alrededores",
+    operations: ["Limpieza previa", "Anfitrion coordinado", "Seguimiento post-estancia"],
+    ratePlan: {
+      baseNightlyRate: "1250.00",
+      cleaningFee: "350.00",
+      minNights: 2,
+      name: "Tarifa base Puerto San Jose",
+      weekendNightlyRate: "1550.00"
+    },
+    stayStyle: "Casa completa",
+    summary:
+      "Casa de playa comoda para escapadas cortas, con patio, piscina y llegada coordinada cerca de la ciudad.",
+    unit: {
+      bathrooms: "2.00",
+      bedrooms: 2,
+      maxGuests: 5,
+      name: "Casa completa"
+    }
+  }
+] as const;
+
+type CatalogStay = (typeof catalogStays)[number];
 
 export async function seedPublicCatalog(prisma: PrismaClient) {
   await seedAccessControl(prisma);
 
   const organization = await prisma.organization.upsert({
-    where: { id: ids.organization },
+    where: { id: organizationId },
     create: {
-      id: ids.organization,
+      id: organizationId,
       name: "KUQUBA Dev"
     },
     update: {
@@ -51,9 +314,9 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
   });
 
   const owner = await prisma.owner.upsert({
-    where: { id: ids.owner },
+    where: { id: ownerId },
     create: {
-      id: ids.owner,
+      id: ownerId,
       organizationId: organization.id,
       displayName: "Propietario KUQUBA",
       email: "owner.dev@kuquba.local"
@@ -65,60 +328,73 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
     }
   });
 
+  await seedFinancialConfiguration(prisma, organization.id);
+
+  for (const stay of catalogStays) {
+    await seedStay(prisma, organization.id, owner.id, stay);
+  }
+}
+
+async function seedStay(
+  prisma: PrismaClient,
+  organizationIdValue: string,
+  ownerIdValue: string,
+  stay: CatalogStay
+) {
   const property = await prisma.property.upsert({
-    where: { id: ids.property },
+    where: { id: stay.ids.property },
     create: {
-      id: ids.property,
-      organizationId: organization.id,
+      id: stay.ids.property,
+      organizationId: organizationIdValue,
       name: stay.name,
       destination: stay.destination,
       neighborhood: stay.neighborhood,
       summary: stay.summary,
       stayStyle: stay.stayStyle,
       bookingNote: stay.bookingNote,
-      amenities: stay.amenities as Prisma.InputJsonValue,
-      houseRules: stay.houseRules as Prisma.InputJsonValue,
-      operations: stay.operations as Prisma.InputJsonValue,
+      amenities: jsonList(stay.amenities),
+      houseRules: jsonList(stay.houseRules),
+      operations: jsonList(stay.operations),
       visibility: "PUBLIC"
     },
     update: {
-      organizationId: organization.id,
+      organizationId: organizationIdValue,
       name: stay.name,
       destination: stay.destination,
       neighborhood: stay.neighborhood,
       summary: stay.summary,
       stayStyle: stay.stayStyle,
       bookingNote: stay.bookingNote,
-      amenities: stay.amenities as Prisma.InputJsonValue,
-      houseRules: stay.houseRules as Prisma.InputJsonValue,
-      operations: stay.operations as Prisma.InputJsonValue,
+      amenities: jsonList(stay.amenities),
+      houseRules: jsonList(stay.houseRules),
+      operations: jsonList(stay.operations),
       visibility: "PUBLIC"
     }
   });
 
   const unit = await prisma.unit.upsert({
-    where: { id: ids.unit },
+    where: { id: stay.ids.unit },
     create: {
-      id: ids.unit,
+      id: stay.ids.unit,
       propertyId: property.id,
-      name: "Casa completa",
-      maxGuests: 6,
-      bedrooms: 3,
-      bathrooms: "2.50"
+      name: stay.unit.name,
+      maxGuests: stay.unit.maxGuests,
+      bedrooms: stay.unit.bedrooms,
+      bathrooms: stay.unit.bathrooms
     },
     update: {
       propertyId: property.id,
-      name: "Casa completa",
-      maxGuests: 6,
-      bedrooms: 3,
-      bathrooms: "2.50"
+      name: stay.unit.name,
+      maxGuests: stay.unit.maxGuests,
+      bedrooms: stay.unit.bedrooms,
+      bathrooms: stay.unit.bathrooms
     }
   });
 
   await prisma.stayCode.upsert({
-    where: { code: stay.code },
+    where: { id: stay.ids.stayCode },
     create: {
-      id: ids.stayCode,
+      id: stay.ids.stayCode,
       propertyId: property.id,
       unitId: unit.id,
       code: stay.code,
@@ -127,86 +403,70 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
     update: {
       propertyId: property.id,
       unitId: unit.id,
+      code: stay.code,
       active: true
     }
   });
 
-  await prisma.propertyImage.upsert({
-    where: { id: ids.imageCover },
-    create: {
-      id: ids.imageCover,
-      propertyId: property.id,
-      url: "/images/hero-villa-atitlan.png",
-      alt: "Villa con terraza abierta frente al Lago de Atitlan",
-      sortOrder: 0,
-      isCover: true
-    },
-    update: {
-      propertyId: property.id,
-      url: "/images/hero-villa-atitlan.png",
-      alt: "Villa con terraza abierta frente al Lago de Atitlan",
-      sortOrder: 0,
-      isCover: true
-    }
-  });
-
-  await prisma.propertyImage.upsert({
-    where: { id: ids.imageSuite },
-    create: {
-      id: ids.imageSuite,
-      propertyId: property.id,
-      url: "/images/guest-suite.png",
-      alt: "Dormitorio preparado para llegada privada",
-      sortOrder: 1,
-      isCover: false
-    },
-    update: {
-      propertyId: property.id,
-      url: "/images/guest-suite.png",
-      alt: "Dormitorio preparado para llegada privada",
-      sortOrder: 1,
-      isCover: false
-    }
-  });
+  for (const image of stay.images) {
+    await prisma.propertyImage.upsert({
+      where: { id: image.id },
+      create: {
+        id: image.id,
+        propertyId: property.id,
+        url: image.url,
+        alt: image.alt,
+        sortOrder: image.sortOrder,
+        isCover: image.isCover
+      },
+      update: {
+        propertyId: property.id,
+        url: image.url,
+        alt: image.alt,
+        sortOrder: image.sortOrder,
+        isCover: image.isCover
+      }
+    });
+  }
 
   await prisma.ratePlan.upsert({
-    where: { id: ids.ratePlan },
+    where: { id: stay.ids.ratePlan },
     create: {
-      id: ids.ratePlan,
+      id: stay.ids.ratePlan,
       propertyId: property.id,
       unitId: unit.id,
-      name: "Tarifa base Atitlan",
+      name: stay.ratePlan.name,
       currency: "GTQ",
-      baseNightlyRate: "1550.00",
-      weekendNightlyRate: "1750.00",
-      cleaningFee: "425.00",
+      baseNightlyRate: stay.ratePlan.baseNightlyRate,
+      weekendNightlyRate: stay.ratePlan.weekendNightlyRate,
+      cleaningFee: stay.ratePlan.cleaningFee,
       serviceFeeBps: 800,
       taxBps: 1200,
-      minNights: 2,
+      minNights: stay.ratePlan.minNights,
       active: true
     },
     update: {
       propertyId: property.id,
       unitId: unit.id,
-      name: "Tarifa base Atitlan",
+      name: stay.ratePlan.name,
       currency: "GTQ",
-      baseNightlyRate: "1550.00",
-      weekendNightlyRate: "1750.00",
-      cleaningFee: "425.00",
+      baseNightlyRate: stay.ratePlan.baseNightlyRate,
+      weekendNightlyRate: stay.ratePlan.weekendNightlyRate,
+      cleaningFee: stay.ratePlan.cleaningFee,
       serviceFeeBps: 800,
       taxBps: 1200,
-      minNights: 2,
+      minNights: stay.ratePlan.minNights,
       active: true
     }
   });
 
-  const termsSnapshot = buildTermsSnapshot();
+  const termsSnapshot = buildTermsSnapshot(stay);
   await prisma.contract.upsert({
-    where: { id: ids.contract },
+    where: { id: stay.ids.contract },
     create: {
-      id: ids.contract,
+      id: stay.ids.contract,
       propertyId: property.id,
-      ownerId: owner.id,
+      ownerId: ownerIdValue,
       status: "ACTIVE",
       currentVersion: 1,
       title: stay.contractTitle,
@@ -214,17 +474,17 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
       termsSnapshot,
       startsOn: parseDateOnly("2026-01-01"),
       endsOn: null,
-      ownerShareBps: 0,
-      kuqubaShareBps: 0,
+      ownerShareBps: defaultOwnerShareBps,
+      kuqubaShareBps: defaultKuqubaShareBps,
       issuedAt: parseDateOnly("2026-01-01"),
       signedAt: parseDateOnly("2026-01-02"),
       signatureProvider: "public_catalog_seed",
       signatureProviderRef: `public-catalog-${stay.code}`,
-      signatureEvidenceHash: `public-catalog-${ids.contract}`
+      signatureEvidenceHash: `public-catalog-${stay.ids.contract}`
     },
     update: {
       propertyId: property.id,
-      ownerId: owner.id,
+      ownerId: ownerIdValue,
       status: "ACTIVE",
       currentVersion: 1,
       title: stay.contractTitle,
@@ -232,26 +492,26 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
       termsSnapshot,
       startsOn: parseDateOnly("2026-01-01"),
       endsOn: null,
-      ownerShareBps: 0,
-      kuqubaShareBps: 0,
+      ownerShareBps: defaultOwnerShareBps,
+      kuqubaShareBps: defaultKuqubaShareBps,
       issuedAt: parseDateOnly("2026-01-01"),
       signedAt: parseDateOnly("2026-01-02"),
       signatureProvider: "public_catalog_seed",
       signatureProviderRef: `public-catalog-${stay.code}`,
-      signatureEvidenceHash: `public-catalog-${ids.contract}`
+      signatureEvidenceHash: `public-catalog-${stay.ids.contract}`
     }
   });
 
   await prisma.contractVersion.upsert({
     where: {
       contractId_version: {
-        contractId: ids.contract,
+        contractId: stay.ids.contract,
         version: 1
       }
     },
     create: {
-      id: ids.contractVersion,
-      contractId: ids.contract,
+      id: stay.ids.contractVersion,
+      contractId: stay.ids.contract,
       version: 1,
       title: stay.contractTitle,
       summary: stay.contractSummary,
@@ -267,27 +527,100 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
   });
 
   await prisma.availabilityBlock.upsert({
-    where: { id: ids.availabilityBlock },
+    where: { id: stay.ids.availabilityBlock },
     create: {
-      id: ids.availabilityBlock,
+      id: stay.ids.availabilityBlock,
       propertyId: property.id,
       unitId: unit.id,
-      startsOn: parseDateOnly("2026-09-18"),
-      endsOn: parseDateOnly("2026-09-20"),
-      reason: "MAINTENANCE",
-      note: "Mantenimiento preventivo de terraza"
+      startsOn: parseDateOnly(stay.availabilityBlock.startsOn),
+      endsOn: parseDateOnly(stay.availabilityBlock.endsOn),
+      reason: stay.availabilityBlock.reason,
+      note: stay.availabilityBlock.note
     },
     update: {
       propertyId: property.id,
       unitId: unit.id,
-      startsOn: parseDateOnly("2026-09-18"),
-      endsOn: parseDateOnly("2026-09-20"),
-      reason: "MAINTENANCE",
-      note: "Mantenimiento preventivo de terraza"
+      startsOn: parseDateOnly(stay.availabilityBlock.startsOn),
+      endsOn: parseDateOnly(stay.availabilityBlock.endsOn),
+      reason: stay.availabilityBlock.reason,
+      note: stay.availabilityBlock.note
     }
   });
 }
 
+async function seedFinancialConfiguration(prisma: PrismaClient, organizationIdValue: string) {
+  for (const definition of financialChargeDefinitions) {
+    await prisma.chargeDefinition.upsert({
+      where: { id: definition.id },
+      create: {
+        id: definition.id,
+        organizationId: organizationIdValue,
+        code: definition.code,
+        label: definition.label,
+        description: definition.description,
+        category: definition.category,
+        calculationMethod: definition.calculationMethod,
+        amount: definition.amount,
+        rateBps: definition.rateBps,
+        taxable: definition.taxable,
+        guestVisible: definition.guestVisible,
+        active: true,
+        distribution: definition.distribution,
+        metadata: {
+          source: "public_catalog_seed",
+          version: "guest-billing-v1"
+        }
+      },
+      update: {
+        organizationId: organizationIdValue,
+        code: definition.code,
+        label: definition.label,
+        description: definition.description,
+        category: definition.category,
+        calculationMethod: definition.calculationMethod,
+        amount: definition.amount,
+        rateBps: definition.rateBps,
+        taxable: definition.taxable,
+        guestVisible: definition.guestVisible,
+        active: true,
+        distribution: definition.distribution,
+        metadata: {
+          source: "public_catalog_seed",
+          version: "guest-billing-v1"
+        }
+      }
+    });
+  }
+
+  for (const taxRule of financialTaxRules) {
+    await prisma.taxRule.upsert({
+      where: { id: taxRule.id },
+      create: {
+        id: taxRule.id,
+        organizationId: organizationIdValue,
+        code: taxRule.code,
+        label: taxRule.label,
+        rateBps: taxRule.rateBps,
+        appliesToCategories: taxRule.appliesToCategories,
+        appliesToChargeCodes: taxRule.appliesToChargeCodes,
+        responsibleParty: taxRule.responsibleParty,
+        active: taxRule.active,
+        metadata: taxRule.metadata
+      },
+      update: {
+        organizationId: organizationIdValue,
+        code: taxRule.code,
+        label: taxRule.label,
+        rateBps: taxRule.rateBps,
+        appliesToCategories: taxRule.appliesToCategories,
+        appliesToChargeCodes: taxRule.appliesToChargeCodes,
+        responsibleParty: taxRule.responsibleParty,
+        active: taxRule.active,
+        metadata: taxRule.metadata
+      }
+    });
+  }
+}
 async function seedAccessControl(prisma: PrismaClient) {
   const permissions = await Promise.all(
     permissionKeys.map((key) =>
@@ -339,13 +672,18 @@ async function seedAccessControl(prisma: PrismaClient) {
     }
   }
 }
-function buildTermsSnapshot(): Prisma.InputJsonObject {
+
+function buildTermsSnapshot(stay: CatalogStay): Prisma.InputJsonObject {
   return {
     source: "public_catalog_seed",
     stayId: stay.code,
     propertyName: stay.name,
     version: 1
   };
+}
+
+function jsonList(items: readonly string[]): Prisma.InputJsonValue {
+  return [...items];
 }
 
 function parseDateOnly(value: string) {

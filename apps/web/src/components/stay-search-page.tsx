@@ -53,7 +53,7 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
             fill
             priority
             sizes="100vw"
-            src="/images/hero-villa-atitlan.png"
+            src="/images/hero-pacific-beach.png"
           />
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.58)_0%,rgba(13,34,51,0.34)_48%,rgba(13,34,51,0.08)_100%)]" />
           <div className="absolute inset-x-0 bottom-0 -z-10 h-32 bg-gradient-to-t from-ivory/70 to-transparent" />
@@ -74,7 +74,7 @@ export function StaySearchPage({ searchParams, stays }: { searchParams: StaySear
                 Encuentra el lugar correcto para tu viaje.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] md:text-xl">
-                Explora propiedades curadas por KUQUBA, valida disponibilidad y continúa a pago
+                Explora estancias en El Paredón, Monterrico y Puerto San José. Valida disponibilidad y continúa a pago
                 desde el detalle de cada estancia.
               </p>
             </div>

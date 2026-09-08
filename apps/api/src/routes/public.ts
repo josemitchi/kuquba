@@ -7,6 +7,16 @@ import { z } from "zod";
 
 import { prisma } from "../lib/prisma";
 import { createAuditEventEnvelope } from "../modules/audit/audit-event";
+import {
+  buildFinancialAllocationInputs,
+  buildGuestQuoteFinancials,
+  buildLedgerEntriesFromFinancialAllocations,
+  buildReservationChargeInputs,
+  buildStayQuoteChargeInputs,
+  buildZeroGuestQuoteFinancials,
+  toFinancialSnapshotInput
+} from "../modules/billing/guest-pricing";
+import { sendOwnerLeadConfirmationEmail } from "../modules/notifications/owner-lead-confirmation-email";
 import { sendReservationConfirmationEmail } from "../modules/notifications/reservation-confirmation-email";
 
 const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -79,7 +89,12 @@ const stayHoldSchema = z.object({
   email: z.string().trim().email().max(160),
   guestName: z.string().trim().min(2).max(120),
   phone: z.string().trim().max(32).optional(),
-  quoteId: z.string().trim().uuid()
+  privacyVersion: z.string().trim().min(1).max(32),
+  quoteId: z.string().trim().uuid(),
+  stayRulesAccepted: z.literal(true),
+  stayRulesVersion: z.string().trim().min(1).max(32),
+  termsAccepted: z.literal(true),
+  termsVersion: z.string().trim().min(1).max(32)
 });
 
 const paymentCheckoutSchema = z.object({
@@ -373,6 +388,13 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
       request
     });
 
+    await deliverOwnerLeadConfirmationEmail({
+      body,
+      message,
+      ownerLead,
+      propertyName,
+      request
+    });
     return reply.code(201).send({
       ownerLead: {
         createdAt: ownerLead.createdAt.toISOString(),
@@ -485,10 +507,10 @@ function mapPublicStayRecord(record: PublicStayRecord, catalogProperty?: PublicC
   const images =
     property.images.length > 0
       ? property.images
-      : [{ alt: `Vista de ${property.name}`, url: "/images/hero-villa-atitlan.png" }];
+      : [{ alt: `Vista de ${property.name}`, url: "/images/hero-pacific-beach.png" }];
   const coverImage = images[0] ?? {
     alt: `Vista de ${property.name}`,
-    url: "/images/hero-villa-atitlan.png"
+    url: "/images/hero-pacific-beach.png"
   };
   const ratePlan =
     property.ratePlans.find((plan) => plan.unitId === unit?.id) ?? property.ratePlans[0] ?? null;
@@ -811,7 +833,7 @@ const publicReservationHoldTtlMinutes = 20;
 
 async function createPublicReservationHold(input: {
   body: PublicReservationHoldBody;
-  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+  request: Pick<FastifyRequest, "headers" | "id" | "ip" | "log">;
 }): Promise<
   | { ok: true; created: boolean; hold: ReturnType<typeof mapReservationHold> }
   | { ok: false; error: string; statusCode: 404 | 409 }
@@ -821,6 +843,11 @@ async function createPublicReservationHold(input: {
       id: input.body.quoteId
     },
     include: {
+      charges: {
+        orderBy: {
+          sortOrder: "asc"
+        }
+      },
       property: true,
       reservation: {
         include: {
@@ -873,25 +900,63 @@ async function createPublicReservationHold(input: {
     phone: normalizeOptionalText(input.body.phone)
   });
   const holdExpiresAt = new Date(now.getTime() + publicReservationHoldTtlMinutes * 60 * 1000);
-  const reservation = await prisma.reservation.create({
-    data: {
-      arrivalDate: quote.arrivalDate,
-      confirmationSource: "public_quote_hold",
-      currency: quote.currency,
-      departureDate: quote.departureDate,
-      guestId: guest.id,
-      holdExpiresAt,
-      privateCode: buildReservationHoldCode(),
-      propertyId: quote.propertyId,
-      status: "HOLD",
-      stayQuoteId: quote.id,
-      total: quote.total,
-      unitId: quote.unitId
-    },
-    include: {
-      property: true,
-      unit: true
+  const acceptedAt = now;
+  const reservation = await prisma.$transaction(async (tx) => {
+    const createdReservation = await tx.reservation.create({
+      data: {
+        arrivalDate: quote.arrivalDate,
+        confirmationSource: "public_quote_hold",
+        currency: quote.currency,
+        departureDate: quote.departureDate,
+        guestId: guest.id,
+        holdExpiresAt,
+        privateCode: buildReservationHoldCode(),
+        propertyId: quote.propertyId,
+        status: "HOLD",
+        stayQuoteId: quote.id,
+        acceptedIpAddress: input.request.ip,
+        acceptedUserAgent: normalizeUserAgent(input.request.headers["user-agent"]),
+        charges:
+          quote.charges.length > 0
+            ? {
+                create: buildReservationChargeInputs({ quoteCharges: quote.charges })
+              }
+            : undefined,
+        financialSnapshot:
+          quote.financialSnapshot === null
+            ? Prisma.DbNull
+            : (quote.financialSnapshot as Prisma.InputJsonValue),
+        privacyVersion: input.body.privacyVersion,
+        stayRulesAcceptedAt: acceptedAt,
+        stayRulesVersion: input.body.stayRulesVersion,
+        termsAcceptedAt: acceptedAt,
+        termsVersion: input.body.termsVersion,
+        total: quote.total,
+        unitId: quote.unitId
+      },
+      include: {
+        charges: {
+          orderBy: {
+            sortOrder: "asc"
+          }
+        },
+        property: true,
+        unit: true
+      }
+    });
+    const allocationInputs = buildFinancialAllocationInputs({
+      financialSnapshot: quote.financialSnapshot,
+      reservationCharges: createdReservation.charges,
+      reservationId: createdReservation.id
+    });
+
+    if (allocationInputs.length > 0) {
+      await tx.financialAllocation.createMany({
+        data: allocationInputs
+      });
     }
+
+    return createdReservation;
   });
 
   await writeReservationHoldAudit({
@@ -904,6 +969,14 @@ async function createPublicReservationHold(input: {
       guests: quote.guests,
       quoteId: quote.id,
       stayId: quote.stayId,
+      legalAcceptance: {
+        acceptedAt: acceptedAt.toISOString(),
+        privacyVersion: input.body.privacyVersion,
+        stayRulesAccepted: input.body.stayRulesAccepted,
+        stayRulesVersion: input.body.stayRulesVersion,
+        termsAccepted: input.body.termsAccepted,
+        termsVersion: input.body.termsVersion
+      },
       total: reservation.total?.toString() ?? null
     },
     request: input.request
@@ -1208,6 +1281,7 @@ async function confirmPublicDevPayment(input: {
           }
         },
         stayQuote: true,
+        financialAllocations: true,
         unit: true
       },
       where: {
@@ -1382,6 +1456,7 @@ async function loadPaymentForCheckoutAction(input: PublicPaymentCheckoutActionBo
             }
           },
           stayQuote: true,
+          financialAllocations: true,
           unit: true
         }
       }
@@ -1565,6 +1640,17 @@ function buildLedgerEntriesForReservation(
   payment: { currency: string; providerRef: string },
   ledgerAccountId: string
 ) {
+  const allocationEntries = buildLedgerEntriesFromFinancialAllocations({
+    allocations: reservation.financialAllocations,
+    ledgerAccountId,
+    paymentProviderRef: payment.providerRef,
+    reservationId: reservation.id
+  });
+
+  if (allocationEntries.length > 0) {
+    return allocationEntries;
+  }
+
   const memo = "Payment checkout " + payment.providerRef;
 
   if (!reservation.stayQuote) {
@@ -1691,7 +1777,19 @@ async function createPublicStayQuote(input: {
       code: input.body.stayId
     },
     include: {
-      property: true,
+      property: {
+        include: {
+          contracts: {
+            orderBy: [{ startsOn: "desc" }, { createdAt: "desc" }],
+            take: 1,
+            where: {
+              status: "ACTIVE",
+              startsOn: { lte: arrivalDate },
+              OR: [{ endsOn: null }, { endsOn: { gte: departureDate } }]
+            }
+          }
+        }
+      },
       unit: true
     }
   });
@@ -1723,21 +1821,29 @@ async function createPublicStayQuote(input: {
   const status = unavailableReason ? "UNAVAILABLE" : "AVAILABLE";
   const amounts =
     status === "AVAILABLE" && ratePlan
-      ? calculateQuoteAmounts({
+      ? buildGuestQuoteFinancials({
+          activeContract: stayCode.property.contracts[0] ?? null,
           arrivalDate,
           nights,
           ratePlan
         })
-      : buildZeroQuoteAmounts(ratePlan?.currency ?? "GTQ");
+      : buildZeroGuestQuoteFinancials(ratePlan?.currency ?? "GTQ");
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   const stayQuote = await prisma.stayQuote.create({
     data: {
       arrivalDate,
+      charges:
+        amounts.charges.length > 0
+          ? {
+              create: buildStayQuoteChargeInputs(amounts.charges)
+            }
+          : undefined,
       cleaningFee: amounts.cleaningFee,
       correlationId: input.request.id,
       currency: amounts.currency,
       departureDate,
       expiresAt,
+      financialSnapshot: toFinancialSnapshotInput(amounts.snapshot),
       guests: input.body.guests,
       ipAddress: input.request.ip,
       nights,
@@ -1759,6 +1865,8 @@ async function createPublicStayQuote(input: {
       arrivalDate: input.body.arrivalDate,
       currency: amounts.currency,
       departureDate: input.body.departureDate,
+      financialModel: amounts.snapshot.version,
+      financialTotals: amounts.snapshot.totals,
       guests: input.body.guests,
       nights,
       propertyId: stayCode.propertyId,
@@ -1779,7 +1887,7 @@ async function createPublicStayQuote(input: {
     departureDate: input.body.departureDate,
     expiresAt: expiresAt.toISOString(),
     guests: input.body.guests,
-    lineItems: status === "AVAILABLE" ? buildQuoteLineItems(amounts) : [],
+    lineItems: status === "AVAILABLE" ? amounts.lineItems : [],
     nights,
     notice: status === "AVAILABLE" ? "quote_available_not_reservation" : "quote_unavailable",
     propertyName: stayCode.property.name,
@@ -1860,76 +1968,6 @@ async function findAvailabilityConflict(input: {
   return overlappingBlock ? "availability_block_" + overlappingBlock.reason.toLowerCase() : null;
 }
 
-function calculateQuoteAmounts(input: {
-  arrivalDate: Date;
-  nights: number;
-  ratePlan: NonNullable<Awaited<ReturnType<typeof findRatePlan>>>;
-}) {
-  let nightlySubtotalCents = 0;
-  const baseNightlyRateCents = toCents(input.ratePlan.baseNightlyRate);
-  const weekendNightlyRateCents = input.ratePlan.weekendNightlyRate
-    ? toCents(input.ratePlan.weekendNightlyRate)
-    : baseNightlyRateCents;
-
-  for (let nightIndex = 0; nightIndex < input.nights; nightIndex += 1) {
-    const stayNight = addUtcDays(input.arrivalDate, nightIndex);
-    nightlySubtotalCents += isWeekendNight(stayNight)
-      ? weekendNightlyRateCents
-      : baseNightlyRateCents;
-  }
-
-  const cleaningFeeCents = toCents(input.ratePlan.cleaningFee);
-  const serviceFeeCents = calculateBps(
-    nightlySubtotalCents + cleaningFeeCents,
-    input.ratePlan.serviceFeeBps
-  );
-  const taxCents = calculateBps(
-    nightlySubtotalCents + cleaningFeeCents + serviceFeeCents,
-    input.ratePlan.taxBps
-  );
-
-  return {
-    cleaningFee: amountFromCents(cleaningFeeCents),
-    currency: input.ratePlan.currency,
-    nightlySubtotal: amountFromCents(nightlySubtotalCents),
-    serviceFee: amountFromCents(serviceFeeCents),
-    tax: amountFromCents(taxCents),
-    total: amountFromCents(nightlySubtotalCents + cleaningFeeCents + serviceFeeCents + taxCents)
-  };
-}
-
-function buildZeroQuoteAmounts(currency: string) {
-  return {
-    cleaningFee: "0.00",
-    currency,
-    nightlySubtotal: "0.00",
-    serviceFee: "0.00",
-    tax: "0.00",
-    total: "0.00"
-  };
-}
-
-function buildQuoteLineItems(amounts: ReturnType<typeof buildZeroQuoteAmounts>) {
-  return [
-    { key: "nightlySubtotal", label: "Noches", amount: amounts.nightlySubtotal },
-    { key: "cleaningFee", label: "Limpieza", amount: amounts.cleaningFee },
-    { key: "serviceFee", label: "Servicio KUQUBA", amount: amounts.serviceFee },
-    { key: "tax", label: "Impuestos estimados", amount: amounts.tax }
-  ];
-}
-
-function calculateBps(amountCents: number, bps: number) {
-  return Math.round((amountCents * bps) / 10000);
-}
-
-function toCents(value: Prisma.Decimal | string | number) {
-  return Math.round(Number(value.toString()) * 100);
-}
-
-function amountFromCents(cents: number) {
-  return (cents / 100).toFixed(2);
-}
-
 function addUtcDays(date: Date, days: number) {
   const result = new Date(date);
   result.setUTCDate(result.getUTCDate() + days);
@@ -1937,11 +1975,6 @@ function addUtcDays(date: Date, days: number) {
   return result;
 }
 
-function isWeekendNight(date: Date) {
-  const day = date.getUTCDay();
-
-  return day === 5 || day === 6;
-}
 
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -2176,6 +2209,75 @@ async function writeGuestPortalProvisioningAudit(input: {
 
   input.request.log.info({ auditEvent }, "audit.event");
 }
+type OwnerLeadConfirmationEmailAudit = {
+  error: string | null;
+  provider: "resend_email";
+  providerMessageId: string | null;
+  reason: string | null;
+  sentAt: string;
+  status: "ACCEPTED" | "FAILED" | "SKIPPED";
+};
+
+async function deliverOwnerLeadConfirmationEmail(input: {
+  body: z.infer<typeof ownerLeadSchema>;
+  message: string | undefined;
+  ownerLead: { createdAt: Date; id: string };
+  propertyName: string | undefined;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}): Promise<OwnerLeadConfirmationEmailAudit> {
+  try {
+    const delivery = await sendOwnerLeadConfirmationEmail({
+      createdAt: input.ownerLead.createdAt,
+      email: input.body.email.toLowerCase(),
+      leadId: input.ownerLead.id,
+      message: input.message ?? null,
+      operatingStatus: input.body.operatingStatus,
+      ownerName: input.body.ownerName,
+      phone: normalizeOptionalText(input.body.phone) ?? null,
+      propertyLocation: input.body.propertyLocation,
+      propertyName: input.propertyName ?? null,
+      propertyType: input.body.propertyType
+    });
+
+    const confirmationEmail = {
+      error: null,
+      provider: delivery.provider,
+      providerMessageId: delivery.status === "ACCEPTED" ? delivery.providerMessageId ?? null : null,
+      reason: delivery.status === "SKIPPED" ? delivery.reason : null,
+      sentAt: delivery.sentAt.toISOString(),
+      status: delivery.status
+    } satisfies OwnerLeadConfirmationEmailAudit;
+
+    input.request.log.info(
+      {
+        confirmationEmail,
+        ownerLeadId: input.ownerLead.id
+      },
+      "owner_lead.confirmation_email"
+    );
+
+    return confirmationEmail;
+  } catch (error) {
+    const confirmationEmail = {
+      error: error instanceof Error ? error.message : "unknown_error",
+      provider: "resend_email",
+      providerMessageId: null,
+      reason: null,
+      sentAt: new Date().toISOString(),
+      status: "FAILED"
+    } satisfies OwnerLeadConfirmationEmailAudit;
+
+    input.request.log.error(
+      {
+        err: error,
+        ownerLeadId: input.ownerLead.id
+      },
+      "owner_lead.confirmation_email_failed"
+    );
+
+    return confirmationEmail;
+  }
+}
 type ReservationConfirmationEmailAudit = {
   error: string | null;
   provider: "resend_email";
@@ -2201,7 +2303,7 @@ async function deliverReservationConfirmationEmail(input: {
       nights: differenceInNights(input.reservation.arrivalDate, input.reservation.departureDate),
       propertyDestination: input.reservation.property.destination,
       propertyImageAlt: propertyImage?.alt ?? `Vista de ${input.reservation.property.name}`,
-      propertyImageUrl: propertyImage?.url ?? "/images/hero-villa-atitlan.png",
+      propertyImageUrl: propertyImage?.url ?? "/images/hero-pacific-beach.png",
       propertyName: input.reservation.property.name,
       reservationCode: input.reservation.privateCode,
       total: input.reservation.total?.toString() ?? "0.00",
@@ -2350,6 +2452,12 @@ function hashContact(email: string) {
 
 function hashValue(value: string) {
   return createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
+}
+
+function normalizeUserAgent(value: string | string[] | undefined) {
+  const userAgent = Array.isArray(value) ? value.join(", ") : value;
+
+  return userAgent ? userAgent.slice(0, 500) : undefined;
 }
 
 function normalizeOptionalText(value: string | undefined) {

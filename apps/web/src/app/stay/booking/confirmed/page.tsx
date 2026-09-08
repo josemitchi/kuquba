@@ -35,7 +35,7 @@ export default async function BookingConfirmedRoute({
             fill
             priority
             sizes="100vw"
-            src="/images/guest-suite.png"
+            src="/images/pacific-family-villa.png"
           />
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(13,34,51,0.96)_0%,rgba(13,34,51,0.84)_52%,rgba(13,34,51,0.58)_100%)]" />
           <div className="absolute inset-x-0 bottom-0 -z-10 h-40 bg-gradient-to-t from-ivory to-transparent" />
@@ -52,7 +52,7 @@ export default async function BookingConfirmedRoute({
                 Tu reserva esta lista.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-white/84 md:text-xl">
-                Confirmamos tu estancia en {propertyName}. El acceso de huesped quedo habilitado
+                Confirmamos tu estancia en {propertyName}. El acceso de huésped quedó habilitado
                 con el correo de la reserva para consultar fechas, pago y proximos pasos.
               </p>
             </div>
@@ -77,7 +77,7 @@ export default async function BookingConfirmedRoute({
                 <SummaryItem icon={MapPin} label="Propiedad" value={propertyName} detail={unitName} />
                 <SummaryItem icon={CalendarCheck2} label="Fechas" value={stayDates} detail={nights ? `${nights} noche(s)` : undefined} />
                 <SummaryItem icon={CreditCard} label="Pago" value={totalLabel} detail={statusLabel} />
-                <SummaryItem icon={ShieldCheck} label="Acceso" value="Portal de huesped" detail="Protegido por OTP" />
+                <SummaryItem icon={ShieldCheck} label="Acceso" value="Portal de huésped" detail="Protegido por OTP" />
               </div>
 
               <div className="mt-8 border-t border-line pt-6">
@@ -103,7 +103,7 @@ export default async function BookingConfirmedRoute({
                   <KeyRound aria-hidden className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-xs font-semibold uppercase text-green">Portal huesped</p>
+                  <p className="text-xs font-semibold uppercase text-green">Portal huésped</p>
                   <h2 className="text-lg font-semibold text-midnight">Ver mi estancia</h2>
                 </div>
               </div>
