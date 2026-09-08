@@ -2,8 +2,6 @@ import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 import { env } from "../../config/env";
 
-import { getPublicReplyToEmail, resolveResendRecipients } from "../notifications/email-routing";
-
 const resendEmailsUrl = "https://api.resend.com/emails";
 const developmentOtpSigningSecret = "kuquba-development-otp-signing-secret-v1";
 
@@ -143,10 +141,10 @@ function buildResendEmailBody(input: OtpDeliveryInput) {
   return {
     from: env.RESEND_FROM_EMAIL,
     html: buildOtpHtml(input.code, ttlMinutes),
-    reply_to: getPublicReplyToEmail(),
+    reply_to: env.KUQUBA_PUBLIC_CONTACT_EMAIL,
     subject,
     text,
-    to: resolveResendRecipients(input.destination)
+    to: [input.destination]
   };
 }
 

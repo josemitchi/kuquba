@@ -25,7 +25,6 @@ const envSchema = z
     KUQUBA_PUBLIC_CONTACT_EMAIL: publicContactEmailSchema,
     RESEND_API_KEY: optionalSecretSchema,
     RESEND_FROM_EMAIL: z.preprocess(emptyToUndefined, z.string().min(3).optional()),
-    RESEND_RECIPIENT_ALIAS_MAP: z.preprocess(emptyToUndefined, z.string().optional()),
     FORMAL_DELIVERY_API_KEY: optionalSecretSchema,
     FORMAL_DELIVERY_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
     FORMAL_DELIVERY_PROVIDER: z.enum(["dev", "webhook"]).default("dev"),
@@ -90,7 +89,9 @@ const envSchema = z
         message: "FORMAL_DELIVERY_WEBHOOK_URL is required when FORMAL_DELIVERY_PROVIDER=webhook",
         path: ["FORMAL_DELIVERY_WEBHOOK_URL"]
       });
-    } else if (!isAllowedFormalDeliveryWebhookUrl(value.FORMAL_DELIVERY_WEBHOOK_URL, value.NODE_ENV)) {
+    } else if (
+      !isAllowedFormalDeliveryWebhookUrl(value.FORMAL_DELIVERY_WEBHOOK_URL, value.NODE_ENV)
+    ) {
       context.addIssue({
         code: "custom",
         message:
@@ -117,7 +118,10 @@ export const env = {
 
 process.env.DATABASE_URL ??= env.DATABASE_URL;
 
-function isAllowedFormalDeliveryWebhookUrl(value: string, nodeEnv: "development" | "test" | "production") {
+function isAllowedFormalDeliveryWebhookUrl(
+  value: string,
+  nodeEnv: "development" | "test" | "production"
+) {
   const url = new URL(value);
 
   if (url.protocol === "https:") {

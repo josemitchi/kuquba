@@ -1,7 +1,5 @@
 import { env } from "../../config/env";
 
-import { getPublicReplyToEmail, resolveResendRecipients } from "./email-routing";
-
 const resendEmailsUrl = "https://api.resend.com/emails";
 const publicSiteUrl = "https://kuquba.com";
 const guestPortalUrl = publicSiteUrl + "/stay";
@@ -161,7 +159,7 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
         </table>
       </div>
     `,
-    reply_to: getPublicReplyToEmail(),
+    reply_to: env.KUQUBA_PUBLIC_CONTACT_EMAIL,
     subject: `Reserva confirmada | ${input.propertyName}`,
     text: [
       `Hola ${input.guestName},`,
@@ -182,7 +180,7 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
       "",
       "KUQUBA"
     ].join("\n"),
-    to: resolveResendRecipients(input.guestEmail)
+    to: [input.guestEmail]
   };
 }
 

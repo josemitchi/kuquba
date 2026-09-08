@@ -1,7 +1,5 @@
 import { env } from "../../config/env";
 
-import { getPublicReplyToEmail, resolveResendRecipients } from "./email-routing";
-
 const resendEmailsUrl = "https://api.resend.com/emails";
 const publicSiteUrl = "https://kuquba.com";
 const ownerEvaluateUrl = publicSiteUrl + "/owner/evaluate";
@@ -164,7 +162,7 @@ function buildOwnerLeadConfirmationEmailBody(input: OwnerLeadConfirmationEmailIn
         </table>
       </div>
     `,
-    reply_to: getPublicReplyToEmail(),
+    reply_to: env.KUQUBA_PUBLIC_CONTACT_EMAIL,
     subject: `Solicitud recibida | Evaluación de propiedad KUQUBA`,
     text: [
       `Hola ${input.ownerName},`,
@@ -190,7 +188,7 @@ function buildOwnerLeadConfirmationEmailBody(input: OwnerLeadConfirmationEmailIn
     ]
       .filter((line): line is string => Boolean(line))
       .join("\n"),
-    to: resolveResendRecipients(input.email)
+    to: [input.email]
   };
 }
 
