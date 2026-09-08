@@ -7,6 +7,10 @@ const emptyToUndefined = (value: unknown) => (value === "" ? undefined : value);
 
 const optionalSecretSchema = z.preprocess(emptyToUndefined, z.string().min(1).optional());
 const optionalUrlSchema = z.preprocess(emptyToUndefined, z.string().url().optional());
+const publicContactEmailSchema = z.preprocess(
+  (value) => (value === "" || value === undefined ? "info@kuquba.com" : value),
+  z.string().email()
+);
 
 const envSchema = z
   .object({
@@ -18,9 +22,10 @@ const envSchema = z
     OTP_CODE_TTL_MINUTES: z.coerce.number().int().min(5).max(30).default(10),
     OTP_PROVIDER: z.enum(["dev", "resend"]).default("dev"),
     OTP_SIGNING_SECRET: optionalSecretSchema,
+    KUQUBA_PUBLIC_CONTACT_EMAIL: publicContactEmailSchema,
     RESEND_API_KEY: optionalSecretSchema,
     RESEND_FROM_EMAIL: z.preprocess(emptyToUndefined, z.string().min(3).optional()),
-    RESEND_REPLY_TO: z.preprocess(emptyToUndefined, z.string().email().optional()),
+    RESEND_RECIPIENT_ALIAS_MAP: z.preprocess(emptyToUndefined, z.string().optional()),
     FORMAL_DELIVERY_API_KEY: optionalSecretSchema,
     FORMAL_DELIVERY_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(10).default(3),
     FORMAL_DELIVERY_PROVIDER: z.enum(["dev", "webhook"]).default("dev"),

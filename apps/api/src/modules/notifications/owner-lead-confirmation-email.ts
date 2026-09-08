@@ -1,5 +1,7 @@
 import { env } from "../../config/env";
 
+import { getPublicReplyToEmail, resolveResendRecipients } from "./email-routing";
+
 const resendEmailsUrl = "https://api.resend.com/emails";
 const publicSiteUrl = "https://kuquba.com";
 const ownerEvaluateUrl = publicSiteUrl + "/owner/evaluate";
@@ -66,7 +68,10 @@ export async function sendOwnerLeadConfirmationEmail(
   };
 
   if (!response.ok) {
-    throw new Error(payload.message ?? `Resend rejected owner lead confirmation email with status ${response.status}.`);
+    throw new Error(
+      payload.message ??
+        `Resend rejected owner lead confirmation email with status ${response.status}.`
+    );
   }
 
   return {
@@ -159,7 +164,7 @@ function buildOwnerLeadConfirmationEmailBody(input: OwnerLeadConfirmationEmailIn
         </table>
       </div>
     `,
-    reply_to: env.RESEND_REPLY_TO,
+    reply_to: getPublicReplyToEmail(),
     subject: `Solicitud recibida | Evaluación de propiedad KUQUBA`,
     text: [
       `Hola ${input.ownerName},`,
@@ -185,7 +190,7 @@ function buildOwnerLeadConfirmationEmailBody(input: OwnerLeadConfirmationEmailIn
     ]
       .filter((line): line is string => Boolean(line))
       .join("\n"),
-    to: [input.email]
+    to: resolveResendRecipients(input.email)
   };
 }
 

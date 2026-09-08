@@ -2,6 +2,8 @@ import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
 
 import { env } from "../../config/env";
 
+import { getPublicReplyToEmail, resolveResendRecipients } from "../notifications/email-routing";
+
 const resendEmailsUrl = "https://api.resend.com/emails";
 const developmentOtpSigningSecret = "kuquba-development-otp-signing-secret-v1";
 
@@ -85,7 +87,11 @@ export async function deliverOtp(input: OtpDeliveryInput): Promise<OtpDeliveryRe
 
 async function sendResendOtpEmail(input: OtpDeliveryInput): Promise<OtpDeliveryResult> {
   if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) {
-    throw new OtpDeliveryError("provider_adapter_required", "Resend OTP provider is missing required configuration.", 501);
+    throw new OtpDeliveryError(
+      "provider_adapter_required",
+      "Resend OTP provider is missing required configuration.",
+      501
+    );
   }
 
   const sentAt = new Date();
@@ -137,10 +143,10 @@ function buildResendEmailBody(input: OtpDeliveryInput) {
   return {
     from: env.RESEND_FROM_EMAIL,
     html: buildOtpHtml(input.code, ttlMinutes),
-    reply_to: env.RESEND_REPLY_TO,
+    reply_to: getPublicReplyToEmail(),
     subject,
     text,
-    to: [input.destination]
+    to: resolveResendRecipients(input.destination)
   };
 }
 

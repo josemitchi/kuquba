@@ -1,5 +1,7 @@
 import { env } from "../../config/env";
 
+import { getPublicReplyToEmail, resolveResendRecipients } from "./email-routing";
+
 const resendEmailsUrl = "https://api.resend.com/emails";
 const publicSiteUrl = "https://kuquba.com";
 const guestPortalUrl = publicSiteUrl + "/stay";
@@ -71,7 +73,10 @@ export async function sendReservationConfirmationEmail(
   };
 
   if (!response.ok) {
-    throw new Error(payload.message ?? `Resend rejected reservation confirmation email with status ${response.status}.`);
+    throw new Error(
+      payload.message ??
+        `Resend rejected reservation confirmation email with status ${response.status}.`
+    );
   }
 
   return {
@@ -156,7 +161,7 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
         </table>
       </div>
     `,
-    reply_to: env.RESEND_REPLY_TO,
+    reply_to: getPublicReplyToEmail(),
     subject: `Reserva confirmada | ${input.propertyName}`,
     text: [
       `Hola ${input.guestName},`,
@@ -177,7 +182,7 @@ function buildReservationConfirmationEmailBody(input: ReservationConfirmationEma
       "",
       "KUQUBA"
     ].join("\n"),
-    to: [input.guestEmail]
+    to: resolveResendRecipients(input.guestEmail)
   };
 }
 
