@@ -12,12 +12,15 @@ import {
   CreditCard,
   DoorOpen,
   FileText,
+  History,
   LogOut,
   Mail,
   Phone,
   Save,
+  Search,
   ShieldCheck,
   UserRound,
+  X,
   type LucideIcon
 } from "lucide-react";
 import Image from "next/image";
@@ -119,7 +122,9 @@ export function GuestPortalHomePage() {
   }
 
   function handleProfileUpdated(profile: GuestProfile) {
-    setPortal((current) => (current ? { ...current, guestName: profile.fullName, profile } : current));
+    setPortal((current) =>
+      current ? { ...current, guestName: profile.fullName, profile } : current
+    );
   }
 
   return (
@@ -150,7 +155,12 @@ export function GuestPortalHomePage() {
               <ArrowLeft aria-hidden className="h-4 w-4" />
               Acceso
             </a>
-            <AccountMenu isValidating={isValidating} onLogout={handleLogout} profile={portal?.profile} session={session} />
+            <AccountMenu
+              isValidating={isValidating}
+              onLogout={handleLogout}
+              profile={portal?.profile}
+              session={session}
+            />
           </div>
         </div>
       </header>
@@ -175,7 +185,11 @@ export function GuestPortalHomePage() {
       <section className="container-shell py-8">
         {session ? (
           portal ? (
-            <GuestDashboard onProfileUpdated={handleProfileUpdated} sessionToken={session.sessionToken} snapshot={portal} />
+            <GuestDashboard
+              onProfileUpdated={handleProfileUpdated}
+              sessionToken={session.sessionToken}
+              snapshot={portal}
+            />
           ) : (
             <PortalLoadState isLoading={isPortalLoading} />
           )
@@ -255,6 +269,30 @@ function AccountMenu({
   );
 }
 
+type GuestDashboardTab = "confirmed" | "history" | "profile";
+
+type ReservationFilters = {
+  endDate: string;
+  query: string;
+  startDate: string;
+};
+
+const emptyReservationFilters: ReservationFilters = {
+  endDate: "",
+  query: "",
+  startDate: ""
+};
+
+const guestDashboardTabs: Array<{
+  icon: LucideIcon;
+  key: GuestDashboardTab;
+  label: string;
+}> = [
+  { icon: CalendarCheck2, key: "confirmed", label: "Confirmadas" },
+  { icon: History, key: "history", label: "Historicas" },
+  { icon: UserRound, key: "profile", label: "Perfil" }
+];
+
 function GuestDashboard({
   onProfileUpdated,
   sessionToken,
@@ -264,15 +302,33 @@ function GuestDashboard({
   sessionToken: string;
   snapshot: GuestPortalSnapshot;
 }) {
-  const activeReservations = snapshot.reservations.filter(isPendingOrCurrentReservation);
-  const historyReservations = snapshot.reservations.filter(
-    (reservation) => !isPendingOrCurrentReservation(reservation)
+  const [activeTab, setActiveTab] = useState<GuestDashboardTab>("confirmed");
+  const [confirmedFilters, setConfirmedFilters] =
+    useState<ReservationFilters>(emptyReservationFilters);
+  const [historyFilters, setHistoryFilters] = useState<ReservationFilters>(emptyReservationFilters);
+  const todayDateKey = getTodayDateKey();
+  const confirmedReservations = sortReservationsByArrival(
+    snapshot.reservations.filter((reservation) =>
+      isConfirmedUpcomingReservation(reservation, todayDateKey)
+    )
   );
-  const defaultSelectedReservationId = getDefaultSelectedReservationId(
-    snapshot,
-    activeReservations,
-    historyReservations
+  const pendingReservations = sortReservationsByArrival(
+    snapshot.reservations.filter(isPendingReservation)
   );
+  const historyReservations = sortReservationsByArrivalDesc(
+    snapshot.reservations.filter((reservation) =>
+      isHistoricalReservation(reservation, todayDateKey)
+    )
+  );
+  const filteredConfirmedReservations = filterReservations(confirmedReservations, confirmedFilters);
+  const filteredPendingReservations = filterReservations(pendingReservations, confirmedFilters);
+  const filteredHistoryReservations = filterReservations(historyReservations, historyFilters);
+  const defaultSelectedReservationId = getDefaultSelectedReservationId({
+    confirmedReservations,
+    historyReservations,
+    nextStay: snapshot.nextStay,
+    pendingReservations
+  });
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(
     defaultSelectedReservationId
   );
@@ -288,77 +344,223 @@ function GuestDashboard({
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-        <div className="space-y-6">
-          <NextStayPanel reservation={snapshot.nextStay} />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-stretch">
+        <NextStayPanel reservation={snapshot.nextStay} />
 
-          {summaryMetrics.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              {summaryMetrics.map((metric, index) => (
-                <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <GuestProfilePanel
-          onProfileUpdated={onProfileUpdated}
-          profile={snapshot.profile}
-          sessionToken={sessionToken}
-        />
+        {summaryMetrics.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
+            {summaryMetrics.map((metric, index) => (
+              <MetricCard
+                icon={metricIcons[index] ?? BadgeCheck}
+                key={metric.label}
+                metric={metric}
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
-      <section className="mt-10">
-        <SectionHeading
-          eyebrow="Reservas activas"
-          title="Estadias pendientes o en curso"
-          value={String(activeReservations.length) + " estancia(s)"}
-        />
-        <ReservationList
-          emptyDescription="Aqui apareceran tus reservas temporales, pagos pendientes y estadias confirmadas por realizar."
-          emptyTitle="Sin estadias activas"
-          onSelect={handleReservationDetail}
-          reservations={activeReservations}
-          selectedReservationId={selectedReservationId}
-        />
-      </section>
+      <section className="mt-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <SectionHeading
+            eyebrow="Portal de huesped"
+            title="Reservas y perfil"
+            value={getTabSummary(activeTab, {
+              confirmedCount: confirmedReservations.length,
+              historyCount: historyReservations.length,
+              pendingCount: pendingReservations.length
+            })}
+          />
 
-      <section className="mt-10">
-        <SectionHeading
-          eyebrow="Historial"
-          title="Historial de estadias"
-          value={String(historyReservations.length) + " registro(s)"}
-        />
-        <ReservationList
-          emptyDescription="Cuando una estancia finalice o una reserva quede vencida, se movera a este historial."
-          emptyTitle="Historial pendiente"
-          onSelect={handleReservationDetail}
-          reservations={historyReservations}
-          selectedReservationId={selectedReservationId}
-        />
+          <div
+            aria-label="Secciones del portal de huesped"
+            className="inline-flex w-full flex-wrap gap-2 rounded-[8px] border border-line bg-white p-1 shadow-soft sm:w-fit"
+            role="tablist"
+          >
+            {guestDashboardTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.key === activeTab;
+
+              return (
+                <button
+                  aria-selected={isActive}
+                  className={
+                    "focus-ring inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[6px] px-4 text-sm font-semibold transition sm:flex-none " +
+                    (isActive
+                      ? "bg-midnight text-white"
+                      : "text-midnight/70 hover:bg-green/10 hover:text-green")
+                  }
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  role="tab"
+                  type="button"
+                >
+                  <Icon aria-hidden className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {activeTab === "confirmed" ? (
+          <div className="mt-5 space-y-6">
+            <ReservationTable
+              emptyDescription="Aqui apareceran tus reservas confirmadas por realizar."
+              emptyTitle="Sin reservas confirmadas"
+              filters={confirmedFilters}
+              icon={CalendarCheck2}
+              onFiltersChange={setConfirmedFilters}
+              onSelect={handleReservationDetail}
+              reservations={filteredConfirmedReservations}
+              selectedReservationId={selectedReservationId}
+              title="Reservas confirmadas"
+              totalCount={confirmedReservations.length}
+            />
+
+            {pendingReservations.length > 0 ? (
+              <ReservationTable
+                emptyDescription="No hay reservas temporales que coincidan con los filtros actuales."
+                emptyTitle="Sin pendientes visibles"
+                filters={confirmedFilters}
+                icon={Clock3}
+                onFiltersChange={setConfirmedFilters}
+                onSelect={handleReservationDetail}
+                reservations={filteredPendingReservations}
+                selectedReservationId={selectedReservationId}
+                title="Pendientes de confirmacion"
+                totalCount={pendingReservations.length}
+              />
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeTab === "history" ? (
+          <ReservationTable
+            emptyDescription="Cuando una estancia finalice o una reserva quede vencida, se movera a este historial."
+            emptyTitle="Historial pendiente"
+            filters={historyFilters}
+            icon={History}
+            onFiltersChange={setHistoryFilters}
+            onSelect={handleReservationDetail}
+            reservations={filteredHistoryReservations}
+            selectedReservationId={selectedReservationId}
+            title="Reservas historicas"
+            totalCount={historyReservations.length}
+          />
+        ) : null}
+
+        {activeTab === "profile" ? (
+          <div className="mt-5 max-w-3xl">
+            <GuestProfilePanel
+              onProfileUpdated={onProfileUpdated}
+              profile={snapshot.profile}
+              sessionToken={sessionToken}
+            />
+          </div>
+        ) : null}
       </section>
     </>
   );
 }
 
-function getDefaultSelectedReservationId(
-  snapshot: GuestPortalSnapshot,
-  activeReservations: GuestReservation[],
-  historyReservations: GuestReservation[]
+function getTabSummary(
+  activeTab: GuestDashboardTab,
+  counts: { confirmedCount: number; historyCount: number; pendingCount: number }
 ) {
-  return snapshot.nextStay?.id ?? activeReservations[0]?.id ?? historyReservations[0]?.id ?? null;
+  if (activeTab === "profile") {
+    return "Datos de acceso";
+  }
+
+  if (activeTab === "history") {
+    return String(counts.historyCount) + " registro(s)";
+  }
+
+  const pendingSuffix = counts.pendingCount > 0 ? ` / ${counts.pendingCount} pendiente(s)` : "";
+  return String(counts.confirmedCount) + " confirmada(s)" + pendingSuffix;
 }
 
-function isPendingOrCurrentReservation(reservation: GuestReservation) {
-  if (reservation.status === "HOLD" || reservation.status === "PENDING_PAYMENT") {
-    return reservation.isActionable;
+function getDefaultSelectedReservationId(input: {
+  confirmedReservations: GuestReservation[];
+  historyReservations: GuestReservation[];
+  nextStay: GuestReservation | null;
+  pendingReservations: GuestReservation[];
+}) {
+  return (
+    input.nextStay?.id ??
+    input.confirmedReservations[0]?.id ??
+    input.pendingReservations[0]?.id ??
+    input.historyReservations[0]?.id ??
+    null
+  );
+}
+
+function isConfirmedUpcomingReservation(reservation: GuestReservation, todayDateKey: string) {
+  return reservation.status === "CONFIRMED" && reservation.departureDate >= todayDateKey;
+}
+
+function isPendingReservation(reservation: GuestReservation) {
+  return (
+    (reservation.status === "HOLD" || reservation.status === "PENDING_PAYMENT") &&
+    reservation.isActionable
+  );
+}
+
+function isHistoricalReservation(reservation: GuestReservation, todayDateKey: string) {
+  if (isPendingReservation(reservation)) {
+    return false;
   }
 
   if (reservation.status === "CONFIRMED") {
-    return reservation.departureDate >= getTodayDateKey();
+    return reservation.departureDate < todayDateKey;
   }
 
-  return false;
+  return true;
+}
+
+function sortReservationsByArrival(reservations: GuestReservation[]) {
+  return [...reservations].sort(
+    (left, right) => getDateKeyTime(left.arrivalDate) - getDateKeyTime(right.arrivalDate)
+  );
+}
+
+function sortReservationsByArrivalDesc(reservations: GuestReservation[]) {
+  return [...reservations].sort(
+    (left, right) => getDateKeyTime(right.arrivalDate) - getDateKeyTime(left.arrivalDate)
+  );
+}
+
+function filterReservations(reservations: GuestReservation[], filters: ReservationFilters) {
+  const query = filters.query.trim().toLowerCase();
+
+  return reservations.filter((reservation) => {
+    if (query && !getReservationSearchText(reservation).includes(query)) {
+      return false;
+    }
+
+    if (filters.startDate && reservation.departureDate < filters.startDate) {
+      return false;
+    }
+
+    if (filters.endDate && reservation.arrivalDate > filters.endDate) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function getReservationSearchText(reservation: GuestReservation) {
+  return [
+    reservation.reservationCode,
+    reservation.propertyName,
+    reservation.unitName,
+    reservation.propertyDestination,
+    reservation.statusLabel,
+    reservation.payment?.statusLabel ?? ""
+  ]
+    .join(" ")
+    .toLowerCase();
 }
 
 function getTodayDateKey() {
@@ -371,6 +573,9 @@ function getTodayDateKey() {
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
 
   return `${values.year}-${values.month}-${values.day}`;
+}
+function getDateKeyTime(value: string) {
+  return new Date(value + "T00:00:00.000Z").getTime();
 }
 
 function MetricCard({
@@ -492,7 +697,7 @@ function GuestProfilePanel({
           />
         </label>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
               <Phone aria-hidden className="h-3.5 w-3.5 text-green" />
@@ -548,46 +753,171 @@ function GuestProfilePanel({
   );
 }
 
-function ReservationList({
+function ReservationTable({
   emptyDescription,
   emptyTitle,
+  filters,
+  icon: Icon,
+  onFiltersChange,
   onSelect,
   reservations,
-  selectedReservationId
+  selectedReservationId,
+  title,
+  totalCount
 }: {
   emptyDescription: string;
   emptyTitle: string;
+  filters: ReservationFilters;
+  icon: LucideIcon;
+  onFiltersChange: (filters: ReservationFilters) => void;
   onSelect: (reservationId: string) => void;
   reservations: GuestReservation[];
   selectedReservationId: string | null;
+  title: string;
+  totalCount: number;
 }) {
-  if (reservations.length === 0) {
-    return (
-      <section className="mt-5 rounded-[8px] border border-line bg-white p-8 text-center shadow-soft">
-        <CalendarCheck2 aria-hidden className="mx-auto h-10 w-10 text-green" />
-        <h2 className="mt-4 text-xl font-semibold text-midnight">{emptyTitle}</h2>
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-ink/68">
-          {emptyDescription}
-        </p>
-      </section>
-    );
+  const hasFilters = hasReservationFilters(filters);
+
+  return (
+    <section className="rounded-[8px] border border-line bg-white shadow-soft">
+      <div className="flex flex-col gap-4 border-b border-line p-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
+            <Icon aria-hidden className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase text-green">Listado</p>
+            <h3 className="mt-1 text-lg font-semibold text-midnight">{title}</h3>
+          </div>
+        </div>
+        <span className="inline-flex w-fit items-center rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
+          {String(reservations.length)} de {String(totalCount)}
+        </span>
+      </div>
+
+      <ReservationFilterBar filters={filters} onFiltersChange={onFiltersChange} />
+
+      {reservations.length === 0 ? (
+        <div className="p-8 text-center">
+          <CalendarCheck2 aria-hidden className="mx-auto h-10 w-10 text-green" />
+          <h4 className="mt-4 text-xl font-semibold text-midnight">
+            {hasFilters ? "Sin resultados" : emptyTitle}
+          </h4>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-ink/68">
+            {hasFilters
+              ? "No hay reservas que coincidan con los filtros aplicados."
+              : emptyDescription}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[920px] table-fixed border-t border-line text-left text-sm">
+            <colgroup>
+              <col className="w-[17%]" />
+              <col className="w-[24%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+            </colgroup>
+            <thead className="bg-ivory text-xs uppercase text-ink/50">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Reserva</th>
+                <th className="px-4 py-3 font-semibold">Estancia</th>
+                <th className="px-4 py-3 font-semibold">Llegada</th>
+                <th className="px-4 py-3 font-semibold">Salida</th>
+                <th className="px-4 py-3 font-semibold">Pago</th>
+                <th className="px-4 py-3 font-semibold">Total</th>
+                <th className="px-4 py-3 text-right font-semibold">Detalle</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {reservations.map((reservation) => (
+                <ReservationTableRow
+                  isSelected={reservation.id === selectedReservationId}
+                  key={reservation.id}
+                  onSelect={onSelect}
+                  reservation={reservation}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ReservationFilterBar({
+  filters,
+  onFiltersChange
+}: {
+  filters: ReservationFilters;
+  onFiltersChange: (filters: ReservationFilters) => void;
+}) {
+  const hasFilters = hasReservationFilters(filters);
+
+  function updateFilter(field: keyof ReservationFilters, value: string) {
+    onFiltersChange({ ...filters, [field]: value });
   }
 
   return (
-    <div className="mt-5 space-y-5">
-      {reservations.map((reservation) => (
-        <ReservationCard
-          isSelected={reservation.id === selectedReservationId}
-          key={reservation.id}
-          onSelect={onSelect}
-          reservation={reservation}
+    <div className="grid gap-3 border-b border-line p-5 lg:grid-cols-[minmax(220px,1fr)_180px_180px_auto] lg:items-end">
+      <label className="block">
+        <span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+          <Search aria-hidden className="h-3.5 w-3.5 text-green" />
+          Nombre o codigo
+        </span>
+        <input
+          className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none"
+          onChange={(event) => updateFilter("query", event.target.value)}
+          placeholder="Propiedad, unidad o reserva"
+          type="search"
+          value={filters.query}
         />
-      ))}
+      </label>
+
+      <label className="block">
+        <span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+          <CalendarCheck2 aria-hidden className="h-3.5 w-3.5 text-green" />
+          Desde
+        </span>
+        <input
+          className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none [color-scheme:light]"
+          onChange={(event) => updateFilter("startDate", event.target.value)}
+          type="date"
+          value={filters.startDate}
+        />
+      </label>
+
+      <label className="block">
+        <span className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+          <CalendarCheck2 aria-hidden className="h-3.5 w-3.5 text-green" />
+          Hasta
+        </span>
+        <input
+          className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none [color-scheme:light]"
+          onChange={(event) => updateFilter("endDate", event.target.value)}
+          type="date"
+          value={filters.endDate}
+        />
+      </label>
+
+      <button
+        className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={!hasFilters}
+        onClick={() => onFiltersChange(emptyReservationFilters)}
+        type="button"
+      >
+        <X aria-hidden className="h-4 w-4" />
+        Limpiar
+      </button>
     </div>
   );
 }
 
-function ReservationCard({
+function ReservationTableRow({
   isSelected,
   onSelect,
   reservation
@@ -597,105 +927,65 @@ function ReservationCard({
   reservation: GuestReservation;
 }) {
   return (
-    <article
-      className={`overflow-hidden rounded-[8px] border bg-white shadow-soft ${isSelected ? "border-green" : "border-line"}`}
-    >
-      <div className="grid gap-5 p-5 lg:grid-cols-[190px_minmax(0,1fr)] lg:p-6">
-        <div className="relative min-h-44 overflow-hidden rounded-[6px] border border-line bg-midnight lg:min-h-full">
-          <Image
-            alt={reservation.propertyImageAlt}
-            className="object-cover"
-            fill
-            sizes="(min-width: 1024px) 190px, 100vw"
-            src={reservation.propertyImageUrl}
-          />
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-green">
-                {reservation.reservationCode}
-              </p>
-              <h3 className="mt-2 truncate font-display text-3xl leading-tight text-midnight">
-                {reservation.propertyName}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-ink/68">
-                {reservation.unitName} / {reservation.propertyDestination}
-              </p>
-            </div>
-            <span
-              className={
-                "inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold " +
-                reservationToneClasses[reservation.statusTone]
-              }
-            >
-              {reservation.statusLabel}
-            </span>
-          </div>
-
-          <dl className="mt-5 grid gap-3 text-sm text-ink/72 sm:grid-cols-2 xl:grid-cols-4">
-            <ReservationFact
-              icon={DoorOpen}
-              label="Llegada"
-              value={formatDate(reservation.arrivalDate)}
-            />
-            <ReservationFact
-              icon={CalendarCheck2}
-              label="Salida"
-              value={formatDate(reservation.departureDate)}
-            />
-            <ReservationFact icon={Clock3} label="Noches" value={String(reservation.nights)} />
-            <ReservationFact
-              icon={CreditCard}
-              label="Total"
-              value={formatCurrency(reservation.total, reservation.currency)}
-            />
-          </dl>
-
-          {reservation.payment ? (
-            <div className="mt-5 flex gap-3 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-midnight">
-              <CreditCard aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
-              <div>
-                <p className="font-semibold">Pago asociado</p>
-                <p className="text-ink/68">
-                  {reservation.payment.statusLabel} -{" "}
-                  {formatCurrency(reservation.payment.amount, reservation.payment.currency)}
-                </p>
-              </div>
-            </div>
-          ) : null}
-
-          {reservation.expiresAt && reservation.isActionable ? (
-            <div className="mt-5 flex gap-3 rounded-[6px] border border-terracotta/26 bg-terracotta/10 p-4 text-sm leading-6 text-midnight">
-              <Clock3 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-terracotta" />
-              <div>
-                <p className="font-semibold">Reserva temporal activa</p>
-                <p className="text-ink/68">Vence {formatDateTime(reservation.expiresAt)}.</p>
-              </div>
-            </div>
-          ) : null}
-
+    <>
+      <tr className={isSelected ? "bg-green/5" : "bg-white"}>
+        <td className="px-4 py-4 align-top">
+          <p className="break-words font-semibold text-midnight">{reservation.reservationCode}</p>
+          <span
+            className={
+              "mt-2 inline-flex w-fit rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold " +
+              reservationToneClasses[reservation.statusTone]
+            }
+          >
+            {reservation.statusLabel}
+          </span>
+        </td>
+        <td className="px-4 py-4 align-top">
+          <p className="font-semibold text-midnight">{reservation.propertyName}</p>
+          <p className="mt-1 text-xs leading-5 text-ink/62">
+            {reservation.unitName} / {reservation.propertyDestination}
+          </p>
+        </td>
+        <td className="px-4 py-4 align-top font-semibold text-midnight">
+          {formatDate(reservation.arrivalDate)}
+        </td>
+        <td className="px-4 py-4 align-top text-ink/68">{formatDate(reservation.departureDate)}</td>
+        <td className="px-4 py-4 align-top text-ink/68">
+          {reservation.payment ? reservation.payment.statusLabel : "Sin pago"}
+        </td>
+        <td className="px-4 py-4 align-top font-semibold text-midnight">
+          {formatCurrency(reservation.total, reservation.currency)}
+        </td>
+        <td className="px-4 py-4 text-right align-top">
           <button
             aria-controls={`guest-reservation-detail-${reservation.id}`}
             aria-expanded={isSelected}
-            className="focus-ring mt-5 inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
+            className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
             onClick={() => onSelect(reservation.id)}
             type="button"
           >
             <ClipboardList aria-hidden className="h-4 w-4" />
-            {isSelected ? "Ocultar detalle" : "Ver detalle"}
+            {isSelected ? "Ocultar" : "Ver"}
           </button>
-        </div>
-      </div>
-
+        </td>
+      </tr>
       {isSelected ? (
-        <div className="border-t border-line bg-white p-5 lg:p-6" id={`guest-reservation-detail-${reservation.id}`}>
-          <ReservationDetailPanel reservation={reservation} variant="embedded" />
-        </div>
+        <tr>
+          <td
+            className="bg-white px-4 py-5"
+            colSpan={7}
+            id={`guest-reservation-detail-${reservation.id}`}
+          >
+            <ReservationDetailPanel reservation={reservation} variant="embedded" />
+          </td>
+        </tr>
       ) : null}
-    </article>
+    </>
   );
+}
+
+function hasReservationFilters(filters: ReservationFilters) {
+  return Boolean(filters.query.trim() || filters.startDate || filters.endDate);
 }
 
 function ReservationDetailPanel({
@@ -770,11 +1060,11 @@ function ReservationDetailPanel({
               />
             </dl>
           ) : (
-            <p className="text-sm leading-6 text-ink/68">No hay pago asociado todavía.</p>
+            <p className="text-sm leading-6 text-ink/68">No hay pago asociado todavia.</p>
           )}
         </DetailSection>
 
-        <DetailSection icon={FileText} title="Confirmación">
+        <DetailSection icon={FileText} title="Confirmacion">
           <div className="text-sm leading-6 text-ink/68">
             <p className="font-semibold text-midnight">{reservation.confirmation.documentLabel}</p>
             <p className="mt-1">
@@ -817,26 +1107,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div className="min-h-14 rounded-[6px] border border-line bg-white px-3 py-2">
       <dt className="text-[0.68rem] font-semibold uppercase text-ink/45">{label}</dt>
       <dd className="mt-1 break-words text-sm font-semibold text-midnight">{value}</dd>
-    </div>
-  );
-}
-
-function ReservationFact({
-  icon: Icon,
-  label,
-  value
-}: {
-  icon: LucideIcon;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="min-h-[76px] rounded-[6px] border border-line p-3">
-      <dt className="flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
-        <Icon aria-hidden className="h-4 w-4 text-green" />
-        {label}
-      </dt>
-      <dd className="mt-2 text-sm font-semibold text-midnight">{value}</dd>
     </div>
   );
 }
@@ -896,8 +1166,9 @@ function NextStayPanel({ reservation }: { reservation: GuestReservation | null }
             </span>
           </div>
 
-          <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+          <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
             <DetailRow label="Destino" value={reservation.propertyDestination} />
+            <DetailRow label="Check-in" value={reservation.arrival.checkInWindow} />
             <DetailRow label="Salida" value={formatDate(reservation.departureDate)} />
             <DetailRow label="Reserva" value={reservation.reservationCode} />
           </dl>
@@ -906,7 +1177,6 @@ function NextStayPanel({ reservation }: { reservation: GuestReservation | null }
     </section>
   );
 }
-
 function AccessState({ isValidating }: { isValidating: boolean }) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-8 text-center shadow-soft">
@@ -969,7 +1239,6 @@ function SectionHeading({
     </div>
   );
 }
-
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("es-GT", {
