@@ -11,6 +11,10 @@ const publicContactEmailSchema = z.preprocess(
   (value) => (value === "" || value === undefined ? "info@kuquba.com" : value),
   z.string().email()
 );
+const ownerIntakeEmailSchema = z.preprocess(
+  (value) => (value === "" || value === undefined ? "propiedades@kuquba.com" : value),
+  z.string().email()
+);
 
 const envSchema = z
   .object({
@@ -23,6 +27,7 @@ const envSchema = z
     OTP_PROVIDER: z.enum(["dev", "resend"]).default("dev"),
     OTP_SIGNING_SECRET: optionalSecretSchema,
     KUQUBA_PUBLIC_CONTACT_EMAIL: publicContactEmailSchema,
+    KUQUBA_OWNER_INTAKE_EMAIL: ownerIntakeEmailSchema,
     RESEND_API_KEY: optionalSecretSchema,
     RESEND_FROM_EMAIL: z.preprocess(emptyToUndefined, z.string().min(3).optional()),
     FORMAL_DELIVERY_API_KEY: optionalSecretSchema,

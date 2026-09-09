@@ -17,6 +17,7 @@ import {
   toFinancialSnapshotInput
 } from "../modules/billing/guest-pricing";
 import { sendOwnerLeadConfirmationEmail } from "../modules/notifications/owner-lead-confirmation-email";
+import { sendOwnerLeadInternalNotificationEmail } from "../modules/notifications/owner-lead-internal-notification-email";
 import { sendReservationConfirmationEmail } from "../modules/notifications/reservation-confirmation-email";
 
 const dateOnlySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -395,6 +396,15 @@ export const registerPublicRoutes: FastifyPluginAsync = async (app) => {
       propertyName,
       request
     });
+
+    await deliverOwnerLeadInternalNotificationEmail({
+      body,
+      message,
+      ownerLead,
+      propertyName,
+      request
+    });
+
     return reply.code(201).send({
       ownerLead: {
         createdAt: ownerLead.createdAt.toISOString(),
@@ -1975,7 +1985,6 @@ function addUtcDays(date: Date, days: number) {
   return result;
 }
 
-
 function toDateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -2218,6 +2227,8 @@ type OwnerLeadConfirmationEmailAudit = {
   status: "ACCEPTED" | "FAILED" | "SKIPPED";
 };
 
+type OwnerLeadInternalNotificationEmailAudit = OwnerLeadConfirmationEmailAudit;
+
 async function deliverOwnerLeadConfirmationEmail(input: {
   body: z.infer<typeof ownerLeadSchema>;
   message: string | undefined;
@@ -2242,7 +2253,8 @@ async function deliverOwnerLeadConfirmationEmail(input: {
     const confirmationEmail = {
       error: null,
       provider: delivery.provider,
-      providerMessageId: delivery.status === "ACCEPTED" ? delivery.providerMessageId ?? null : null,
+      providerMessageId:
+        delivery.status === "ACCEPTED" ? (delivery.providerMessageId ?? null) : null,
       reason: delivery.status === "SKIPPED" ? delivery.reason : null,
       sentAt: delivery.sentAt.toISOString(),
       status: delivery.status
@@ -2276,6 +2288,67 @@ async function deliverOwnerLeadConfirmationEmail(input: {
     );
 
     return confirmationEmail;
+  }
+}
+async function deliverOwnerLeadInternalNotificationEmail(input: {
+  body: z.infer<typeof ownerLeadSchema>;
+  message: string | undefined;
+  ownerLead: { createdAt: Date; id: string };
+  propertyName: string | undefined;
+  request: Pick<FastifyRequest, "id" | "ip" | "log">;
+}): Promise<OwnerLeadInternalNotificationEmailAudit> {
+  try {
+    const delivery = await sendOwnerLeadInternalNotificationEmail({
+      createdAt: input.ownerLead.createdAt,
+      email: input.body.email.toLowerCase(),
+      leadId: input.ownerLead.id,
+      message: input.message ?? null,
+      operatingStatus: input.body.operatingStatus,
+      ownerName: input.body.ownerName,
+      phone: normalizeOptionalText(input.body.phone) ?? null,
+      propertyLocation: input.body.propertyLocation,
+      propertyName: input.propertyName ?? null,
+      propertyType: input.body.propertyType
+    });
+
+    const internalNotificationEmail = {
+      error: null,
+      provider: delivery.provider,
+      providerMessageId:
+        delivery.status === "ACCEPTED" ? (delivery.providerMessageId ?? null) : null,
+      reason: delivery.status === "SKIPPED" ? delivery.reason : null,
+      sentAt: delivery.sentAt.toISOString(),
+      status: delivery.status
+    } satisfies OwnerLeadInternalNotificationEmailAudit;
+
+    input.request.log.info(
+      {
+        internalNotificationEmail,
+        ownerLeadId: input.ownerLead.id
+      },
+      "owner_lead.internal_notification_email"
+    );
+
+    return internalNotificationEmail;
+  } catch (error) {
+    const internalNotificationEmail = {
+      error: error instanceof Error ? error.message : "unknown_error",
+      provider: "resend_email",
+      providerMessageId: null,
+      reason: null,
+      sentAt: new Date().toISOString(),
+      status: "FAILED"
+    } satisfies OwnerLeadInternalNotificationEmailAudit;
+
+    input.request.log.error(
+      {
+        err: error,
+        ownerLeadId: input.ownerLead.id
+      },
+      "owner_lead.internal_notification_email_failed"
+    );
+
+    return internalNotificationEmail;
   }
 }
 type ReservationConfirmationEmailAudit = {
@@ -2313,7 +2386,8 @@ async function deliverReservationConfirmationEmail(input: {
     const confirmationEmail = {
       error: null,
       provider: delivery.provider,
-      providerMessageId: delivery.status === "ACCEPTED" ? delivery.providerMessageId ?? null : null,
+      providerMessageId:
+        delivery.status === "ACCEPTED" ? (delivery.providerMessageId ?? null) : null,
       reason: delivery.status === "SKIPPED" ? delivery.reason : null,
       sentAt: delivery.sentAt.toISOString(),
       status: delivery.status
