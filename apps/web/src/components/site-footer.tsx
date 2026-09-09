@@ -1,5 +1,5 @@
-import { accessOptions } from "@kuquba/config";
-import { Camera, MessageCircle, ShieldCheck } from "lucide-react";
+import { accessOptions, publicContactEmail } from "@kuquba/config";
+import { Camera, Mail, MessageCircle, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 
 const footerNavigation = [
@@ -43,8 +43,16 @@ export function SiteFooter() {
             </div>
           </div>
           <p className="mt-5 max-w-xs text-sm leading-6 text-white/70">
-            Administramos estancias seleccionadas en la costa del Pacífico de Guatemala, con operación y soporte KUQUBA.
+            Administramos estancias seleccionadas en la costa del Pacífico de Guatemala, con
+            operación y soporte KUQUBA.
           </p>
+          <a
+            className="focus-ring mt-4 inline-flex items-center gap-2 rounded-[6px] text-sm font-semibold text-white/82 transition hover:text-white"
+            href={`mailto:${publicContactEmail}`}
+          >
+            <Mail aria-hidden className="h-4 w-4 text-beige" />
+            {publicContactEmail}
+          </a>
           <div className="mt-6 flex gap-3">
             {footerActions.map((action) => {
               const Icon = action.icon;

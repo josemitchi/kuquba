@@ -12,6 +12,8 @@ export const kuqubaBrand = {
   }
 } as const;
 
+export const publicContactEmail = "info@kuquba.com" as const;
+
 export const publicNavigation = [
   { label: "Estancias", href: "#estancias" },
   { label: "Propietarios", href: "#propietarios" },
