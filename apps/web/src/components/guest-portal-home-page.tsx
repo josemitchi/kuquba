@@ -2,13 +2,11 @@
 
 import {
   ArrowLeft,
-  BadgeCheck,
   Cake,
   CalendarCheck2,
   CheckCircle2,
   ChevronDown,
   ClipboardList,
-  Clock3,
   CreditCard,
   DoorOpen,
   FileText,
@@ -39,7 +37,6 @@ import type {
   GuestReservationTone
 } from "@/data/guest-portal";
 
-const metricIcons: LucideIcon[] = [CalendarCheck2, Clock3, CreditCard];
 const protectedPortalSummary =
   "Vista protegida para huespedes verificados. Tus reservas, pagos y datos de llegada se cargan desde una sesion vigente.";
 
@@ -312,27 +309,21 @@ function GuestDashboard({
       isConfirmedUpcomingReservation(reservation, todayDateKey)
     )
   );
-  const pendingReservations = sortReservationsByArrival(
-    snapshot.reservations.filter(isPendingReservation)
-  );
   const historyReservations = sortReservationsByArrivalDesc(
     snapshot.reservations.filter((reservation) =>
       isHistoricalReservation(reservation, todayDateKey)
     )
   );
   const filteredConfirmedReservations = filterReservations(confirmedReservations, confirmedFilters);
-  const filteredPendingReservations = filterReservations(pendingReservations, confirmedFilters);
   const filteredHistoryReservations = filterReservations(historyReservations, historyFilters);
   const defaultSelectedReservationId = getDefaultSelectedReservationId({
     confirmedReservations,
     historyReservations,
-    nextStay: snapshot.nextStay,
-    pendingReservations
+    nextStay: snapshot.nextStay
   });
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(
     defaultSelectedReservationId
   );
-  const summaryMetrics = snapshot.metrics.filter((metric) => metric.label !== "Proxima llegada");
 
   useEffect(() => {
     setSelectedReservationId(defaultSelectedReservationId);
@@ -344,31 +335,14 @@ function GuestDashboard({
 
   return (
     <>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-stretch">
-        <NextStayPanel reservation={snapshot.nextStay} />
-
-        {summaryMetrics.length > 0 ? (
-          <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
-            {summaryMetrics.map((metric, index) => (
-              <MetricCard
-                icon={metricIcons[index] ?? BadgeCheck}
-                key={metric.label}
-                metric={metric}
-              />
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <section className="mt-8">
+      <section>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <SectionHeading
             eyebrow="Portal de huesped"
             title="Reservas y perfil"
             value={getTabSummary(activeTab, {
               confirmedCount: confirmedReservations.length,
-              historyCount: historyReservations.length,
-              pendingCount: pendingReservations.length
+              historyCount: historyReservations.length
             })}
           />
 
@@ -405,6 +379,8 @@ function GuestDashboard({
 
         {activeTab === "confirmed" ? (
           <div className="mt-5 space-y-6">
+            <NextStayPanel reservation={snapshot.nextStay} />
+
             <ReservationTable
               emptyDescription="Aqui apareceran tus reservas confirmadas por realizar."
               emptyTitle="Sin reservas confirmadas"
@@ -417,28 +393,13 @@ function GuestDashboard({
               title="Reservas confirmadas"
               totalCount={confirmedReservations.length}
             />
-
-            {pendingReservations.length > 0 ? (
-              <ReservationTable
-                emptyDescription="No hay reservas temporales que coincidan con los filtros actuales."
-                emptyTitle="Sin pendientes visibles"
-                filters={confirmedFilters}
-                icon={Clock3}
-                onFiltersChange={setConfirmedFilters}
-                onSelect={handleReservationDetail}
-                reservations={filteredPendingReservations}
-                selectedReservationId={selectedReservationId}
-                title="Pendientes de confirmacion"
-                totalCount={pendingReservations.length}
-              />
-            ) : null}
           </div>
         ) : null}
 
         {activeTab === "history" ? (
           <ReservationTable
-            emptyDescription="Cuando una estancia finalice o una reserva quede vencida, se movera a este historial."
-            emptyTitle="Historial pendiente"
+            emptyDescription="Cuando una estancia finalice o pase su fecha de salida, aparecera aqui."
+            emptyTitle="Sin historial"
             filters={historyFilters}
             icon={History}
             onFiltersChange={setHistoryFilters}
@@ -466,7 +427,7 @@ function GuestDashboard({
 
 function getTabSummary(
   activeTab: GuestDashboardTab,
-  counts: { confirmedCount: number; historyCount: number; pendingCount: number }
+  counts: { confirmedCount: number; historyCount: number }
 ) {
   if (activeTab === "profile") {
     return "Datos de acceso";
@@ -476,20 +437,17 @@ function getTabSummary(
     return String(counts.historyCount) + " registro(s)";
   }
 
-  const pendingSuffix = counts.pendingCount > 0 ? ` / ${counts.pendingCount} pendiente(s)` : "";
-  return String(counts.confirmedCount) + " confirmada(s)" + pendingSuffix;
+  return String(counts.confirmedCount) + " confirmada(s)";
 }
 
 function getDefaultSelectedReservationId(input: {
   confirmedReservations: GuestReservation[];
   historyReservations: GuestReservation[];
   nextStay: GuestReservation | null;
-  pendingReservations: GuestReservation[];
 }) {
   return (
     input.nextStay?.id ??
     input.confirmedReservations[0]?.id ??
-    input.pendingReservations[0]?.id ??
     input.historyReservations[0]?.id ??
     null
   );
@@ -499,25 +457,13 @@ function isConfirmedUpcomingReservation(reservation: GuestReservation, todayDate
   return reservation.status === "CONFIRMED" && reservation.departureDate >= todayDateKey;
 }
 
-function isPendingReservation(reservation: GuestReservation) {
-  return (
-    (reservation.status === "HOLD" || reservation.status === "PENDING_PAYMENT") &&
-    reservation.isActionable
-  );
-}
-
 function isHistoricalReservation(reservation: GuestReservation, todayDateKey: string) {
-  if (isPendingReservation(reservation)) {
-    return false;
-  }
-
   if (reservation.status === "CONFIRMED") {
     return reservation.departureDate < todayDateKey;
   }
 
-  return true;
+  return reservation.status === "COMPLETED";
 }
-
 function sortReservationsByArrival(reservations: GuestReservation[]) {
   return [...reservations].sort(
     (left, right) => getDateKeyTime(left.arrivalDate) - getDateKeyTime(right.arrivalDate)
@@ -576,23 +522,6 @@ function getTodayDateKey() {
 }
 function getDateKeyTime(value: string) {
   return new Date(value + "T00:00:00.000Z").getTime();
-}
-
-function MetricCard({
-  icon: Icon,
-  metric
-}: {
-  icon: LucideIcon;
-  metric: GuestPortalSnapshot["metrics"][number];
-}) {
-  return (
-    <article className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
-      <Icon aria-hidden className="h-6 w-6 text-green" />
-      <p className="mt-4 text-xs font-semibold uppercase text-ink/48">{metric.label}</p>
-      <p className="mt-1 text-2xl font-semibold text-midnight">{metric.value}</p>
-      <p className="mt-2 text-sm leading-6 text-ink/62">{metric.hint}</p>
-    </article>
-  );
 }
 
 function GuestProfilePanel({
@@ -811,15 +740,15 @@ function ReservationTable({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[920px] table-fixed border-t border-line text-left text-sm">
+          <table className="w-full min-w-[980px] table-fixed border-t border-line text-left text-sm">
             <colgroup>
-              <col className="w-[17%]" />
-              <col className="w-[24%]" />
+              <col className="w-[15%]" />
+              <col className="w-[30%]" />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
-              <col className="w-[14%]" />
-              <col className="w-[11%]" />
+              <col className="w-[13%]" />
               <col className="w-[10%]" />
+              <col className="w-[8%]" />
             </colgroup>
             <thead className="bg-ivory text-xs uppercase text-ink/50">
               <tr>
@@ -928,7 +857,7 @@ function ReservationTableRow({
 }) {
   return (
     <>
-      <tr className={isSelected ? "bg-green/5" : "bg-white"}>
+      <tr className={isSelected ? "bg-green/5" : "bg-white hover:bg-ivory/70"}>
         <td className="px-4 py-4 align-top">
           <p className="break-words font-semibold text-midnight">{reservation.reservationCode}</p>
           <span
@@ -941,10 +870,23 @@ function ReservationTableRow({
           </span>
         </td>
         <td className="px-4 py-4 align-top">
-          <p className="font-semibold text-midnight">{reservation.propertyName}</p>
-          <p className="mt-1 text-xs leading-5 text-ink/62">
-            {reservation.unitName} / {reservation.propertyDestination}
-          </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-[6px] border border-line bg-midnight">
+              <Image
+                alt={reservation.propertyImageAlt}
+                className="object-cover"
+                fill
+                sizes="80px"
+                src={reservation.propertyImageUrl}
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-midnight">{reservation.propertyName}</p>
+              <p className="mt-1 text-xs leading-5 text-ink/62">
+                {reservation.unitName} / {reservation.propertyDestination}
+              </p>
+            </div>
+          </div>
         </td>
         <td className="px-4 py-4 align-top font-semibold text-midnight">
           {formatDate(reservation.arrivalDate)}

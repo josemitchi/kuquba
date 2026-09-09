@@ -98,8 +98,8 @@ export const registerGuestRoutes: FastifyPluginAsync = async (app) => {
       result: "SUCCESS",
       reason: "guest_portal_loaded",
       nextValue: {
-        activeHoldCount:
-          portal.metrics.find((metric) => metric.label === "Reservas temporales")?.value ?? "0",
+        confirmedReservationCount:
+          portal.metrics.find((metric) => metric.label === "Reservas")?.value ?? "0",
         reservationCount: portal.reservations.length
       }
     });
@@ -339,12 +339,17 @@ function buildGuestPortal(
   now: Date
 ) {
   const reservations = guest.reservations.filter(
-    (reservation) => reservation.status !== "CANCELLED"
+    (reservation) => reservation.status === "CONFIRMED" || reservation.status === "COMPLETED"
   );
-  const activeReservations = reservations.filter((reservation) =>
-    isActiveGuestReservation(reservation, now)
+  const upcomingReservations = reservations.filter(
+    (reservation) =>
+      reservation.status === "CONFIRMED" && reservation.departureDate.getTime() >= now.getTime()
   );
-  const activeHolds = reservations.filter((reservation) => isActiveGuestHold(reservation, now));
+  const historicalReservations = reservations.filter(
+    (reservation) =>
+      reservation.status === "COMPLETED" ||
+      (reservation.status === "CONFIRMED" && reservation.departureDate.getTime() < now.getTime())
+  );
   const pendingPayments = reservations.filter((reservation) =>
     reservation.payments.some(
       (payment) =>
@@ -355,10 +360,7 @@ function buildGuestPortal(
   const paidReservations = reservations.filter((reservation) =>
     reservation.payments.some((payment) => payment.status === "SUCCEEDED")
   );
-  const nextStay = reservations.find(
-    (reservation) =>
-      reservation.status === "CONFIRMED" && reservation.departureDate.getTime() >= now.getTime()
-  );
+  const nextStay = upcomingReservations[0] ?? null;
 
   return {
     guestName: guest.fullName,
@@ -366,14 +368,14 @@ function buildGuestPortal(
     summary: "Consulta tus reservas, pagos, codigos privados y datos de llegada en un solo lugar.",
     metrics: [
       {
-        hint: "Confirmadas y reservas temporales vigentes",
+        hint: "Confirmadas por realizar",
         label: "Reservas",
-        value: String(activeReservations.length)
+        value: String(upcomingReservations.length)
       },
       {
-        hint: "Apartan inventario por tiempo limitado",
-        label: "Reservas temporales",
-        value: String(activeHolds.length)
+        hint: "Estancias cerradas o pasadas",
+        label: "Historial",
+        value: String(historicalReservations.length)
       },
       {
         hint: nextStay ? nextStay.property.name : "Sin reserva confirmada",
@@ -398,7 +400,7 @@ function buildGuestPortal(
     reservations: reservations.map((reservation) => mapGuestReservation(reservation, now)),
     governance: [
       "El portal solo muestra reservas vinculadas al perfil del huesped autenticado.",
-      "Las reservas temporales vencidas se retiran de disponibilidad antes de mostrar esta vista.",
+      "Las reservas se separan entre proximas llegadas confirmadas e historial.",
       "Lectura auditada para sesion " + session.sessionId.slice(0, 8) + "."
     ]
   };
@@ -450,40 +452,37 @@ function mapGuestReservation(reservation: GuestReservationRecord, now: Date) {
 }
 
 function buildGuestArrivalInfo(reservation: GuestReservationRecord) {
-  const isConfirmed = reservation.status === "CONFIRMED";
+  const hasConfirmedStay = reservation.status === "CONFIRMED" || reservation.status === "COMPLETED";
 
   return {
-    checkInWindow: isConfirmed ? "15:00 - 20:00" : "Se confirma al completar reserva",
+    checkInWindow: hasConfirmedStay ? "15:00 - 20:00" : "Se confirma al completar reserva",
     checkOutTime: "11:00",
     destination: reservation.property.destination,
-    instructions: isConfirmed
+    instructions: hasConfirmedStay
       ? [
           "El equipo KUQUBA coordinara la llegada antes del check-in.",
           "Ten a mano tu codigo de reserva al llegar.",
           "La ocupacion debe coincidir con la reserva confirmada."
         ]
-      : [
-          "Completa el pago para confirmar llegada y liberar instrucciones finales.",
-          "Mientras la reserva temporal este vigente, las fechas permanecen apartadas."
-        ],
-    readinessLabel: isConfirmed
-      ? "Llegada coordinable"
-      : reservation.status === "HOLD"
-        ? "Pendiente de pago"
-        : "Sin llegada activa"
+      : ["Completa el pago para confirmar llegada y liberar instrucciones finales."],
+    readinessLabel:
+      reservation.status === "CONFIRMED"
+        ? "Llegada coordinable"
+        : reservation.status === "COMPLETED"
+          ? "Estancia completada"
+          : "Sin llegada activa"
   };
 }
-
 function buildGuestConfirmationInfo(
   reservation: GuestReservationRecord,
   latestPayment: ReturnType<typeof getLatestPayment>
 ) {
-  const isConfirmed = reservation.status === "CONFIRMED";
+  const hasConfirmedStay = reservation.status === "CONFIRMED" || reservation.status === "COMPLETED";
   const paymentConfirmed = latestPayment?.status === "SUCCEEDED";
 
   return {
-    documentLabel: isConfirmed ? "Confirmacion de reserva" : "Comprobante pendiente",
-    documentStatus: isConfirmed ? "Disponible" : "No disponible",
+    documentLabel: hasConfirmedStay ? "Confirmacion de reserva" : "Comprobante pendiente",
+    documentStatus: hasConfirmedStay ? "Disponible" : "No disponible",
     reference: reservation.privateCode,
     sections: [
       `Reserva ${reservation.privateCode}`,
@@ -491,8 +490,8 @@ function buildGuestConfirmationInfo(
       `${toDateOnly(reservation.arrivalDate)} a ${toDateOnly(reservation.departureDate)}`,
       paymentConfirmed ? "Pago confirmado" : "Pago pendiente o no asociado"
     ],
-    shareable: isConfirmed,
-    statusLabel: isConfirmed ? "Confirmada para consulta" : "Pendiente de confirmacion"
+    shareable: hasConfirmedStay,
+    statusLabel: hasConfirmedStay ? "Confirmada para consulta" : "Pendiente de confirmacion"
   };
 }
 
@@ -530,14 +529,6 @@ function paymentStatusLabel(status: string) {
   }
 
   return "Pago vencido";
-}
-
-function isActiveGuestReservation(reservation: GuestReservationRecord, now: Date) {
-  if (reservation.status === "CONFIRMED") {
-    return true;
-  }
-
-  return isActiveGuestHold(reservation, now);
 }
 
 function isActiveGuestHold(reservation: GuestReservationRecord, now: Date) {
