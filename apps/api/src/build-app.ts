@@ -48,7 +48,9 @@ export async function configureApp(app: FastifyInstance) {
 
   await app.register(cors, {
     origin: corsOrigins,
-    credentials: true
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PATCH", "OPTIONS"],
+    allowedHeaders: ["content-type", "x-kuquba-dev-session"]
   });
 
   await app.register(sensible);

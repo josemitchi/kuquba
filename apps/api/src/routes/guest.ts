@@ -595,17 +595,37 @@ function parseNullableDateOnly(value: string | null | undefined) {
     return null;
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+  const dateOnly = normalizeDateOnlyInput(normalized);
+
+  if (!dateOnly) {
     return undefined;
   }
 
-  const date = new Date(normalized + "T00:00:00.000Z");
+  const date = new Date(dateOnly + "T00:00:00.000Z");
 
-  if (Number.isNaN(date.getTime()) || toDateOnly(date) !== normalized) {
+  if (Number.isNaN(date.getTime()) || toDateOnly(date) !== dateOnly) {
     return undefined;
   }
 
   return date;
+}
+
+function normalizeDateOnlyInput(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const slashDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value);
+
+  if (!slashDate) {
+    return null;
+  }
+
+  const day = slashDate[1]!;
+  const month = slashDate[2]!;
+  const year = slashDate[3]!;
+
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
 function toDateOnly(date: Date) {

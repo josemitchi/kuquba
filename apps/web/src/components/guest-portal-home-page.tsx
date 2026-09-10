@@ -57,6 +57,11 @@ type GuestProfileResponse = {
   profile: GuestProfile;
 };
 
+type GuestProfileErrorResponse = {
+  correlationId?: string;
+  error?: string;
+};
+
 type ProfileSaveState = "idle" | "saving" | "success" | "error";
 
 export function GuestPortalHomePage() {
@@ -163,23 +168,23 @@ export function GuestPortalHomePage() {
       </header>
 
       <section className="border-b border-line bg-white">
-        <div className="container-shell py-8">
-          <div className="max-w-4xl">
-            <p className="inline-flex items-center gap-2 rounded-full border border-green/20 bg-green/10 px-4 py-2 text-sm font-semibold text-green">
+        <div className="container-shell py-5 md:py-6">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full border border-green/20 bg-green/10 px-3 py-1.5 text-xs font-semibold text-green">
               <DoorOpen aria-hidden className="h-4 w-4" />
               Huespedes
             </p>
-            <h1 className="mt-5 font-display text-4xl leading-tight text-midnight md:text-5xl">
+            <h1 className="mt-3 font-display text-3xl leading-tight text-midnight md:text-4xl">
               Reservas y llegada
             </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/68">
               {portal?.summary ?? protectedPortalSummary}
             </p>
           </div>
         </div>
       </section>
 
-      <section className="container-shell py-8">
+      <section className="container-shell py-6">
         {session ? (
           portal ? (
             <GuestDashboard
@@ -539,6 +544,7 @@ function GuestProfilePanel({
     phone: profile.phone
   });
   const [saveState, setSaveState] = useState<ProfileSaveState>("idle");
+  const [profileErrorMessage, setProfileErrorMessage] = useState("");
   const isSaving = saveState === "saving";
 
   useEffect(() => {
@@ -551,6 +557,7 @@ function GuestProfilePanel({
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    setProfileErrorMessage("");
     setSaveState("idle");
   }
 
@@ -558,16 +565,26 @@ function GuestProfilePanel({
     event.preventDefault();
 
     if (form.fullName.trim().length < 2) {
+      setProfileErrorMessage("Ingresa el nombre completo del huesped.");
       setSaveState("error");
       return;
     }
 
+    const dateOfBirth = normalizeProfileDateForApi(form.dateOfBirth);
+
+    if (dateOfBirth === undefined) {
+      setProfileErrorMessage("Revisa la fecha de nacimiento. Usa una fecha valida.");
+      setSaveState("error");
+      return;
+    }
+
+    setProfileErrorMessage("");
     setSaveState("saving");
 
     try {
       const response = await fetch(`${getDevPortalApiBaseUrl()}/api/guest/profile`, {
         body: JSON.stringify({
-          dateOfBirth: form.dateOfBirth || null,
+          dateOfBirth,
           fullName: form.fullName.trim(),
           phone: form.phone.trim() || null
         }),
@@ -579,13 +596,18 @@ function GuestProfilePanel({
       });
 
       if (!response.ok) {
-        throw new Error("guest_profile_update_failed");
+        const errorPayload = await readGuestProfileError(response);
+        throw new Error(getGuestProfileErrorMessage(errorPayload?.error));
       }
 
       const payload = (await response.json()) as GuestProfileResponse;
       onProfileUpdated(payload.profile);
+      setProfileErrorMessage("");
       setSaveState("success");
-    } catch {
+    } catch (error) {
+      setProfileErrorMessage(
+        error instanceof Error ? error.message : getGuestProfileErrorMessage()
+      );
       setSaveState("error");
     }
   }
@@ -652,6 +674,7 @@ function GuestProfilePanel({
               className="focus-ring min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm text-midnight outline-none [color-scheme:light]"
               name="dateOfBirth"
               onChange={(event) => updateField("dateOfBirth", event.target.value)}
+              max={getTodayDateKey()}
               type="date"
               value={form.dateOfBirth}
             />
@@ -674,7 +697,8 @@ function GuestProfilePanel({
         ) : null}
         {saveState === "error" ? (
           <p className="rounded-[6px] border border-terracotta/30 bg-terracotta/10 px-3 py-2 text-xs font-semibold text-terracotta">
-            No se pudo actualizar el perfil. Revisa los datos e intenta de nuevo.
+            {profileErrorMessage ||
+              "No se pudo actualizar el perfil. Revisa los datos e intenta de nuevo."}
           </p>
         ) : null}
       </form>
@@ -682,6 +706,57 @@ function GuestProfilePanel({
   );
 }
 
+async function readGuestProfileError(response: Response) {
+  try {
+    return (await response.json()) as GuestProfileErrorResponse;
+  } catch {
+    return null;
+  }
+}
+
+function getGuestProfileErrorMessage(error?: string) {
+  if (error === "guest_profile_invalid_date_of_birth") {
+    return "Revisa la fecha de nacimiento. Usa una fecha valida.";
+  }
+
+  if (error === "guest_profile_invalid_payload") {
+    return "Revisa nombre, telefono y fecha de nacimiento.";
+  }
+
+  if (error === "invalid_or_expired_session" || error === "missing_session") {
+    return "Tu sesion vencio. Ingresa nuevamente al portal.";
+  }
+
+  if (error === "missing_permission") {
+    return "Tu sesion no tiene permiso para actualizar el perfil.";
+  }
+
+  return "No se pudo actualizar el perfil. Intenta de nuevo en unos minutos.";
+}
+
+function normalizeProfileDateForApi(value: string) {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  const slashDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(normalized);
+
+  if (!slashDate) {
+    return undefined;
+  }
+
+  const day = slashDate[1]!;
+  const month = slashDate[2]!;
+  const year = slashDate[3]!;
+
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+}
 function ReservationTable({
   emptyDescription,
   emptyTitle,
@@ -1075,23 +1150,23 @@ function NextStayPanel({ reservation }: { reservation: GuestReservation | null }
 
   return (
     <section className="overflow-hidden rounded-[8px] border border-line bg-white shadow-soft">
-      <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
-        <div className="relative min-h-52 bg-midnight lg:min-h-full">
+      <div className="grid gap-0 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <div className="relative min-h-36 bg-midnight sm:min-h-40 lg:min-h-full">
           <Image
             alt={reservation.propertyImageAlt}
             className="object-cover"
             fill
             priority
-            sizes="(min-width: 1024px) 260px, 100vw"
+            sizes="(min-width: 1024px) 200px, 100vw"
             src={reservation.propertyImageUrl}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-midnight/45 to-transparent" />
         </div>
-        <div className="p-6">
+        <div className="p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase text-green">Proxima llegada</p>
-              <h2 className="mt-1 font-display text-3xl leading-tight text-midnight">
+              <h2 className="mt-1 font-display text-2xl leading-tight text-midnight md:text-3xl">
                 {formatDate(reservation.arrivalDate)}
               </h2>
               <p className="mt-2 text-sm leading-6 text-ink/68">
@@ -1108,7 +1183,7 @@ function NextStayPanel({ reservation }: { reservation: GuestReservation | null }
             </span>
           </div>
 
-          <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2 xl:grid-cols-4">
             <DetailRow label="Destino" value={reservation.propertyDestination} />
             <DetailRow label="Check-in" value={reservation.arrival.checkInWindow} />
             <DetailRow label="Salida" value={formatDate(reservation.departureDate)} />
