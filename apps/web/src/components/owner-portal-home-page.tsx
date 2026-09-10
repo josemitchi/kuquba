@@ -233,23 +233,23 @@ export function OwnerPortalHomePage() {
       </header>
 
       <section className="border-b border-line bg-white">
-        <div className="container-shell py-8">
-          <div className="max-w-4xl">
-            <p className="inline-flex items-center gap-2 rounded-full border border-green/20 bg-green/10 px-4 py-2 text-sm font-semibold text-green">
+        <div className="container-shell py-5 md:py-6">
+          <div className="max-w-3xl">
+            <p className="inline-flex items-center gap-2 rounded-full border border-green/20 bg-green/10 px-3 py-1.5 text-xs font-semibold text-green">
               <Building2 aria-hidden className="h-4 w-4" />
               Propietarios
             </p>
-            <h1 className="mt-5 font-display text-4xl leading-tight text-midnight md:text-5xl">
+            <h1 className="mt-3 font-display text-3xl leading-tight text-midnight md:text-4xl">
               Portfolio y operacion de propiedades
             </h1>
-            <p className="mt-4 max-w-3xl text-base leading-7 text-ink/72">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/68">
               {portal?.summary ?? protectedPortalSummary}
             </p>
           </div>
         </div>
       </section>
 
-      <section className="container-shell py-8">
+      <section className="container-shell py-6">
         {session ? (
           portal ? (
             <OwnerDashboard
@@ -746,6 +746,8 @@ function PropertyCard({
             </button>
           </div>
 
+          <PropertySplitStrip contract={property.contract} />
+
           <dl className="mt-5 grid gap-3 text-sm text-ink/72 sm:grid-cols-3">
             <PropertyFact
               icon={CalendarCheck2}
@@ -765,6 +767,55 @@ function PropertyCard({
   );
 }
 
+function PropertySplitStrip({ contract }: { contract: OwnerProperty["contract"] }) {
+  const split = getContractSplitTerms(contract);
+
+  return (
+    <dl className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs">
+      {split.map((term) => (
+        <div
+          className="inline-flex min-h-8 items-center gap-2 rounded-full border border-green/20 bg-green/10 px-3 py-1 text-midnight"
+          key={term.label}
+        >
+          <dt className="font-semibold uppercase text-ink/48">{term.label}</dt>
+          <dd className="font-semibold text-green">{term.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function PropertySplitOverview({ contract }: { contract: OwnerProperty["contract"] }) {
+  const split = getContractSplitTerms(contract);
+
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className="text-xs font-semibold uppercase text-green">Participacion contractual</p>
+      <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        {split.map((term) => (
+          <div className="rounded-[6px] border border-line bg-white px-3 py-2" key={term.label}>
+            <dt className="text-xs font-semibold uppercase text-ink/48">{term.label}</dt>
+            <dd className="mt-1 text-lg font-semibold text-midnight">{term.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function getContractSplitTerms(contract: OwnerProperty["contract"]) {
+  const ownerTerm = contract.terms.find((term) => {
+    const label = term.label.toLowerCase();
+
+    return label.includes("propietario") || label.includes("owner");
+  });
+  const kuqubaTerm = contract.terms.find((term) => term.label.toLowerCase().includes("kuquba"));
+
+  return [
+    { label: "Propietario", value: ownerTerm?.value ?? "Por definir" },
+    { label: "KUQUBA", value: kuqubaTerm?.value ?? "Por definir" }
+  ];
+}
 function PropertySummaryPanel({ property }: { property: OwnerProperty }) {
   return (
     <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
@@ -786,6 +837,9 @@ function PropertySummaryPanel({ property }: { property: OwnerProperty }) {
               </div>
             ))}
           </div>
+
+          <PropertySplitOverview contract={property.contract} />
+
           <div className="mt-5 flex flex-wrap gap-2">
             {[property.reviewLabel, ...property.highlights].map((item) => (
               <span

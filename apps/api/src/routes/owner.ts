@@ -383,7 +383,7 @@ function buildOwnerPortal(owner: OwnerPortalRecord, session: AuthorizedDevPortal
     ownerName: owner.displayName,
     periodLabel: formatMonthYear(new Date()),
     summary:
-      "Vista para revisar propiedades asignadas, estancias proximas, pendientes operativos, contratos y cierre documental sin exponer reglas financieras definitivas.",
+      "Vista para revisar propiedades asignadas, estancias proximas, pendientes operativos, contratos y participacion financiera contractual.",
     metrics: [
       {
         hint: `${activeCount} operativa(s), ${activationCount} en activacion`,
@@ -497,7 +497,7 @@ function buildPropertySummary(contract: OwnerContractRecord, tasks: OwnerPortalR
     imageAlt: `Vista operativa de ${property.name}`,
     location: property.destination,
     name: property.name,
-    estimatedRevenue: buildOwnerPropertyRevenue(activeReservations),
+    estimatedRevenue: buildOwnerPropertyRevenue(activeReservations, contract.ownerShareBps),
     nextArrival: nextReservation
       ? formatDateLabel(nextReservation.arrivalDate, true)
       : "Pendiente de publicacion",
@@ -539,7 +539,10 @@ function buildOwnerPropertyImage(destination: string) {
     return "/images/pacific-paredon-beach-house.png";
   }
 
-  if (normalizedDestination.includes("monterrico") || normalizedDestination.includes("puerto san jose")) {
+  if (
+    normalizedDestination.includes("monterrico") ||
+    normalizedDestination.includes("puerto san jose")
+  ) {
     return "/images/pacific-family-villa.png";
   }
 
@@ -583,13 +586,13 @@ function mapOwnerAvailabilityBlock(block: OwnerAvailabilityBlockRecord) {
   };
 }
 
-function buildOwnerPropertyRevenue(reservations: OwnerReservationRecord[]) {
+function buildOwnerPropertyRevenue(reservations: OwnerReservationRecord[], ownerShareBps: number) {
   const confirmed = reservations.filter((reservation) => reservation.status === "CONFIRMED");
   const gross = confirmed.reduce(
     (sum, reservation) => sum + Number(reservation.total?.toString() ?? "0"),
     0
   );
-  const estimatedOwner = gross * 0.82;
+  const estimatedOwner = gross * (ownerShareBps / 10_000);
 
   return {
     confirmedCount: confirmed.length,
