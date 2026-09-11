@@ -814,40 +814,55 @@ function ReservationTable({
           </p>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] table-fixed border-t border-line text-left text-sm">
-            <colgroup>
-              <col className="w-[15%]" />
-              <col className="w-[27%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
-              <col className="w-[13%]" />
-              <col className="w-[10%]" />
-              <col className="w-[11%]" />
-            </colgroup>
-            <thead className="bg-ivory text-xs uppercase text-ink/50">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Reserva</th>
-                <th className="px-4 py-3 font-semibold">Estancia</th>
-                <th className="px-4 py-3 font-semibold">Llegada</th>
-                <th className="px-4 py-3 font-semibold">Salida</th>
-                <th className="px-4 py-3 font-semibold">Pago</th>
-                <th className="px-4 py-3 font-semibold">Total</th>
-                <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">Detalle</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {reservations.map((reservation) => (
-                <ReservationTableRow
-                  isSelected={reservation.id === selectedReservationId}
-                  key={reservation.id}
-                  onSelect={onSelect}
-                  reservation={reservation}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="divide-y divide-line xl:hidden">
+            {reservations.map((reservation) => (
+              <ReservationMobileRow
+                isSelected={reservation.id === selectedReservationId}
+                key={reservation.id}
+                onSelect={onSelect}
+                reservation={reservation}
+              />
+            ))}
+          </div>
+
+          <div className="hidden overflow-x-auto xl:block">
+            <table className="w-full min-w-[1040px] table-fixed border-t border-line text-left text-sm">
+              <colgroup>
+                <col className="w-[15%]" />
+                <col className="w-[25%]" />
+                <col className="w-[12%]" />
+                <col className="w-[12%]" />
+                <col className="w-[13%]" />
+                <col className="w-[10%]" />
+                <col className="w-[11%]" />
+                <col className="w-[2%]" />
+              </colgroup>
+              <thead className="bg-ivory text-xs uppercase text-ink/50">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Reserva</th>
+                  <th className="px-4 py-3 font-semibold">Estancia</th>
+                  <th className="px-4 py-3 font-semibold">Llegada</th>
+                  <th className="px-4 py-3 font-semibold">Salida</th>
+                  <th className="px-4 py-3 font-semibold">Pago</th>
+                  <th className="px-4 py-3 font-semibold">Total</th>
+                  <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">Detalle</th>
+                  <th aria-hidden className="px-0 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {reservations.map((reservation) => (
+                  <ReservationTableRow
+                    isSelected={reservation.id === selectedReservationId}
+                    key={reservation.id}
+                    onSelect={onSelect}
+                    reservation={reservation}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </section>
   );
@@ -921,6 +936,93 @@ function ReservationFilterBar({
   );
 }
 
+function ReservationMobileRow({
+  isSelected,
+  onSelect,
+  reservation
+}: {
+  isSelected: boolean;
+  onSelect: (reservationId: string) => void;
+  reservation: GuestReservation;
+}) {
+  const detailId = `guest-reservation-detail-card-${reservation.id}`;
+
+  return (
+    <article className={isSelected ? "bg-green/5 p-4" : "bg-white p-4"}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-base font-semibold text-midnight">
+            {reservation.reservationCode}
+          </p>
+          <span
+            className={
+              "mt-2 inline-flex w-fit rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold " +
+              reservationToneClasses[reservation.statusTone]
+            }
+          >
+            {reservation.statusLabel}
+          </span>
+        </div>
+        <p className="shrink-0 text-right text-sm font-semibold text-midnight">
+          {formatCurrency(reservation.total, reservation.currency)}
+        </p>
+      </div>
+
+      <div className="mt-4 flex min-w-0 gap-3">
+        <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-[6px] border border-line bg-midnight">
+          <Image
+            alt={reservation.propertyImageAlt}
+            className="object-cover"
+            fill
+            sizes="96px"
+            src={reservation.propertyImageUrl}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-semibold text-midnight">{reservation.propertyName}</p>
+          <p className="mt-1 break-words text-sm leading-5 text-ink/62">
+            {reservation.unitName} / {reservation.propertyDestination}
+          </p>
+        </div>
+      </div>
+
+      <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+        <ReservationMobileFact label="Llegada" value={formatDate(reservation.arrivalDate)} />
+        <ReservationMobileFact label="Salida" value={formatDate(reservation.departureDate)} />
+        <ReservationMobileFact
+          label="Pago"
+          value={reservation.payment ? reservation.payment.statusLabel : "Sin pago"}
+        />
+      </dl>
+
+      <button
+        aria-controls={detailId}
+        aria-expanded={isSelected}
+        className="focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
+        onClick={() => onSelect(reservation.id)}
+        type="button"
+      >
+        <ClipboardList aria-hidden className="h-4 w-4 shrink-0" />
+        {isSelected ? "Ocultar detalle" : "Ver detalle"}
+      </button>
+
+      {isSelected ? (
+        <div className="mt-5 border-t border-line pt-5" id={detailId}>
+          <ReservationDetailPanel reservation={reservation} variant="embedded" />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ReservationMobileFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[6px] border border-line bg-white px-3 py-2">
+      <dt className="text-[0.68rem] font-semibold uppercase text-ink/45">{label}</dt>
+      <dd className="mt-1 break-words font-semibold text-midnight">{value}</dd>
+    </div>
+  );
+}
 function ReservationTableRow({
   isSelected,
   onSelect,
@@ -975,7 +1077,7 @@ function ReservationTableRow({
         </td>
         <td className="px-4 py-4 text-right align-top">
           <button
-            aria-controls={`guest-reservation-detail-${reservation.id}`}
+            aria-controls={`guest-reservation-detail-row-${reservation.id}`}
             aria-expanded={isSelected}
             className="focus-ring inline-flex min-h-10 min-w-[6.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
             onClick={() => onSelect(reservation.id)}
@@ -985,13 +1087,14 @@ function ReservationTableRow({
             {isSelected ? "Ocultar" : "Ver"}
           </button>
         </td>
+        <td aria-hidden className="px-0 py-4 align-top" />
       </tr>
       {isSelected ? (
         <tr>
           <td
             className="bg-white px-4 py-5"
-            colSpan={7}
-            id={`guest-reservation-detail-${reservation.id}`}
+            colSpan={8}
+            id={`guest-reservation-detail-row-${reservation.id}`}
           >
             <ReservationDetailPanel reservation={reservation} variant="embedded" />
           </td>
