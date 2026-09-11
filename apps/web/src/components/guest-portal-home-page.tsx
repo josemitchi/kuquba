@@ -818,12 +818,12 @@ function ReservationTable({
           <table className="w-full min-w-[980px] table-fixed border-t border-line text-left text-sm">
             <colgroup>
               <col className="w-[15%]" />
-              <col className="w-[30%]" />
+              <col className="w-[27%]" />
               <col className="w-[12%]" />
               <col className="w-[12%]" />
               <col className="w-[13%]" />
               <col className="w-[10%]" />
-              <col className="w-[8%]" />
+              <col className="w-[11%]" />
             </colgroup>
             <thead className="bg-ivory text-xs uppercase text-ink/50">
               <tr>
@@ -833,7 +833,7 @@ function ReservationTable({
                 <th className="px-4 py-3 font-semibold">Salida</th>
                 <th className="px-4 py-3 font-semibold">Pago</th>
                 <th className="px-4 py-3 font-semibold">Total</th>
-                <th className="px-4 py-3 text-right font-semibold">Detalle</th>
+                <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">Detalle</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -977,11 +977,11 @@ function ReservationTableRow({
           <button
             aria-controls={`guest-reservation-detail-${reservation.id}`}
             aria-expanded={isSelected}
-            className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
+            className="focus-ring inline-flex min-h-10 min-w-[6.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
             onClick={() => onSelect(reservation.id)}
             type="button"
           >
-            <ClipboardList aria-hidden className="h-4 w-4" />
+            <ClipboardList aria-hidden className="h-4 w-4 shrink-0" />
             {isSelected ? "Ocultar" : "Ver"}
           </button>
         </td>
