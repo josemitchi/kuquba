@@ -826,8 +826,8 @@ function ReservationTable({
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto xl:block">
-            <table className="w-full min-w-[1040px] table-fixed border-t border-line text-left text-sm">
+          <div className="hidden xl:block">
+            <table className="w-full min-w-[1100px] table-fixed border-t border-line text-left text-sm">
               <colgroup>
                 <col className="w-[15%]" />
                 <col className="w-[25%]" />
@@ -835,8 +835,7 @@ function ReservationTable({
                 <col className="w-[12%]" />
                 <col className="w-[13%]" />
                 <col className="w-[10%]" />
-                <col className="w-[11%]" />
-                <col className="w-[2%]" />
+                <col className="w-44" />
               </colgroup>
               <thead className="bg-ivory text-xs uppercase text-ink/50">
                 <tr>
@@ -846,8 +845,9 @@ function ReservationTable({
                   <th className="px-4 py-3 font-semibold">Salida</th>
                   <th className="px-4 py-3 font-semibold">Pago</th>
                   <th className="px-4 py-3 font-semibold">Total</th>
-                  <th className="px-4 py-3 text-right font-semibold whitespace-nowrap">Detalle</th>
-                  <th aria-hidden className="px-0 py-3" />
+                  <th className="px-4 py-3 pr-8 text-center font-semibold whitespace-nowrap">
+                    Detalle
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -1075,11 +1075,11 @@ function ReservationTableRow({
         <td className="px-4 py-4 align-top font-semibold text-midnight">
           {formatCurrency(reservation.total, reservation.currency)}
         </td>
-        <td className="px-4 py-4 text-right align-top">
+        <td className="px-4 py-4 pr-8 text-center align-top">
           <button
             aria-controls={`guest-reservation-detail-row-${reservation.id}`}
             aria-expanded={isSelected}
-            className="focus-ring inline-flex min-h-10 min-w-[6.75rem] items-center justify-center gap-2 whitespace-nowrap rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
+            className="focus-ring inline-flex min-h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
             onClick={() => onSelect(reservation.id)}
             type="button"
           >
@@ -1087,13 +1087,12 @@ function ReservationTableRow({
             {isSelected ? "Ocultar" : "Ver"}
           </button>
         </td>
-        <td aria-hidden className="px-0 py-4 align-top" />
       </tr>
       {isSelected ? (
         <tr>
           <td
             className="bg-white px-4 py-5"
-            colSpan={8}
+            colSpan={7}
             id={`guest-reservation-detail-row-${reservation.id}`}
           >
             <ReservationDetailPanel reservation={reservation} variant="embedded" />
