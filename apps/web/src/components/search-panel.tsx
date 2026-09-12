@@ -54,7 +54,9 @@ export function SearchPanel({
   const dateInputClass = isLight
     ? "w-full max-w-full min-w-0 appearance-none bg-transparent text-sm leading-5 outline-none [color-scheme:light] [min-inline-size:0]"
     : "w-full max-w-full min-w-0 appearance-none bg-transparent text-sm leading-5 outline-none [color-scheme:dark] [min-inline-size:0]";
-  const [destination, setDestination] = useState(() => getInitialDestination(defaults?.destination));
+  const [destination, setDestination] = useState(() =>
+    getInitialDestination(defaults?.destination)
+  );
   const [destinationError, setDestinationError] = useState<string | null>(null);
   const [guests, setGuests] = useState(() => getInitialGuests(defaults?.guests));
 
@@ -86,7 +88,9 @@ export function SearchPanel({
     >
       <div className="grid min-w-0 gap-3 lg:grid-cols-[1.15fr_1.2fr_1fr_auto] lg:items-end">
         <label className="block min-w-0">
-          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>Destino</span>
+          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>
+            Destino
+          </span>
           <ChoiceField
             error={destinationError}
             fieldClass={fieldClass}
@@ -120,7 +124,12 @@ export function SearchPanel({
                 type="date"
               />
             </span>
-            <span aria-hidden className={isLight ? "hidden text-ink/34 md:inline" : "hidden text-white/52 md:inline"}>
+            <span
+              aria-hidden
+              className={
+                isLight ? "hidden text-ink/34 md:inline" : "hidden text-white/52 md:inline"
+              }
+            >
               /
             </span>
             <input
@@ -134,7 +143,9 @@ export function SearchPanel({
         </label>
 
         <label className="block min-w-0">
-          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>Huéspedes</span>
+          <span className={`mb-2 block text-xs font-semibold uppercase ${labelClass}`}>
+            Huéspedes
+          </span>
           <ChoiceField
             fieldClass={fieldClass}
             icon={UsersRound}
@@ -201,8 +212,7 @@ function ChoiceField({
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find((option) => option.value === value);
   const placeholderClass = isLight ? "text-ink/45" : "text-white/64";
-  const desktopPlacementClass =
-    menuPlacement === "top" ? "lg:bottom-full lg:mb-2" : "lg:top-full lg:mt-2";
+  const menuPlacementClass = menuPlacement === "top" ? "bottom-full mb-3" : "top-full mt-3";
 
   useEffect(() => {
     if (!isOpen) {
@@ -233,7 +243,7 @@ function ChoiceField({
   }, [isOpen]);
 
   return (
-    <div className="relative z-30" ref={containerRef}>
+    <div className={`relative ${isOpen ? "z-50" : "z-30"}`} ref={containerRef}>
       <input name={name} type="hidden" value={value} />
       <button
         aria-controls={listboxId}
@@ -241,13 +251,15 @@ function ChoiceField({
         aria-haspopup="listbox"
         aria-invalid={Boolean(error)}
         className={`focus-ring flex min-h-[52px] w-full min-w-0 items-center gap-3 rounded-[6px] border text-left transition ${fieldClass} ${
-          error ? "ring-1 ring-terracotta" : ""
-        }`}
+          isOpen ? (isLight ? "ring-2 ring-green/14" : "ring-2 ring-beige/24") : ""
+        } ${error ? "ring-1 ring-terracotta" : ""}`}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
         <Icon aria-hidden className={`h-5 w-5 shrink-0 ${iconClass}`} />
-        <span className={`min-w-0 flex-1 truncate text-sm ${selectedOption ? "" : placeholderClass}`}>
+        <span
+          className={`min-w-0 flex-1 truncate text-sm ${selectedOption ? "" : placeholderClass}`}
+        >
           {selectedOption?.label ?? placeholder}
         </span>
         <ChevronDown
@@ -260,11 +272,16 @@ function ChoiceField({
 
       {isOpen ? (
         <div
-          className={`relative z-50 mt-2 overflow-hidden rounded-[8px] border p-1 shadow-panel lg:absolute lg:left-0 lg:right-0 lg:mt-0 ${desktopPlacementClass} ${
-            isLight ? "border-line bg-white" : "border-white/18 bg-midnight"
+          className={`absolute left-0 right-0 z-50 overflow-hidden rounded-[8px] border bg-white p-2 text-ink shadow-[0_22px_70px_rgba(6,22,34,0.32)] ${menuPlacementClass} ${
+            isLight ? "border-line" : "border-white/18"
           }`}
         >
-          <ul aria-label={placeholder} className="max-h-56 overflow-auto" id={listboxId} role="listbox">
+          <ul
+            aria-label={placeholder}
+            className="max-h-64 overflow-auto pr-1"
+            id={listboxId}
+            role="listbox"
+          >
             {options.map((option) => {
               const isSelected = option.value === value;
 
@@ -272,12 +289,10 @@ function ChoiceField({
                 <li key={option.value} role="presentation">
                   <button
                     aria-selected={isSelected}
-                    className={`flex w-full items-center justify-between gap-3 rounded-[6px] px-3 py-3 text-left text-sm transition ${
+                    className={`group flex min-h-12 w-full items-center justify-between gap-3 rounded-[6px] border px-3 py-3 text-left text-sm transition ${
                       isSelected
-                        ? "bg-green text-white"
-                        : isLight
-                          ? "text-ink hover:bg-green/8"
-                          : "text-white/88 hover:bg-white/10 hover:text-white"
+                        ? "border-green/20 bg-green/10 text-green"
+                        : "border-transparent text-midnight hover:border-line hover:bg-ivory"
                     }`}
                     onClick={() => {
                       onChange(option.value);
@@ -287,7 +302,13 @@ function ChoiceField({
                     type="button"
                   >
                     <span className="min-w-0 truncate">{option.label}</span>
-                    {isSelected ? <Check aria-hidden className="h-4 w-4 shrink-0" /> : null}
+                    {isSelected ? (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-green text-white">
+                        <Check aria-hidden className="h-3.5 w-3.5" />
+                      </span>
+                    ) : (
+                      <span aria-hidden className="h-6 w-6 shrink-0" />
+                    )}
                   </button>
                 </li>
               );
@@ -302,7 +323,11 @@ function ChoiceField({
 function getInitialDestination(value: string | undefined) {
   const normalizedValue = normalizeText(value ?? "");
 
-  return publicCoverageDestinations.find((destination) => normalizeText(destination) === normalizedValue) ?? "";
+  return (
+    publicCoverageDestinations.find(
+      (destination) => normalizeText(destination) === normalizedValue
+    ) ?? ""
+  );
 }
 
 function normalizeText(value: string) {

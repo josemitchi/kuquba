@@ -1,5 +1,13 @@
 import { accessOptions, publicNavigation } from "@kuquba/config";
-import { Building2, CalendarCheck2, ChevronDown, Menu, ShieldCheck, UserRound } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  CalendarCheck2,
+  ChevronDown,
+  Menu,
+  ShieldCheck,
+  UserRound
+} from "lucide-react";
 import Image from "next/image";
 
 const accessOptionIcons = [CalendarCheck2, Building2, ShieldCheck] as const;
@@ -69,25 +77,29 @@ export function SiteHeader({
                 className="h-4 w-4 transition duration-200 group-open:rotate-180"
               />
             </summary>
-            <div className="absolute right-0 z-50 mt-3 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[8px] border border-white/18 bg-midnight p-2 shadow-[0_24px_60px_rgba(0,0,0,0.38)]">
+            <div className="absolute right-0 z-50 mt-3 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[8px] border border-white/22 bg-white p-2 text-ink shadow-[0_24px_70px_rgba(6,22,34,0.34)]">
               {accessOptions.map((option, index) => {
                 const Icon = accessOptionIcons[index] ?? UserRound;
 
                 return (
                   <a
-                    className="focus-ring flex items-center gap-3 rounded-[6px] px-3 py-3 text-sm text-white/90 transition hover:bg-white/10 hover:text-white"
+                    className="focus-ring group flex items-center gap-3 rounded-[6px] px-3 py-3 text-sm text-midnight transition hover:bg-ivory"
                     href={option.href}
                     key={option.href}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-white/8 text-beige">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
                       <Icon aria-hidden className="h-4 w-4" />
                     </span>
                     <span className="min-w-0">
                       <span className="block font-semibold leading-5">{option.label}</span>
-                      <span className="mt-0.5 block text-xs leading-4 text-white/58">
+                      <span className="mt-0.5 block text-xs leading-4 text-ink/58">
                         {option.description}
                       </span>
                     </span>
+                    <ArrowRight
+                      aria-hidden
+                      className="ml-auto h-4 w-4 shrink-0 text-ink/30 transition group-hover:text-green"
+                    />
                   </a>
                 );
               })}
