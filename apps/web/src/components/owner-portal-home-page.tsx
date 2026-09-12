@@ -2,7 +2,6 @@
 
 import {
   ArrowLeft,
-  BadgeCheck,
   Building2,
   CalendarCheck2,
   CheckCircle2,
@@ -46,7 +45,6 @@ const taskPriorityClasses: Record<OwnerTask["priority"], string> = {
   medium: "border-green/24 bg-green/10 text-green"
 };
 
-const metricIcons: LucideIcon[] = [Building2, CalendarCheck2, ClipboardCheck, FileText, TrendingUp];
 const protectedPortalSummary =
   "Vista protegida para propietarios verificados. Las propiedades, tareas y documentos se cargan con una sesion vigente.";
 
@@ -65,13 +63,20 @@ type OwnerAvailabilityBlockResponse = OwnerPortalResponse & {
 
 type Notice = { kind: "success" | "error"; text: string } | null;
 
-type OwnerModuleKey = "properties" | "reservations" | "finance" | "blocks" | "documents";
+type OwnerPropertyTabKey =
+  | "overview"
+  | "reservations"
+  | "blocks"
+  | "finance"
+  | "operations"
+  | "documents";
 
-const ownerModules: Array<{ icon: LucideIcon; key: OwnerModuleKey; label: string }> = [
-  { icon: Building2, key: "properties", label: "Propiedades" },
+const propertyTabs: Array<{ icon: LucideIcon; key: OwnerPropertyTabKey; label: string }> = [
+  { icon: Building2, key: "overview", label: "Informacion" },
   { icon: CalendarCheck2, key: "reservations", label: "Reservas" },
-  { icon: TrendingUp, key: "finance", label: "Finanzas" },
   { icon: Wrench, key: "blocks", label: "Bloqueos" },
+  { icon: TrendingUp, key: "finance", label: "Finanzas" },
+  { icon: ClipboardCheck, key: "operations", label: "Operaciones" },
   { icon: FileText, key: "documents", label: "Documentos" }
 ];
 
@@ -350,22 +355,27 @@ function OwnerDashboard({
   snapshot: OwnerPortalSnapshot;
   updatingContractId: string | null;
 }) {
-  const [activeModule, setActiveModule] = useState<OwnerModuleKey>("properties");
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
     snapshot.properties[0]?.id ?? null
   );
+  const [activePropertyTab, setActivePropertyTab] = useState<OwnerPropertyTabKey>("overview");
   const selectedProperty =
     snapshot.properties.find((property) => property.id === selectedPropertyId) ??
     snapshot.properties[0] ??
     null;
+  const selectedPropertyTasks = selectedProperty ? getPropertyTasks(snapshot, selectedProperty) : [];
+  const selectedPropertySettlements = selectedProperty
+    ? getPropertySettlements(snapshot, selectedProperty)
+    : [];
+
+  function handleSelectProperty(propertyId: string) {
+    setSelectedPropertyId(propertyId);
+    setActivePropertyTab("overview");
+  }
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {snapshot.metrics.map((metric, index) => (
-          <MetricCard icon={metricIcons[index] ?? BadgeCheck} key={metric.label} metric={metric} />
-        ))}
-      </div>
+      <OwnerPortfolioDashboard session={session} snapshot={snapshot} />
 
       {contractNotice ? (
         <div
@@ -380,208 +390,247 @@ function OwnerDashboard({
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
-        <OwnerModuleNav
-          activeModule={activeModule}
-          onSelect={setActiveModule}
-          snapshot={snapshot}
+      <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
+        <PropertyCatalog
+          onSelect={handleSelectProperty}
+          properties={snapshot.properties}
+          selectedPropertyId={selectedProperty?.id ?? null}
         />
-        <OwnerIdentityCard session={session} snapshot={snapshot} />
-      </div>
 
-      <div className="mt-6 min-w-0">
-        {activeModule === "properties" ? (
-          <PropertiesModule
-            onSelectProperty={setSelectedPropertyId}
-            selectedProperty={selectedProperty}
-            selectedPropertyId={selectedProperty?.id ?? null}
-            snapshot={snapshot}
-          />
-        ) : null}
-
-        {activeModule === "reservations" ? <ReservationsModule snapshot={snapshot} /> : null}
-
-        {activeModule === "finance" ? <SettlementPanel snapshot={snapshot} /> : null}
-
-        {activeModule === "blocks" ? (
-          <BlocksModule
+        {selectedProperty ? (
+          <PropertyWorkspace
+            activeTab={activePropertyTab}
             blockingPropertyId={blockingPropertyId}
             onAvailabilityBlockRequest={onAvailabilityBlockRequest}
-            snapshot={snapshot}
-          />
-        ) : null}
-
-        {activeModule === "documents" ? (
-          <DocumentsModule
             onContractAccept={onContractAccept}
-            snapshot={snapshot}
+            onTabChange={setActivePropertyTab}
+            property={selectedProperty}
+            propertySettlements={selectedPropertySettlements}
+            propertyTasks={selectedPropertyTasks}
             updatingContractId={updatingContractId}
           />
-        ) : null}
+        ) : (
+          <OwnerEmptyState />
+        )}
       </div>
     </>
   );
 }
 
-function OwnerModuleNav({
-  activeModule,
-  onSelect,
+function OwnerPortfolioDashboard({
+  session,
   snapshot
 }: {
-  activeModule: OwnerModuleKey;
-  onSelect: (module: OwnerModuleKey) => void;
+  session: DevPortalSession;
   snapshot: OwnerPortalSnapshot;
 }) {
+  const finance = snapshot.financeSummary;
+  const pendingSettlement = snapshot.settlements.find((settlement) => settlement.status !== "PAID") ?? null;
+  const confirmedReservations = snapshot.reservations.filter(
+    (reservation) => reservation.status === "CONFIRMED"
+  ).length;
+
   return (
-    <nav
-      aria-label="Modulos del propietario"
-      className="self-start rounded-[8px] border border-line bg-white p-1.5 shadow-soft"
-    >
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {ownerModules.map((module) => {
-          const Icon = module.icon;
-          const isActive = activeModule === module.key;
+    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase text-green">Dashboard principal</p>
+          <h2 className="mt-1 text-2xl font-semibold text-midnight">{snapshot.ownerName}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/64">
+            Seguimiento de cortes, reservas del periodo y acumulado estimado para el propietario.
+          </p>
+        </div>
+        <div className="flex min-w-0 items-center gap-3 rounded-[8px] border border-line bg-ivory px-3 py-2">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
+            <UserRound aria-hidden className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-midnight">{session.user.displayName}</p>
+            <p className="text-xs text-ink/56">{snapshot.properties.length} propiedades asignadas</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <DashboardFact
+          detail={
+            pendingSettlement
+              ? `${pendingSettlement.periodLabel} / ${pendingSettlement.statusLabel}`
+              : `${finance.periodLabel} / Sin corte pendiente`
+          }
+          icon={Clock3}
+          label="Corte pendiente de ejecutarse"
+          value={pendingSettlement?.ownerPayoutLabel ?? "Sin corte"}
+        />
+        <DashboardFact
+          detail={`${confirmedReservations} confirmada(s), ${snapshot.reservations.length} visible(s)`}
+          icon={CalendarCheck2}
+          label="Reservas del periodo"
+          value={String(snapshot.reservations.length)}
+        />
+        <DashboardFact
+          detail={`${finance.statusLabel} / ${finance.periodLabel}`}
+          icon={TrendingUp}
+          label="Acumulado para este corte"
+          value={finance.ownerPayoutLabel}
+        />
+      </div>
+
+      <SettlementHistory settlements={snapshot.settlements} />
+    </section>
+  );
+}
+
+function DashboardFact({
+  detail,
+  icon: Icon,
+  label,
+  value
+}: {
+  detail: string;
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[8px] border border-line bg-ivory p-4">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+        <Icon aria-hidden className="h-4 w-4 text-green" />
+        {label}
+      </p>
+      <p className="mt-3 break-words text-2xl font-semibold text-midnight">{value}</p>
+      <p className="mt-1 text-sm leading-6 text-ink/62">{detail}</p>
+    </div>
+  );
+}
+
+function SettlementHistory({ settlements }: { settlements: OwnerPortalSnapshot["settlements"] }) {
+  return (
+    <div className="mt-5 border-t border-line pt-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase text-green">Historico de cortes</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Pagos al propietario</h3>
+        </div>
+        <span className="w-fit rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-midnight/72">
+          {settlements.length} corte(s)
+        </span>
+      </div>
+
+      {settlements.length > 0 ? (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+            <thead className="bg-ivory text-ink/48">
+              <tr>
+                <th className="px-3 py-2 font-semibold uppercase">Periodo</th>
+                <th className="px-3 py-2 font-semibold uppercase">Propiedad</th>
+                <th className="px-3 py-2 font-semibold uppercase">Estado</th>
+                <th className="px-3 py-2 font-semibold uppercase">Pago propietario</th>
+                <th className="px-3 py-2 font-semibold uppercase">Pagado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {settlements.map((settlement) => (
+                <tr key={settlement.id}>
+                  <td className="px-3 py-3 font-semibold text-midnight">{settlement.periodLabel}</td>
+                  <td className="px-3 py-3 text-ink/64">{settlement.propertyName}</td>
+                  <td className="px-3 py-3 text-ink/64">{settlement.statusLabel}</td>
+                  <td className="px-3 py-3 font-semibold text-midnight">
+                    {settlement.ownerPayoutLabel}
+                  </td>
+                  <td className="px-3 py-3 text-ink/64">{formatContractDate(settlement.paidAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mt-4 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-ink/64">
+          Aun no hay cortes historicos para este propietario.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PropertyCatalog({
+  onSelect,
+  properties,
+  selectedPropertyId
+}: {
+  onSelect: (propertyId: string) => void;
+  properties: OwnerProperty[];
+  selectedPropertyId: string | null;
+}) {
+  return (
+    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
+      <SectionHeading
+        eyebrow="Catalogo"
+        title="Propiedades"
+        value={String(properties.length) + " asignada(s)"}
+      />
+      <div className="mt-5 space-y-3">
+        {properties.map((property) => {
+          const isSelected = property.id === selectedPropertyId;
           return (
             <button
-              aria-current={isActive ? "page" : undefined}
+              aria-pressed={isSelected}
               className={
-                "focus-ring flex min-h-10 items-center justify-between gap-3 rounded-[6px] px-3 text-sm font-semibold transition " +
-                (isActive ? "bg-green text-white" : "text-midnight hover:bg-ivory hover:text-green")
+                "focus-ring grid w-full gap-3 rounded-[8px] border p-3 text-left transition sm:grid-cols-[88px_minmax(0,1fr)] " +
+                (isSelected
+                  ? "border-green bg-green/8"
+                  : "border-line bg-white hover:border-green hover:bg-ivory")
               }
-              key={module.key}
-              onClick={() => onSelect(module.key)}
+              key={property.id}
+              onClick={() => onSelect(property.id)}
               type="button"
             >
-              <span className="inline-flex items-center gap-2">
-                <Icon aria-hidden className="h-4 w-4" />
-                {module.label}
+              <span className="relative h-20 overflow-hidden rounded-[6px] bg-midnight sm:h-full">
+                <Image
+                  alt={property.imageAlt}
+                  className="object-cover"
+                  fill
+                  sizes="88px"
+                  src={property.image}
+                />
               </span>
-              <span
-                className={
-                  "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[0.68rem] " +
-                  (isActive ? "bg-white/20" : "bg-ivory text-ink/58")
-                }
-              >
-                {getOwnerModuleCount(module.key, snapshot)}
+              <span className="min-w-0">
+                <span className="flex items-center justify-between gap-3">
+                  <span className="truncate text-sm font-semibold text-midnight">{property.name}</span>
+                  <span className="shrink-0 rounded-full border border-line bg-white px-2 py-0.5 text-[0.68rem] font-semibold text-midnight/70">
+                    {property.reservations.length}
+                  </span>
+                </span>
+                <span className="mt-1 block truncate text-xs text-ink/58">{property.location}</span>
+                <span className="mt-3 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[0.68rem] font-semibold text-midnight/70">
+                    {property.statusLabel}
+                  </span>
+                  <span className="rounded-full border border-line bg-white px-2 py-0.5 text-[0.68rem] font-semibold text-midnight/70">
+                    {property.openItems} pendiente(s)
+                  </span>
+                </span>
               </span>
             </button>
           );
         })}
       </div>
-    </nav>
+    </section>
   );
 }
 
-function getOwnerModuleCount(module: OwnerModuleKey, snapshot: OwnerPortalSnapshot) {
-  if (module === "properties") return snapshot.properties.length;
-  if (module === "reservations") return snapshot.reservations.length;
-  if (module === "finance") return snapshot.financeSummary.lineCount;
-  if (module === "blocks")
-    return snapshot.properties.reduce(
-      (total, property) => total + property.requestedBlocks.length,
-      0
-    );
-  return snapshot.properties.length;
-}
-
-function PropertiesModule({
-  onSelectProperty,
-  selectedProperty,
-  selectedPropertyId,
-  snapshot
-}: {
-  onSelectProperty: (propertyId: string) => void;
-  selectedProperty: OwnerProperty | null;
-  selectedPropertyId: string | null;
-  snapshot: OwnerPortalSnapshot;
-}) {
-  return (
-    <div className="space-y-6">
-      <section>
-        <SectionHeading
-          eyebrow={snapshot.periodLabel}
-          title="Propiedades asignadas"
-          value={String(snapshot.properties.length) + " activas o en activacion"}
-        />
-        <div className="mt-5 grid gap-4">
-          {snapshot.properties.map((property) => (
-            <PropertyCard
-              isSelected={property.id === selectedPropertyId}
-              key={property.id}
-              onSelect={onSelectProperty}
-              property={property}
-            />
-          ))}
-        </div>
-      </section>
-
-      {selectedProperty ? <PropertySummaryPanel property={selectedProperty} /> : null}
-      <TasksPanel snapshot={snapshot} />
-    </div>
-  );
-}
-
-function ReservationsModule({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
-  return (
-    <div className="space-y-6">
-      <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-        <SectionHeading
-          eyebrow={snapshot.periodLabel}
-          title="Reservas"
-          value={String(snapshot.reservations.length) + " registro(s)"}
-        />
-        {snapshot.reservations.length === 0 ? (
-          <p className="mt-5 text-sm leading-6 text-ink/62">
-            Sin reservas visibles para tus propiedades.
-          </p>
-        ) : (
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-left text-xs">
-              <thead className="bg-ivory text-ink/48">
-                <tr>
-                  <th className="px-3 py-2 font-semibold uppercase">Codigo</th>
-                  <th className="px-3 py-2 font-semibold uppercase">Propiedad</th>
-                  <th className="px-3 py-2 font-semibold uppercase">Fechas</th>
-                  <th className="px-3 py-2 font-semibold uppercase">Huesped</th>
-                  <th className="px-3 py-2 font-semibold uppercase">Estado</th>
-                  <th className="px-3 py-2 font-semibold uppercase">Pago</th>
-                  <th className="px-3 py-2 font-semibold uppercase">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {snapshot.reservations.map((reservation) => (
-                  <tr key={reservation.id}>
-                    <td className="px-3 py-3 font-semibold text-midnight">
-                      {reservation.reservationCode}
-                    </td>
-                    <td className="px-3 py-3 text-ink/64">{reservation.propertyName}</td>
-                    <td className="px-3 py-3 text-ink/64">
-                      {formatShortDate(reservation.arrivalDate)} -{" "}
-                      {formatShortDate(reservation.departureDate)}
-                    </td>
-                    <td className="px-3 py-3 text-ink/64">{reservation.guestName}</td>
-                    <td className="px-3 py-3 text-ink/64">{reservation.statusLabel}</td>
-                    <td className="px-3 py-3 text-ink/64">{reservation.paymentStatusLabel}</td>
-                    <td className="px-3 py-3 font-semibold text-midnight">
-                      {formatCurrency(reservation.total, reservation.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      <UpcomingStaysPanel snapshot={snapshot} />
-    </div>
-  );
-}
-
-function BlocksModule({
+function PropertyWorkspace({
+  activeTab,
   blockingPropertyId,
   onAvailabilityBlockRequest,
-  snapshot
+  onContractAccept,
+  onTabChange,
+  property,
+  propertySettlements,
+  propertyTasks,
+  updatingContractId
 }: {
+  activeTab: OwnerPropertyTabKey;
   blockingPropertyId: string | null;
   onAvailabilityBlockRequest: (input: {
     endsOn: string;
@@ -590,191 +639,114 @@ function BlocksModule({
     startsOn: string;
     unitId: string;
   }) => void;
-  snapshot: OwnerPortalSnapshot;
-}) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <SectionHeading
-        eyebrow="Calendario"
-        title="Bloqueos de disponibilidad"
-        value={String(getOwnerModuleCount("blocks", snapshot)) + " visibles"}
-      />
-      <div className="mt-5 space-y-6 divide-y divide-line">
-        {snapshot.properties.map((property) => (
-          <div className="pt-6 first:pt-0" key={property.id}>
-            <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-midnight">{property.name}</h3>
-                <p className="text-sm leading-6 text-ink/62">{property.location}</p>
-              </div>
-              <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
-                {property.requestedBlocks.length} bloqueo(s)
-              </span>
-            </div>
-            <OwnerAvailabilityBlockForm
-              isSubmitting={blockingPropertyId === property.id}
-              onSubmit={onAvailabilityBlockRequest}
-              property={property}
-            />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function DocumentsModule({
-  onContractAccept,
-  snapshot,
-  updatingContractId
-}: {
   onContractAccept: (contractId: string) => void;
-  snapshot: OwnerPortalSnapshot;
+  onTabChange: (tab: OwnerPropertyTabKey) => void;
+  property: OwnerProperty;
+  propertySettlements: OwnerPortalSnapshot["settlements"];
+  propertyTasks: OwnerPortalSnapshot["tasks"];
   updatingContractId: string | null;
 }) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
-      <SectionHeading
-        eyebrow="Contratos"
-        title="Documentos por propiedad"
-        value={String(snapshot.properties.length) + " contrato(s)"}
+  const content =
+    activeTab === "overview" ? (
+      <PropertyOverviewTab property={property} />
+    ) : activeTab === "reservations" ? (
+      <PropertyReservationsTab reservations={property.reservations} />
+    ) : activeTab === "blocks" ? (
+      <PropertyBlocksTab
+        blockingPropertyId={blockingPropertyId}
+        onAvailabilityBlockRequest={onAvailabilityBlockRequest}
+        property={property}
       />
-      <div className="mt-5 grid gap-4">
-        {snapshot.properties.map((property) => (
-          <section className="rounded-[8px] border border-line bg-ivory p-4" key={property.id}>
-            <p className="text-xs font-semibold uppercase text-green">{property.name}</p>
-            <PropertyContractPanel
-              onContractAccept={onContractAccept}
-              property={property}
-              updatingContractId={updatingContractId}
-            />
-          </section>
-        ))}
+    ) : activeTab === "finance" ? (
+      <PropertyFinanceTab property={property} settlements={propertySettlements} />
+    ) : activeTab === "operations" ? (
+      <PropertyOperationsTab property={property} tasks={propertyTasks} />
+    ) : (
+      <PropertyDocumentsTab
+        onContractAccept={onContractAccept}
+        property={property}
+        updatingContractId={updatingContractId}
+      />
+    );
+
+  return (
+    <section className="min-w-0 rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-medium text-green">
+            <MapPin aria-hidden className="h-4 w-4" />
+            {property.location}
+          </p>
+          <h2 className="mt-2 font-display text-3xl leading-tight text-midnight">{property.name}</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/64">{property.contractStage}</p>
+        </div>
+        <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
+          {property.serviceLevel}
+        </span>
       </div>
+
+      <PropertyTabs
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        property={property}
+        propertySettlements={propertySettlements}
+        propertyTasks={propertyTasks}
+      />
+
+      <div className="mt-5">{content}</div>
     </section>
   );
 }
 
-function MetricCard({
-  icon: Icon,
-  metric
+function PropertyTabs({
+  activeTab,
+  onTabChange,
+  property,
+  propertySettlements,
+  propertyTasks
 }: {
-  icon: LucideIcon;
-  metric: OwnerPortalSnapshot["metrics"][number];
-}) {
-  return (
-    <article className="rounded-[8px] border border-line bg-white p-4 shadow-soft">
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
-        <Icon aria-hidden className="h-4 w-4 text-green" />
-        <span>{metric.label}</span>
-      </div>
-      <p className="mt-3 text-xl font-semibold text-midnight">{metric.value}</p>
-      <p className="mt-1 text-sm leading-6 text-ink/62">{metric.hint}</p>
-    </article>
-  );
-}
-
-function PropertyCard({
-  isSelected,
-  onSelect,
-  property
-}: {
-  isSelected: boolean;
-  onSelect: (propertyId: string) => void;
+  activeTab: OwnerPropertyTabKey;
+  onTabChange: (tab: OwnerPropertyTabKey) => void;
   property: OwnerProperty;
+  propertySettlements: OwnerPortalSnapshot["settlements"];
+  propertyTasks: OwnerPortalSnapshot["tasks"];
 }) {
   return (
-    <article
-      className={
-        "overflow-hidden rounded-[8px] border bg-white shadow-soft " +
-        (isSelected ? "border-green" : "border-line")
-      }
-    >
-      <div className="grid gap-0 md:grid-cols-[220px_minmax(0,1fr)]">
-        <button
-          aria-label={"Seleccionar " + property.name}
-          className="relative min-h-[180px] bg-midnight text-left md:min-h-full"
-          onClick={() => onSelect(property.id)}
-          type="button"
-        >
-          <Image
-            alt={property.imageAlt}
-            className="object-cover"
-            fill
-            sizes="(min-width: 768px) 220px, 100vw"
-            src={property.image}
-          />
-          <span
+    <div className="mt-5 flex flex-wrap gap-2 border-b border-line pb-3" role="tablist">
+      {propertyTabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = activeTab === tab.key;
+        const count = getPropertyTabCount(tab.key, property, propertyTasks, propertySettlements);
+        return (
+          <button
+            aria-selected={isActive}
             className={
-              "absolute left-4 top-4 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur " +
-              propertyStatusClasses[property.status]
+              "focus-ring inline-flex min-h-10 items-center gap-2 rounded-[6px] border px-3 text-sm font-semibold transition " +
+              (isActive
+                ? "border-green bg-green text-white"
+                : "border-line bg-white text-midnight hover:border-green hover:text-green")
             }
+            key={tab.key}
+            onClick={() => onTabChange(tab.key)}
+            role="tab"
+            type="button"
           >
-            {property.statusLabel}
-          </span>
-        </button>
-
-        <div className="p-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-            <div>
-              <p className="flex items-center gap-2 text-sm font-medium text-green">
-                <MapPin aria-hidden className="h-4 w-4" />
-                {property.location}
-              </p>
-              <h3 className="mt-2 font-display text-2xl leading-tight text-midnight">
-                {property.name}
-              </h3>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-ink/68">
-                {property.contractStage}
-              </p>
-            </div>
-            <button
-              aria-pressed={isSelected}
-              className="focus-ring inline-flex min-h-10 w-fit items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green"
-              onClick={() => onSelect(property.id)}
-              type="button"
-            >
-              <ClipboardCheck aria-hidden className="h-4 w-4" />
-              {isSelected ? "Seleccionada" : "Ver resumen"}
-            </button>
-          </div>
-
-          <PropertySplitStrip contract={property.contract} />
-
-          <dl className="mt-5 grid gap-3 text-sm text-ink/72 sm:grid-cols-3">
-            <PropertyFact
-              icon={CalendarCheck2}
-              label="Proxima llegada"
-              value={property.nextArrival}
-            />
-            <PropertyFact
-              icon={TrendingUp}
-              label="Senal comercial"
-              value={property.occupancySignal}
-            />
-            <PropertyFact icon={Wrench} label="Pendientes" value={String(property.openItems)} />
-          </dl>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function PropertySplitStrip({ contract }: { contract: OwnerProperty["contract"] }) {
-  const split = getContractSplitTerms(contract);
-
-  return (
-    <dl className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs">
-      {split.map((term) => (
-        <div
-          className="inline-flex min-h-8 items-center gap-2 rounded-full border border-green/20 bg-green/10 px-3 py-1 text-midnight"
-          key={term.label}
-        >
-          <dt className="font-semibold uppercase text-ink/48">{term.label}</dt>
-          <dd className="font-semibold text-green">{term.value}</dd>
-        </div>
-      ))}
-    </dl>
+            <Icon aria-hidden className="h-4 w-4" />
+            {tab.label}
+            {count !== null ? (
+              <span
+                className={
+                  "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[0.68rem] " +
+                  (isActive ? "bg-white/20 text-white" : "bg-ivory text-ink/58")
+                }
+              >
+                {count}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -782,7 +754,7 @@ function PropertySplitOverview({ contract }: { contract: OwnerProperty["contract
   const split = getContractSplitTerms(contract);
 
   return (
-    <div className="mt-5 border-t border-line pt-4">
+    <div className="rounded-[8px] border border-line bg-ivory p-4">
       <p className="text-xs font-semibold uppercase text-green">Participacion contractual</p>
       <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
         {split.map((term) => (
@@ -809,47 +781,251 @@ function getContractSplitTerms(contract: OwnerProperty["contract"]) {
     { label: "KUQUBA", value: kuqubaTerm?.value ?? "Por definir" }
   ];
 }
-function PropertySummaryPanel({ property }: { property: OwnerProperty }) {
+function PropertyOverviewTab({ property }: { property: OwnerProperty }) {
   return (
-    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
-      <SectionHeading
-        eyebrow="Detalle seleccionado"
-        title={property.name}
-        value={property.serviceLevel}
-      />
-
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        {property.operations.map((operation) => (
-          <div
-            className="min-h-[96px] rounded-[6px] border border-line bg-ivory p-4 text-sm"
-            key={operation.label}
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(300px,0.55fr)]">
+      <div className="overflow-hidden rounded-[8px] border border-line bg-ivory">
+        <div className="relative min-h-[260px] bg-midnight">
+          <Image alt={property.imageAlt} className="object-cover" fill sizes="(min-width: 1024px) 55vw, 100vw" src={property.image} />
+          <span
+            className={
+              "absolute left-4 top-4 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur " +
+              propertyStatusClasses[property.status]
+            }
           >
-            <p className="font-semibold text-midnight">{operation.label}</p>
-            <p className="mt-2 leading-6 text-ink/62">{operation.state}</p>
+            {property.statusLabel}
+          </span>
+        </div>
+        <div className="p-4">
+          <p className="text-sm leading-6 text-ink/64">{property.occupancySignal}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[property.reviewLabel, ...property.highlights].map((item) => (
+              <span
+                className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-midnight/72"
+                key={item}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        <dl className="grid gap-3 text-sm text-ink/72">
+          <PropertyFact icon={CalendarCheck2} label="Proxima llegada" value={property.nextArrival} />
+          <PropertyFact icon={TrendingUp} label="Senal comercial" value={property.occupancySignal} />
+          <PropertyFact icon={Wrench} label="Pendientes" value={String(property.openItems)} />
+        </dl>
+        <PropertySplitOverview contract={property.contract} />
+        <PropertyRevenuePanel property={property} />
+      </div>
+    </div>
+  );
+}
+
+function PropertyReservationsTab({ reservations }: { reservations: OwnerProperty["reservations"] }) {
+  if (reservations.length === 0) {
+    return <EmptyPanel text="Sin reservas visibles para esta propiedad en el periodo." />;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-[8px] border border-line">
+      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+        <thead className="bg-ivory text-ink/48">
+          <tr>
+            <th className="px-3 py-2 font-semibold uppercase">Codigo</th>
+            <th className="px-3 py-2 font-semibold uppercase">Fechas</th>
+            <th className="px-3 py-2 font-semibold uppercase">Huesped</th>
+            <th className="px-3 py-2 font-semibold uppercase">Unidad</th>
+            <th className="px-3 py-2 font-semibold uppercase">Estado</th>
+            <th className="px-3 py-2 font-semibold uppercase">Pago</th>
+            <th className="px-3 py-2 font-semibold uppercase">Total</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line bg-white">
+          {reservations.map((reservation) => (
+            <tr key={reservation.id}>
+              <td className="px-3 py-3 font-semibold text-midnight">{reservation.reservationCode}</td>
+              <td className="px-3 py-3 text-ink/64">
+                {formatShortDate(reservation.arrivalDate)} - {formatShortDate(reservation.departureDate)}
+              </td>
+              <td className="px-3 py-3 text-ink/64">{reservation.guestName}</td>
+              <td className="px-3 py-3 text-ink/64">{reservation.unitName}</td>
+              <td className="px-3 py-3 text-ink/64">{reservation.statusLabel}</td>
+              <td className="px-3 py-3 text-ink/64">{reservation.paymentStatusLabel}</td>
+              <td className="px-3 py-3 font-semibold text-midnight">
+                {formatCurrency(reservation.total, reservation.currency)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PropertyBlocksTab({
+  blockingPropertyId,
+  onAvailabilityBlockRequest,
+  property
+}: {
+  blockingPropertyId: string | null;
+  onAvailabilityBlockRequest: (input: {
+    endsOn: string;
+    note: string;
+    propertyId: string;
+    startsOn: string;
+    unitId: string;
+  }) => void;
+  property: OwnerProperty;
+}) {
+  return (
+    <div className="space-y-5">
+      {property.requestedBlocks.length > 0 ? (
+        <div className="grid gap-3 md:grid-cols-2">
+          {property.requestedBlocks.map((block) => (
+            <div className="rounded-[8px] border border-line bg-ivory p-4" key={block.id}>
+              <p className="text-xs font-semibold uppercase text-green">{block.reasonLabel}</p>
+              <p className="mt-2 text-sm font-semibold text-midnight">
+                {formatShortDate(block.startsOn)} - {formatShortDate(block.endsOn)}
+              </p>
+              {block.note ? <p className="mt-2 text-sm leading-6 text-ink/62">{block.note}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyPanel text="Sin bloqueos activos o solicitados para esta propiedad." />
+      )}
+
+      <OwnerAvailabilityBlockForm
+        isSubmitting={blockingPropertyId === property.id}
+        onSubmit={onAvailabilityBlockRequest}
+        property={property}
+      />
+    </div>
+  );
+}
+
+function PropertyFinanceTab({
+  property,
+  settlements
+}: {
+  property: OwnerProperty;
+  settlements: OwnerPortalSnapshot["settlements"];
+}) {
+  return (
+    <div className="space-y-5">
+      <PropertyRevenuePanel property={property} />
+      <div className="border-t border-line pt-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-green">Cortes de la propiedad</p>
+            <h3 className="mt-1 text-lg font-semibold text-midnight">Historial financiero</h3>
+          </div>
+          <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
+            {settlements.length} corte(s)
+          </span>
+        </div>
+
+        {settlements.length > 0 ? (
+          <div className="mt-4 grid gap-3">
+            {settlements.map((settlement) => (
+              <div className="rounded-[8px] border border-line bg-ivory p-4" key={settlement.id}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-midnight">{settlement.periodLabel}</p>
+                    <p className="mt-1 text-xs leading-5 text-ink/56">
+                      {settlement.statusLabel} / Pagado {formatContractDate(settlement.paidAt)}
+                    </p>
+                  </div>
+                  <p className="text-lg font-semibold text-midnight">{settlement.ownerPayoutLabel}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyPanel text="Aun no hay cortes historicos asociados a esta propiedad." />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PropertyOperationsTab({
+  property,
+  tasks
+}: {
+  property: OwnerProperty;
+  tasks: OwnerPortalSnapshot["tasks"];
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-3">
+        {property.operations.map((operation) => (
+          <div className="min-h-[96px] rounded-[8px] border border-line bg-ivory p-4" key={operation.label}>
+            <p className="text-sm font-semibold text-midnight">{operation.label}</p>
+            <p className="mt-2 text-sm leading-6 text-ink/62">{operation.state}</p>
           </div>
         ))}
       </div>
 
-      <PropertyRevenuePanel property={property} />
-      <PropertySplitOverview contract={property.contract} />
-
-      <div className="mt-5 flex flex-wrap gap-2 rounded-[6px] border border-line bg-ivory p-3">
-        {[property.reviewLabel, ...property.highlights].map((item) => (
-          <span
-            className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-midnight/72"
-            key={item}
-          >
-            {item}
-          </span>
-        ))}
+      <div className="border-t border-line pt-5">
+        <p className="text-xs font-semibold uppercase text-green">Mantenimiento y acciones abiertas</p>
+        {tasks.length > 0 ? (
+          <div className="mt-3 divide-y divide-line rounded-[8px] border border-line bg-white px-4">
+            {tasks.map((task) => (
+              <div className="grid gap-3 py-4 md:grid-cols-[1fr_auto] md:items-center" key={task.id}>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-midnight">{task.title}</h3>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${taskPriorityClasses[task.priority]}`}
+                    >
+                      {task.ownerAction ? "Accion propietario" : "KUQUBA"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-ink/62">{task.property}</p>
+                </div>
+                <p className="flex items-center gap-2 text-sm font-semibold text-midnight">
+                  <Clock3 aria-hidden className="h-4 w-4 text-green" />
+                  {task.due}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyPanel text="Sin pendientes operativos abiertos para esta propiedad." />
+        )}
       </div>
-    </section>
+    </div>
+  );
+}
+
+function PropertyDocumentsTab({
+  onContractAccept,
+  property,
+  updatingContractId
+}: {
+  onContractAccept: (contractId: string) => void;
+  property: OwnerProperty;
+  updatingContractId: string | null;
+}) {
+  return (
+    <div className="rounded-[8px] border border-line bg-ivory p-4">
+      <p className="text-xs font-semibold uppercase text-green">Contrato vigente</p>
+      <PropertyContractPanel
+        onContractAccept={onContractAccept}
+        property={property}
+        updatingContractId={updatingContractId}
+      />
+    </div>
   );
 }
 
 function PropertyRevenuePanel({ property }: { property: OwnerProperty }) {
   return (
-    <div className="mt-5 grid gap-3 border-t border-line pt-5 md:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-3">
       <FinanceFact
         detail={property.estimatedRevenue.label}
         label="Reservas confirmadas"
@@ -875,6 +1051,39 @@ function PropertyRevenuePanel({ property }: { property: OwnerProperty }) {
   );
 }
 
+function OwnerEmptyState() {
+  return <EmptyPanel text="No hay propiedades asignadas a este propietario." />;
+}
+
+function EmptyPanel({ text }: { text: string }) {
+  return (
+    <div className="rounded-[8px] border border-line bg-ivory p-5 text-sm leading-6 text-ink/64">
+      {text}
+    </div>
+  );
+}
+
+function getPropertyTasks(snapshot: OwnerPortalSnapshot, property: OwnerProperty) {
+  return snapshot.tasks.filter((task) => task.property === property.name);
+}
+
+function getPropertySettlements(snapshot: OwnerPortalSnapshot, property: OwnerProperty) {
+  return snapshot.settlements.filter((settlement) => settlement.propertyName === property.name);
+}
+
+function getPropertyTabCount(
+  tab: OwnerPropertyTabKey,
+  property: OwnerProperty,
+  tasks: OwnerPortalSnapshot["tasks"],
+  settlements: OwnerPortalSnapshot["settlements"]
+) {
+  if (tab === "overview") return null;
+  if (tab === "reservations") return property.reservations.length;
+  if (tab === "blocks") return property.requestedBlocks.length;
+  if (tab === "finance") return settlements.length;
+  if (tab === "operations") return tasks.length;
+  return property.contract.versions.length;
+}
 function OwnerAvailabilityBlockForm({
   isSubmitting,
   onSubmit,
@@ -1056,198 +1265,6 @@ function PropertyFact({
       </dt>
       <dd className="mt-2 text-sm font-semibold text-midnight">{value}</dd>
     </div>
-  );
-}
-
-function TasksPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
-      <SectionHeading
-        eyebrow="Acciones abiertas"
-        title="Pendientes operativos"
-        value={`${snapshot.tasks.length} tareas`}
-      />
-      {snapshot.tasks.length > 0 ? (
-        <div className="mt-5 divide-y divide-line">
-          {snapshot.tasks.map((task) => (
-            <div
-              className="grid gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[1fr_auto] md:items-center"
-              key={task.id}
-            >
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-midnight">{task.title}</h3>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${taskPriorityClasses[task.priority]}`}
-                  >
-                    {task.ownerAction ? "Accion propietario" : "KUQUBA"}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm leading-6 text-ink/62">{task.property}</p>
-              </div>
-              <p className="flex items-center gap-2 text-sm font-semibold text-midnight">
-                <Clock3 aria-hidden className="h-4 w-4 text-green" />
-                {task.due}
-              </p>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-5 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-ink/64">
-          No hay pendientes operativos abiertos para este periodo.
-        </div>
-      )}
-    </section>
-  );
-}
-
-function OwnerIdentityCard({
-  session,
-  snapshot
-}: {
-  session: DevPortalSession;
-  snapshot: OwnerPortalSnapshot;
-}) {
-  return (
-    <section className="self-start rounded-[8px] border border-line bg-white px-4 py-3 shadow-soft">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
-          <UserRound aria-hidden className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[0.68rem] font-semibold uppercase text-green">Propietario</p>
-          <h2 className="truncate text-sm font-semibold text-midnight">{session.user.displayName}</h2>
-          <p className="mt-0.5 truncate text-xs text-ink/56">{snapshot.properties.length} propiedades asignadas</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function UpcomingStaysPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <SectionHeading eyebrow="Calendario" title="Proximas estancias" value="API" />
-      <div className="mt-5 divide-y divide-line">
-        {snapshot.upcomingStays.map((stay) => (
-          <div
-            className="grid grid-cols-[64px_1fr] gap-4 py-4 first:pt-0 last:pb-0"
-            key={`${stay.date}-${stay.traveler}`}
-          >
-            <div className="rounded-[6px] bg-ivory px-3 py-2 text-center">
-              <p className="text-xs font-semibold uppercase text-green">{stay.date}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-midnight">{stay.property}</h3>
-              <p className="mt-1 text-sm leading-6 text-ink/62">{stay.traveler}</p>
-              <p className="mt-1 text-xs font-semibold uppercase text-terracotta">{stay.status}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SettlementPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
-  const finance = snapshot.financeSummary;
-  const latestSettlement = snapshot.settlements[0];
-
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <SectionHeading
-        eyebrow={finance.periodLabel}
-        title="Finanzas"
-        value={finance.ownerPayoutLabel}
-      />
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-        <FinanceFact
-          detail={`${finance.lineCount} linea(s) conciliada(s)`}
-          label="Ingresos"
-          value={formatCurrency(finance.grossAccommodation, finance.currency)}
-        />
-        <FinanceFact
-          detail="Comision y servicio KUQUBA"
-          label="Servicio"
-          value={formatCurrency(finance.kuqubaServiceFees, finance.currency)}
-        />
-        <FinanceFact
-          detail="Limpieza, mantenimiento y gastos del propietario"
-          label="Gastos"
-          value={formatCurrency(finance.ownerExpenses, finance.currency)}
-        />
-        <FinanceFact
-          detail={finance.statusLabel}
-          label="Saldo estimado"
-          value={finance.ownerPayoutLabel}
-        />
-      </div>
-
-      {latestSettlement ? (
-        <div className="mt-5 border-t border-line pt-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase text-green">
-                {latestSettlement.propertyName}
-              </p>
-              <h3 className="mt-1 text-sm font-semibold text-midnight">
-                {latestSettlement.periodLabel}
-              </h3>
-            </div>
-            <span className="rounded-full border border-line bg-ivory px-2 py-0.5 text-[0.7rem] font-semibold text-midnight/72">
-              {latestSettlement.statusLabel}
-            </span>
-          </div>
-
-          <div className="mt-4 divide-y divide-line">
-            {latestSettlement.lineItems.slice(0, 6).map((line) => (
-              <div
-                className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[1fr_auto]"
-                key={line.id}
-              >
-                <div>
-                  <p className="text-sm font-semibold text-midnight">{line.label}</p>
-                  <p className="mt-1 text-xs leading-5 text-ink/52">
-                    {line.typeLabel} - {line.reservationCode ?? "Sin reserva"} -{" "}
-                    {formatShortDate(line.occurredAt)}
-                  </p>
-                </div>
-                <p className="text-sm font-semibold text-midnight">
-                  {formatCurrency(line.amount, line.currency)}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-4 text-xs leading-5 text-ink/56">
-            Generada {formatShortDate(latestSettlement.generatedAt)}. Payout productivo
-            deshabilitado hasta aprobar proveedor.
-          </p>
-        </div>
-      ) : (
-        <p className="mt-5 border-t border-line pt-5 text-sm leading-6 text-ink/62">
-          Sin liquidaciones registradas para este periodo.
-        </p>
-      )}
-
-      <div className="mt-5 border-t border-line pt-5">
-        <p className="text-xs font-semibold uppercase text-ink/48">Documentos soporte</p>
-        <div className="mt-3 divide-y divide-line">
-          {snapshot.settlementItems.map((item) => (
-            <div className="py-3 first:pt-0 last:pb-0" key={item.label}>
-              <div className="flex items-start justify-between gap-4">
-                <h3 className="text-sm font-semibold text-midnight">{item.label}</h3>
-                <span className="rounded-full border border-line bg-ivory px-2 py-0.5 text-[0.7rem] font-semibold text-midnight/72">
-                  {item.status}
-                </span>
-              </div>
-              <p className="mt-2 text-sm leading-6 text-ink/62">{item.detail}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 }
 
