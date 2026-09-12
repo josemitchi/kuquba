@@ -49,6 +49,13 @@ const taskPriorityClasses: Record<OwnerTask["priority"], string> = {
   medium: "border-green/24 bg-green/10 text-green"
 };
 
+const settlementStatusClasses: Record<OwnerPortalSnapshot["settlements"][number]["status"], string> = {
+  APPROVED: "border-green/24 bg-green/10 text-green",
+  DRAFT: "border-line bg-ivory text-ink/62",
+  PAID: "border-green/24 bg-green text-white",
+  READY_FOR_REVIEW: "border-[#f0b35a]/35 bg-[#f0b35a]/16 text-midnight"
+};
+
 const protectedPortalSummary =
   "Vista protegida para propietarios verificados. Las propiedades, tareas y documentos se cargan con una sesion vigente.";
 
@@ -611,20 +618,20 @@ function DashboardFact({
 
 function SettlementHistory({ settlements }: { settlements: OwnerPortalSnapshot["settlements"] }) {
   return (
-    <div className="mt-5 border-t border-line pt-5">
+    <section className="mt-5 rounded-[8px] border border-line bg-white p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase text-green">Historico de cortes</p>
           <h3 className="mt-1 text-lg font-semibold text-midnight">Pagos al propietario</h3>
         </div>
-        <span className="w-fit rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-midnight/72">
+        <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
           {settlements.length} corte(s)
         </span>
       </div>
 
       {settlements.length > 0 ? (
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+        <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
+          <table className="w-full min-w-[760px] border-collapse text-left text-xs">
             <thead className="bg-ivory text-ink/48">
               <tr>
                 <th className="px-3 py-2 font-semibold uppercase">Periodo</th>
@@ -634,15 +641,17 @@ function SettlementHistory({ settlements }: { settlements: OwnerPortalSnapshot["
                 <th className="px-3 py-2 font-semibold uppercase">Pagado</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-line">
+            <tbody className="divide-y divide-line bg-white">
               {settlements.map((settlement) => (
                 <tr key={settlement.id}>
                   <td className="px-3 py-3 font-semibold text-midnight">{settlement.periodLabel}</td>
                   <td className="px-3 py-3 text-ink/64">{settlement.propertyName}</td>
-                  <td className="px-3 py-3 text-ink/64">{settlement.statusLabel}</td>
-                  <td className="px-3 py-3 font-semibold text-midnight">
-                    {settlement.ownerPayoutLabel}
+                  <td className="px-3 py-3">
+                    <span className={`inline-flex rounded-full px-2 py-1 font-semibold ${settlementStatusClasses[settlement.status]}`}>
+                      {settlement.statusLabel}
+                    </span>
                   </td>
+                  <td className="px-3 py-3 font-semibold text-midnight">{settlement.ownerPayoutLabel}</td>
                   <td className="px-3 py-3 text-ink/64">{formatContractDate(settlement.paidAt)}</td>
                 </tr>
               ))}
@@ -654,7 +663,7 @@ function SettlementHistory({ settlements }: { settlements: OwnerPortalSnapshot["
           Aun no hay cortes historicos para este propietario.
         </p>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -1267,7 +1276,7 @@ function PropertyFinanceTab({
   return (
     <div className="space-y-5">
       <PropertyRevenuePanel property={property} />
-      <div className="border-t border-line pt-5">
+      <section className="rounded-[8px] border border-line bg-white p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase text-green">Cortes de la propiedad</p>
@@ -1279,56 +1288,50 @@ function PropertyFinanceTab({
         </div>
 
         {settlements.length > 0 ? (
-          <div className="mt-4 grid gap-3">
-            {settlements.map((settlement) => {
-              const reservationLines = settlement.lineItems.filter((line) => line.reservationCode);
+          <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
+            <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+              <thead className="bg-ivory text-ink/48">
+                <tr>
+                  <th className="px-3 py-2 font-semibold uppercase">Periodo</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Estado</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Reservas</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Pago propietario</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Pagado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line bg-white">
+                {settlements.map((settlement) => {
+                  const reservationLines = settlement.lineItems.filter((line) => line.reservationCode);
+                  const reservationCodes = getSettlementReservationCodes(reservationLines);
 
-              return (
-                <div className="rounded-[8px] border border-line bg-ivory p-4" key={settlement.id}>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-midnight">{settlement.periodLabel}</p>
-                      <p className="mt-1 text-xs leading-5 text-ink/56">
-                        {settlement.statusLabel} / Pagado {formatContractDate(settlement.paidAt)}
-                      </p>
-                    </div>
-                    <p className="text-lg font-semibold text-midnight">{settlement.ownerPayoutLabel}</p>
-                  </div>
-
-                  {reservationLines.length > 0 ? (
-                    <div className="mt-3 overflow-x-auto rounded-[6px] border border-line bg-white">
-                      <table className="w-full min-w-[620px] border-collapse text-left text-xs">
-                        <thead className="bg-ivory text-ink/48">
-                          <tr>
-                            <th className="px-3 py-2 font-semibold uppercase">Reserva</th>
-                            <th className="px-3 py-2 font-semibold uppercase">Concepto</th>
-                            <th className="px-3 py-2 font-semibold uppercase">Fecha</th>
-                            <th className="px-3 py-2 text-right font-semibold uppercase">Monto</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-line">
-                          {reservationLines.map((line) => (
-                            <tr key={line.id}>
-                              <td className="px-3 py-2 font-semibold text-midnight">{line.reservationCode}</td>
-                              <td className="px-3 py-2 text-ink/64">{line.typeLabel}</td>
-                              <td className="px-3 py-2 text-ink/64">{formatShortDate(line.occurredAt)}</td>
-                              <td className="px-3 py-2 text-right font-semibold text-midnight">
-                                {formatCurrency(line.amount, line.currency)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+                  return (
+                    <tr key={settlement.id}>
+                      <td className="px-3 py-3 font-semibold text-midnight">{settlement.periodLabel}</td>
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex rounded-full px-2 py-1 font-semibold ${settlementStatusClasses[settlement.status]}`}>
+                          {settlement.statusLabel}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-ink/64">
+                        <p className="font-semibold text-midnight">{reservationLines.length} linea(s)</p>
+                        <p className="mt-1 text-[0.68rem] leading-4 text-ink/52">
+                          {reservationCodes.length > 0 ? reservationCodes.join(", ") : "Sin reservas asociadas"}
+                        </p>
+                      </td>
+                      <td className="px-3 py-3 font-semibold text-midnight">{settlement.ownerPayoutLabel}</td>
+                      <td className="px-3 py-3 text-ink/64">{formatContractDate(settlement.paidAt)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <EmptyPanel text="Aun no hay cortes historicos asociados a esta propiedad." />
+          <p className="mt-4 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-ink/64">
+            Aun no hay cortes historicos asociados a esta propiedad.
+          </p>
         )}
-      </div>
+      </section>
     </div>
   );
 }
@@ -1351,38 +1354,69 @@ function PropertyOperationsTab({
         ))}
       </div>
 
-      <div className="border-t border-line pt-5">
-        <p className="text-xs font-semibold uppercase text-green">Mantenimiento y acciones abiertas</p>
+      <section className="rounded-[8px] border border-line bg-white p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-green">Registro</p>
+            <h3 className="mt-1 text-lg font-semibold text-midnight">Mantenimiento y acciones abiertas</h3>
+          </div>
+          <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
+            {tasks.length} tarea(s)
+          </span>
+        </div>
+
         {tasks.length > 0 ? (
-          <div className="mt-3 divide-y divide-line rounded-[8px] border border-line bg-white px-4">
-            {tasks.map((task) => (
-              <div className="grid gap-3 py-4 md:grid-cols-[1fr_auto] md:items-center" key={task.id}>
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-sm font-semibold text-midnight">{task.title}</h3>
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${taskPriorityClasses[task.priority]}`}
-                    >
-                      {task.ownerAction ? "Accion propietario" : "KUQUBA"}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-ink/62">{task.property}</p>
-                </div>
-                <p className="flex items-center gap-2 text-sm font-semibold text-midnight">
-                  <Clock3 aria-hidden className="h-4 w-4 text-green" />
-                  {task.due}
-                </p>
-              </div>
-            ))}
+          <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
+            <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+              <thead className="bg-ivory text-ink/48">
+                <tr>
+                  <th className="px-3 py-2 font-semibold uppercase">Vencimiento</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Propiedad</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Tipo</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Responsable</th>
+                  <th className="px-3 py-2 font-semibold uppercase">Nota</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line bg-white">
+                {tasks.map((task) => (
+                  <tr key={task.id}>
+                    <td className="px-3 py-3 font-semibold text-midnight">{task.due}</td>
+                    <td className="px-3 py-3 text-ink/64">{task.property}</td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-flex rounded-full px-2 py-1 font-semibold ${taskPriorityClasses[task.priority]}`}>
+                        {taskPriorityLabel(task.priority)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-ink/64">{task.ownerAction ? "Propietario" : "KUQUBA"}</td>
+                    <td className="px-3 py-3 text-ink/64">{task.title}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
-          <EmptyPanel text="Sin pendientes operativos abiertos para esta propiedad." />
+          <p className="mt-4 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-ink/64">
+            Sin pendientes operativos abiertos para esta propiedad.
+          </p>
         )}
-      </div>
+      </section>
     </div>
   );
 }
 
+function taskPriorityLabel(priority: OwnerTask["priority"]) {
+  const labels: Record<OwnerTask["priority"], string> = {
+    high: "Alta prioridad",
+    low: "Baja prioridad",
+    medium: "Prioridad media"
+  };
+
+  return labels[priority];
+}
+
+function getSettlementReservationCodes(lines: OwnerPortalSnapshot["settlements"][number]["lineItems"]) {
+  return Array.from(new Set(lines.flatMap((line) => (line.reservationCode ? [line.reservationCode] : []))));
+}
 function PropertyDocumentsTab({
   onContractAccept,
   property,
