@@ -54,11 +54,19 @@ export function SearchPanel({
   const dateInputClass = isLight
     ? "w-full max-w-full min-w-0 appearance-none bg-transparent text-sm leading-5 outline-none [color-scheme:light] [min-inline-size:0]"
     : "w-full max-w-full min-w-0 appearance-none bg-transparent text-sm leading-5 outline-none [color-scheme:dark] [min-inline-size:0]";
+  const choiceMenuPlacement = "bottom" as const;
   const [destination, setDestination] = useState(() =>
     getInitialDestination(defaults?.destination)
   );
   const [destinationError, setDestinationError] = useState<string | null>(null);
   const [guests, setGuests] = useState(() => getInitialGuests(defaults?.guests));
+  const [openChoice, setOpenChoice] = useState<"destination" | "guests" | null>(null);
+  const choiceMenuOffsetClass =
+    openChoice === "guests"
+      ? "mt-4 lg:mt-72"
+      : openChoice === "destination"
+        ? "mt-4 lg:mt-48"
+        : "mt-4";
 
   useEffect(() => {
     setDestination(getInitialDestination(defaults?.destination));
@@ -97,8 +105,10 @@ export function SearchPanel({
             icon={MapPin}
             iconClass={iconClass}
             isLight={isLight}
-            menuPlacement="bottom"
+            isOpen={openChoice === "destination"}
+            menuPlacement={choiceMenuPlacement}
             name="destination"
+            onOpenChange={(isOpen) => setOpenChoice(isOpen ? "destination" : null)}
             onChange={(value) => {
               setDestination(value);
               setDestinationError(null);
@@ -151,8 +161,10 @@ export function SearchPanel({
             icon={UsersRound}
             iconClass={iconClass}
             isLight={isLight}
-            menuPlacement="top"
+            isOpen={openChoice === "guests"}
+            menuPlacement={choiceMenuPlacement}
             name="guests"
+            onOpenChange={(isOpen) => setOpenChoice(isOpen ? "guests" : null)}
             onChange={setGuests}
             options={guestOptions}
             placeholder="Huéspedes"
@@ -171,7 +183,7 @@ export function SearchPanel({
       </div>
 
       <div
-        className={`mt-4 flex flex-wrap items-center justify-center gap-2 text-center text-sm ${
+        className={`${choiceMenuOffsetClass} flex flex-wrap items-center justify-center gap-2 text-center text-sm transition-[margin] duration-200 ${
           isLight ? "text-ink/64" : "text-white/78"
         }`}
       >
@@ -188,9 +200,11 @@ function ChoiceField({
   icon: Icon,
   iconClass,
   isLight,
+  isOpen,
   menuPlacement,
   name,
   onChange,
+  onOpenChange,
   options,
   placeholder,
   value
@@ -200,19 +214,21 @@ function ChoiceField({
   icon: LucideIcon;
   iconClass: string;
   isLight: boolean;
+  isOpen: boolean;
   menuPlacement: "bottom" | "top";
   name: string;
   onChange: (value: string) => void;
+  onOpenChange: (isOpen: boolean) => void;
   options: readonly ChoiceOption[];
   placeholder: string;
   value: string;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find((option) => option.value === value);
   const placeholderClass = isLight ? "text-ink/45" : "text-white/64";
-  const menuPlacementClass = menuPlacement === "top" ? "bottom-full mb-3" : "top-full mt-3";
+  const menuPlacementClass =
+    menuPlacement === "top" ? "lg:bottom-full lg:mb-3" : "lg:top-full lg:mt-3";
 
   useEffect(() => {
     if (!isOpen) {
@@ -223,13 +239,13 @@ function ChoiceField({
       const target = event.target;
 
       if (target instanceof Node && !containerRef.current?.contains(target)) {
-        setIsOpen(false);
+        onOpenChange(false);
       }
     }
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setIsOpen(false);
+        onOpenChange(false);
       }
     }
 
@@ -240,7 +256,7 @@ function ChoiceField({
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [isOpen]);
+  }, [isOpen, onOpenChange]);
 
   return (
     <div className={`relative ${isOpen ? "z-50" : "z-30"}`} ref={containerRef}>
@@ -253,7 +269,7 @@ function ChoiceField({
         className={`focus-ring flex min-h-[52px] w-full min-w-0 items-center gap-3 rounded-[6px] border text-left transition ${fieldClass} ${
           isOpen ? (isLight ? "ring-2 ring-green/14" : "ring-2 ring-beige/24") : ""
         } ${error ? "ring-1 ring-terracotta" : ""}`}
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => onOpenChange(!isOpen)}
         type="button"
       >
         <Icon aria-hidden className={`h-5 w-5 shrink-0 ${iconClass}`} />
@@ -272,7 +288,7 @@ function ChoiceField({
 
       {isOpen ? (
         <div
-          className={`absolute left-0 right-0 z-50 overflow-hidden rounded-[8px] border bg-white p-2 text-ink shadow-[0_22px_70px_rgba(6,22,34,0.32)] ${menuPlacementClass} ${
+          className={`relative z-50 mt-3 overflow-hidden rounded-[8px] border bg-white p-2 text-ink shadow-[0_22px_70px_rgba(6,22,34,0.32)] lg:absolute lg:left-0 lg:right-0 lg:mt-0 ${menuPlacementClass} ${
             isLight ? "border-line" : "border-white/18"
           }`}
         >
@@ -296,7 +312,7 @@ function ChoiceField({
                     }`}
                     onClick={() => {
                       onChange(option.value);
-                      setIsOpen(false);
+                      onOpenChange(false);
                     }}
                     role="option"
                     type="button"
