@@ -1169,15 +1169,15 @@ function PropertyBlocksTab({
   return (
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <OwnerAvailabilityBlockForm
-          isSubmitting={blockingPropertyId === property.id}
-          onSubmit={onAvailabilityBlockRequest}
-          property={property}
-        />
+        <OwnerOccupancyCalendar days={calendarDays} units={calendarUnits} />
         <OwnerBlocksSummary blocks={blocks} />
       </div>
 
-      <OwnerOccupancyCalendar days={calendarDays} units={calendarUnits} />
+      <OwnerAvailabilityBlockForm
+        isSubmitting={blockingPropertyId === property.id}
+        onSubmit={onAvailabilityBlockRequest}
+        property={property}
+      />
       <OwnerAvailabilityBlocksTable blocks={blocks} property={property} />
     </div>
   );
@@ -1711,8 +1711,8 @@ function OwnerAvailabilityBlockForm({
     <form className="rounded-[8px] border border-line bg-white p-4" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-green">Solicitud</p>
-          <h3 className="mt-1 text-lg font-semibold text-midnight">Bloquear fechas disponibles</h3>
+          <p className="text-xs font-semibold uppercase text-green">Crear bloqueo</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Solicitar nuevas fechas bloqueadas</h3>
           <p className="mt-1 text-sm leading-6 text-ink/62">
             Se audita contra reservas y bloqueos existentes antes de registrar la solicitud.
           </p>
