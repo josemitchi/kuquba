@@ -85,7 +85,7 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    const portal = buildOwnerPortal(owner, authorization.session);
+    const portal = buildOwnerPortal(owner);
 
     await writeOwnerAudit({
       action: "owner.portal.read",
@@ -172,7 +172,7 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.code(201).send({
       block: blockResult.block,
-      portal: buildOwnerPortal(refreshedOwner, authorization.session),
+      portal: buildOwnerPortal(refreshedOwner),
       correlationId: request.id
     });
   });
@@ -241,7 +241,7 @@ export const registerOwnerRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.send({
       contract: acceptResult.contract,
-      portal: buildOwnerPortal(refreshedOwner, authorization.session),
+      portal: buildOwnerPortal(refreshedOwner),
       correlationId: request.id
     });
   });
@@ -365,7 +365,7 @@ type OwnerSettlementRecord = OwnerPortalRecord["settlements"][number];
 type OwnerAccessRecord = NonNullable<Awaited<ReturnType<typeof loadOwnerByUserId>>>;
 type OwnerContractForSignature = NonNullable<Awaited<ReturnType<typeof loadContractForOwner>>>;
 
-function buildOwnerPortal(owner: OwnerPortalRecord, session: AuthorizedDevPortalSession) {
+function buildOwnerPortal(owner: OwnerPortalRecord) {
   const contracts = uniqueContractsByProperty(owner.contracts);
   const reservations = getReservationsWithProperty(contracts)
     .filter((reservation) => reservation.status !== "CANCELLED")
@@ -433,13 +433,7 @@ function buildOwnerPortal(owner: OwnerPortalRecord, session: AuthorizedDevPortal
       label: document.label,
       status: document.statusLabel
     })),
-    settlements: owner.settlements.map(mapOwnerSettlement),
-    governance: [
-      "El portal respeta permisos de propietario y no muestra propiedades no asignadas.",
-      "Contratos y aceptaciones quedan versionados y auditados antes de habilitar firma externa.",
-      "Finanzas del propietario se leen desde liquidaciones y lineas contables registradas; pagos externos siguen deshabilitados.",
-      `Lectura auditada para sesion ${session.sessionId.slice(0, 8)}.`
-    ]
+    settlements: owner.settlements.map(mapOwnerSettlement)
   };
 }
 

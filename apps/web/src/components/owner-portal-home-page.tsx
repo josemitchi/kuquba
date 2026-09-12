@@ -10,7 +10,6 @@ import {
   ClipboardCheck,
   Clock3,
   FileText,
-  KeyRound,
   LogOut,
   MapPin,
   ShieldCheck,
@@ -381,8 +380,12 @@ function OwnerDashboard({
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-stretch">
-        <OwnerModuleNav activeModule={activeModule} onSelect={setActiveModule} snapshot={snapshot} />
+      <div className="mt-6 grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+        <OwnerModuleNav
+          activeModule={activeModule}
+          onSelect={setActiveModule}
+          snapshot={snapshot}
+        />
         <OwnerIdentityCard session={session} snapshot={snapshot} />
       </div>
 
@@ -432,7 +435,7 @@ function OwnerModuleNav({
   return (
     <nav
       aria-label="Modulos del propietario"
-      className="rounded-[8px] border border-line bg-white p-2 shadow-soft"
+      className="self-start rounded-[8px] border border-line bg-white p-1.5 shadow-soft"
     >
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {ownerModules.map((module) => {
@@ -442,7 +445,7 @@ function OwnerModuleNav({
             <button
               aria-current={isActive ? "page" : undefined}
               className={
-                "focus-ring flex min-h-11 items-center justify-between gap-3 rounded-[6px] px-3 text-sm font-semibold transition " +
+                "focus-ring flex min-h-10 items-center justify-between gap-3 rounded-[6px] px-3 text-sm font-semibold transition " +
                 (isActive ? "bg-green text-white" : "text-midnight hover:bg-ivory hover:text-green")
               }
               key={module.key}
@@ -455,7 +458,7 @@ function OwnerModuleNav({
               </span>
               <span
                 className={
-                  "rounded-full px-2 py-0.5 text-[0.68rem] " +
+                  "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[0.68rem] " +
                   (isActive ? "bg-white/20" : "bg-ivory text-ink/58")
                 }
               >
@@ -630,31 +633,25 @@ function DocumentsModule({
   updatingContractId: string | null;
 }) {
   return (
-    <div className="space-y-6">
-      <section>
-        <SectionHeading
-          eyebrow="Contratos"
-          title="Documentos por propiedad"
-          value={String(snapshot.properties.length) + " contrato(s)"}
-        />
-        <div className="mt-5 space-y-5">
-          {snapshot.properties.map((property) => (
-            <section
-              className="rounded-[8px] border border-line bg-white p-6 shadow-soft"
-              key={property.id}
-            >
-              <p className="text-xs font-semibold uppercase text-green">{property.name}</p>
-              <PropertyContractPanel
-                onContractAccept={onContractAccept}
-                property={property}
-                updatingContractId={updatingContractId}
-              />
-            </section>
-          ))}
-        </div>
-      </section>
-      <GovernancePanel snapshot={snapshot} />
-    </div>
+    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
+      <SectionHeading
+        eyebrow="Contratos"
+        title="Documentos por propiedad"
+        value={String(snapshot.properties.length) + " contrato(s)"}
+      />
+      <div className="mt-5 grid gap-4">
+        {snapshot.properties.map((property) => (
+          <section className="rounded-[8px] border border-line bg-ivory p-4" key={property.id}>
+            <p className="text-xs font-semibold uppercase text-green">{property.name}</p>
+            <PropertyContractPanel
+              onContractAccept={onContractAccept}
+              property={property}
+              updatingContractId={updatingContractId}
+            />
+          </section>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -666,11 +663,13 @@ function MetricCard({
   metric: OwnerPortalSnapshot["metrics"][number];
 }) {
   return (
-    <article className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
-      <Icon aria-hidden className="h-6 w-6 text-green" />
-      <p className="mt-4 text-xs font-semibold uppercase text-ink/48">{metric.label}</p>
-      <p className="mt-1 text-2xl font-semibold text-midnight">{metric.value}</p>
-      <p className="mt-2 text-sm leading-6 text-ink/62">{metric.hint}</p>
+    <article className="rounded-[8px] border border-line bg-white p-4 shadow-soft">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase text-ink/48">
+        <Icon aria-hidden className="h-4 w-4 text-green" />
+        <span>{metric.label}</span>
+      </div>
+      <p className="mt-3 text-xl font-semibold text-midnight">{metric.value}</p>
+      <p className="mt-1 text-sm leading-6 text-ink/62">{metric.hint}</p>
     </article>
   );
 }
@@ -1110,19 +1109,17 @@ function OwnerIdentityCard({
   snapshot: OwnerPortalSnapshot;
 }) {
   return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
+    <section className="self-start rounded-[8px] border border-line bg-white px-4 py-3 shadow-soft">
       <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
           <UserRound aria-hidden className="h-5 w-5" />
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase text-green">{snapshot.ownerName}</p>
-          <h2 className="text-lg font-semibold text-midnight">{session.user.displayName}</h2>
+        <div className="min-w-0">
+          <p className="text-[0.68rem] font-semibold uppercase text-green">Propietario</p>
+          <h2 className="truncate text-sm font-semibold text-midnight">{session.user.displayName}</h2>
+          <p className="mt-0.5 truncate text-xs text-ink/56">{snapshot.properties.length} propiedades asignadas</p>
         </div>
       </div>
-      <p className="mt-4 text-sm leading-6 text-ink/68">
-        Acceso limitado a propiedades asignadas y permisos de lectura para liquidaciones.
-      </p>
     </section>
   );
 }
@@ -1261,25 +1258,6 @@ function FinanceFact({ detail, label, value }: { detail: string; label: string; 
       <p className="mt-2 break-words text-xl font-semibold text-midnight">{value}</p>
       <p className="mt-2 text-xs leading-5 text-ink/56">{detail}</p>
     </div>
-  );
-}
-
-function GovernancePanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
-  return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
-      <div className="flex items-center gap-3">
-        <KeyRound aria-hidden className="h-5 w-5 text-green" />
-        <h2 className="text-lg font-semibold text-midnight">Gobernanza</h2>
-      </div>
-      <ul className="mt-5 space-y-3 text-sm leading-6 text-ink/68">
-        {snapshot.governance.map((item) => (
-          <li className="flex gap-3" key={item}>
-            <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
   );
 }
 

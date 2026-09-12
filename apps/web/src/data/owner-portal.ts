@@ -172,7 +172,6 @@ export type OwnerSettlement = {
 
 export type OwnerPortalSnapshot = {
   financeSummary: OwnerFinanceSummary;
-  governance: string[];
   metrics: OwnerPortalMetric[];
   ownerName: string;
   periodLabel: string;
@@ -487,13 +486,5 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
       status: "2 pendientes",
       detail: "Datos fiscales e inventario sensible requieren confirmacion."
     }
-  ],
-  governance: [
-    "El portal respeta permisos de propietario y no muestra propiedades no asignadas.",
-    "Contratos y aceptaciones dev quedan preparados para auditoria por sesion.",
-    "Finanzas owner se leen desde liquidaciones y lineas ledger persistidas; payouts reales siguen deshabilitados."
   ]
 };
-
-
-
