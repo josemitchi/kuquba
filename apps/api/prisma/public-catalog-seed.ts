@@ -8,6 +8,7 @@ process.env.DATABASE_URL ??= defaultDevDatabaseUrl;
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const ownerId = "00000000-0000-4000-8000-000000000101";
+const publicDemoOwnerEmail = "josemitchi@gmail.com";
 
 const defaultOwnerShareBps = 6500;
 const defaultKuqubaShareBps = 3500;
@@ -313,18 +314,22 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
     }
   });
 
+  const ownerUser = await seedPortalOwnerUser(prisma, organization.id);
+
   const owner = await prisma.owner.upsert({
     where: { id: ownerId },
     create: {
       id: ownerId,
       organizationId: organization.id,
+      userId: ownerUser.id,
       displayName: "Propietario KUQUBA",
-      email: "owner.dev@kuquba.local"
+      email: publicDemoOwnerEmail
     },
     update: {
       organizationId: organization.id,
+      userId: ownerUser.id,
       displayName: "Propietario KUQUBA",
-      email: "owner.dev@kuquba.local"
+      email: publicDemoOwnerEmail
     }
   });
 
@@ -333,6 +338,72 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
   for (const stay of catalogStays) {
     await seedStay(prisma, organization.id, owner.id, stay);
   }
+}
+
+async function seedPortalOwnerUser(prisma: PrismaClient, organizationIdValue: string) {
+  const user = await prisma.user.upsert({
+    where: {
+      organizationId_email: {
+        organizationId: organizationIdValue,
+        email: publicDemoOwnerEmail
+      }
+    },
+    create: {
+      organizationId: organizationIdValue,
+      email: publicDemoOwnerEmail,
+      displayName: "Propietario KUQUBA"
+    },
+    update: {
+      displayName: "Propietario KUQUBA"
+    }
+  });
+
+  await prisma.identity.upsert({
+    where: {
+      provider_subject: {
+        provider: "EMAIL_OTP",
+        subject: publicDemoOwnerEmail
+      }
+    },
+    create: {
+      userId: user.id,
+      provider: "EMAIL_OTP",
+      subject: publicDemoOwnerEmail,
+      status: "VERIFIED",
+      verifiedAt: new Date()
+    },
+    update: {
+      userId: user.id,
+      status: "VERIFIED",
+      verifiedAt: new Date()
+    }
+  });
+
+  const ownerRole = await prisma.role.findUniqueOrThrow({
+    where: {
+      key: "owner"
+    }
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId_scope_resourceId: {
+        userId: user.id,
+        roleId: ownerRole.id,
+        scope: "ORGANIZATION",
+        resourceId: organizationIdValue
+      }
+    },
+    create: {
+      userId: user.id,
+      roleId: ownerRole.id,
+      scope: "ORGANIZATION",
+      resourceId: organizationIdValue
+    },
+    update: {}
+  });
+
+  return user;
 }
 
 async function seedStay(
