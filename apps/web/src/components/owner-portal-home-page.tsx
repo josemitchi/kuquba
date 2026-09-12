@@ -1154,7 +1154,7 @@ function PropertyReservationsTab({ reservations }: { reservations: OwnerProperty
 
   return (
     <div className="overflow-x-auto rounded-[8px] border border-line">
-      <table className="w-full min-w-[760px] border-collapse text-left text-xs">
+      <table className="w-full min-w-[980px] border-collapse text-left text-xs">
         <thead className="bg-ivory text-ink/48">
           <tr>
             <th className="px-3 py-2 font-semibold uppercase">Codigo</th>
@@ -1162,8 +1162,10 @@ function PropertyReservationsTab({ reservations }: { reservations: OwnerProperty
             <th className="px-3 py-2 font-semibold uppercase">Huesped</th>
             <th className="px-3 py-2 font-semibold uppercase">Unidad</th>
             <th className="px-3 py-2 font-semibold uppercase">Estado</th>
-            <th className="px-3 py-2 font-semibold uppercase">Pago</th>
-            <th className="px-3 py-2 font-semibold uppercase">Total</th>
+            <th className="px-3 py-2 font-semibold uppercase">Pago huesped</th>
+            <th className="px-3 py-2 font-semibold uppercase">Total reserva</th>
+            <th className="px-3 py-2 font-semibold uppercase">Pago propietario</th>
+            <th className="px-3 py-2 font-semibold uppercase">Corte</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line bg-white">
@@ -1179,6 +1181,22 @@ function PropertyReservationsTab({ reservations }: { reservations: OwnerProperty
               <td className="px-3 py-3 text-ink/64">{reservation.paymentStatusLabel}</td>
               <td className="px-3 py-3 font-semibold text-midnight">
                 {formatCurrency(reservation.total, reservation.currency)}
+              </td>
+              <td className="px-3 py-3">
+                <p className="font-semibold text-midnight">{reservation.ownerPayment.amountLabel}</p>
+                <p className="mt-1 text-[0.68rem] font-semibold uppercase text-green">
+                  {reservation.ownerPayment.statusLabel}
+                </p>
+              </td>
+              <td className="px-3 py-3 text-ink/64">
+                <p className="font-semibold text-midnight">
+                  {reservation.ownerPayment.settlementPeriodLabel ?? "Sin corte"}
+                </p>
+                <p className="mt-1 text-[0.68rem] text-ink/52">
+                  {reservation.ownerPayment.paidAt
+                    ? `Pagado ${formatShortDate(reservation.ownerPayment.paidAt)}`
+                    : reservation.ownerPayment.settlementStatusLabel ?? "Pendiente"}
+                </p>
               </td>
             </tr>
           ))}
@@ -1262,19 +1280,50 @@ function PropertyFinanceTab({
 
         {settlements.length > 0 ? (
           <div className="mt-4 grid gap-3">
-            {settlements.map((settlement) => (
-              <div className="rounded-[8px] border border-line bg-ivory p-4" key={settlement.id}>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-midnight">{settlement.periodLabel}</p>
-                    <p className="mt-1 text-xs leading-5 text-ink/56">
-                      {settlement.statusLabel} / Pagado {formatContractDate(settlement.paidAt)}
-                    </p>
+            {settlements.map((settlement) => {
+              const reservationLines = settlement.lineItems.filter((line) => line.reservationCode);
+
+              return (
+                <div className="rounded-[8px] border border-line bg-ivory p-4" key={settlement.id}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-midnight">{settlement.periodLabel}</p>
+                      <p className="mt-1 text-xs leading-5 text-ink/56">
+                        {settlement.statusLabel} / Pagado {formatContractDate(settlement.paidAt)}
+                      </p>
+                    </div>
+                    <p className="text-lg font-semibold text-midnight">{settlement.ownerPayoutLabel}</p>
                   </div>
-                  <p className="text-lg font-semibold text-midnight">{settlement.ownerPayoutLabel}</p>
+
+                  {reservationLines.length > 0 ? (
+                    <div className="mt-3 overflow-x-auto rounded-[6px] border border-line bg-white">
+                      <table className="w-full min-w-[620px] border-collapse text-left text-xs">
+                        <thead className="bg-ivory text-ink/48">
+                          <tr>
+                            <th className="px-3 py-2 font-semibold uppercase">Reserva</th>
+                            <th className="px-3 py-2 font-semibold uppercase">Concepto</th>
+                            <th className="px-3 py-2 font-semibold uppercase">Fecha</th>
+                            <th className="px-3 py-2 text-right font-semibold uppercase">Monto</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-line">
+                          {reservationLines.map((line) => (
+                            <tr key={line.id}>
+                              <td className="px-3 py-2 font-semibold text-midnight">{line.reservationCode}</td>
+                              <td className="px-3 py-2 text-ink/64">{line.typeLabel}</td>
+                              <td className="px-3 py-2 text-ink/64">{formatShortDate(line.occurredAt)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-midnight">
+                                {formatCurrency(line.amount, line.currency)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <EmptyPanel text="Aun no hay cortes historicos asociados a esta propiedad." />

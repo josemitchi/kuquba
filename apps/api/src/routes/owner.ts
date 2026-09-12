@@ -271,6 +271,15 @@ async function loadOwnerPortalRecord(userId: string) {
               },
               reservations: {
                 include: {
+                  financialAllocations: {
+                    orderBy: {
+                      createdAt: "asc"
+                    },
+                    where: {
+                      beneficiaryType: "OWNER",
+                      settlementEligible: true
+                    }
+                  },
                   guest: true,
                   payments: { orderBy: { createdAt: "desc" }, take: 1 },
                   unit: true
@@ -362,6 +371,20 @@ type OwnerReservationRecord = OwnerPropertyRecord["reservations"][number];
 type OwnerAvailabilityBlockRecord = OwnerPropertyRecord["availabilityBlocks"][number];
 type ReservationWithProperty = OwnerReservationRecord & { property: OwnerPropertyRecord };
 type OwnerSettlementRecord = OwnerPortalRecord["settlements"][number];
+type OwnerSettlementLineRecord = OwnerSettlementRecord["lines"][number];
+type OwnerReservationPaymentStatus = "PENDING_CONFIRMATION" | "PENDING_SETTLEMENT" | "IN_SETTLEMENT" | "PAID";
+type OwnerReservationPaymentTrace = {
+  amount: string;
+  amountLabel: string;
+  currency: string;
+  paidAt: string | null;
+  settlementId: string | null;
+  settlementPeriodLabel: string | null;
+  settlementStatus: string | null;
+  settlementStatusLabel: string | null;
+  status: OwnerReservationPaymentStatus;
+  statusLabel: string;
+};
 type OwnerAccessRecord = NonNullable<Awaited<ReturnType<typeof loadOwnerByUserId>>>;
 type OwnerContractForSignature = NonNullable<Awaited<ReturnType<typeof loadContractForOwner>>>;
 
@@ -370,14 +393,17 @@ function buildOwnerPortal(owner: OwnerPortalRecord) {
   const reservations = getReservationsWithProperty(contracts)
     .filter((reservation) => reservation.status !== "CANCELLED")
     .sort((left, right) => left.arrivalDate.getTime() - right.arrivalDate.getTime());
-  const properties = contracts.map((contract) => buildPropertySummary(contract, owner.tasks));
+  const reservationPaymentTraces = buildOwnerReservationPaymentTraces(owner.settlements, contracts);
+  const properties = contracts.map((contract) => buildPropertySummary(contract, owner.tasks, reservationPaymentTraces));
   const activeCount = properties.filter((property) => property.status === "active").length;
   const activationCount = properties.filter((property) => property.status === "onboarding").length;
   const ownerActionCount = owner.tasks.filter((task) => task.ownerAction).length;
   const pendingContractCount = contracts.filter(isOwnerContractPending).length;
   const activeContractCount = contracts.filter((contract) => contract.status === "ACTIVE").length;
   const financeSummary = buildOwnerFinanceSummary(owner.settlements, contracts);
-  const reservationSummaries = reservations.slice(0, 20).map(mapOwnerReservation);
+  const reservationSummaries = reservations
+    .slice(0, 20)
+    .map((reservation) => mapOwnerReservation(reservation, reservationPaymentTraces.get(reservation.id)));
 
   return {
     ownerName: owner.displayName,
@@ -466,7 +492,11 @@ function getReservationsWithProperty(contracts: OwnerContractRecord[]) {
   return reservations;
 }
 
-function buildPropertySummary(contract: OwnerContractRecord, tasks: OwnerPortalRecord["tasks"]) {
+function buildPropertySummary(
+  contract: OwnerContractRecord,
+  tasks: OwnerPortalRecord["tasks"],
+  reservationPaymentTraces: Map<string, OwnerReservationPaymentTrace>
+) {
   const property = contract.property;
   const firstUnit = property.units[0];
   const propertyTasks = tasks.filter((task) => task.propertyId === property.id);
@@ -497,7 +527,9 @@ function buildPropertySummary(contract: OwnerContractRecord, tasks: OwnerPortalR
       : "Pendiente de publicacion",
     occupancySignal: property.reservations.length > 0 ? "Demanda activa" : "Preparando inventario",
     openItems: propertyTasks.length,
-    reservations: activeReservations.slice(0, 8).map(mapOwnerReservation),
+    reservations: activeReservations
+      .slice(0, 8)
+      .map((reservation) => mapOwnerReservation(reservation, reservationPaymentTraces.get(reservation.id))),
     requestedBlocks: property.availabilityBlocks.map(mapOwnerAvailabilityBlock),
     units: property.units.map((unit) => ({ id: unit.id, name: unit.name })),
     operations: [
@@ -542,7 +574,10 @@ function buildOwnerPropertyImage(destination: string) {
 
   return "/images/owner-dashboard.png";
 }
-function mapOwnerReservation(reservation: ReservationWithProperty | OwnerReservationRecord) {
+function mapOwnerReservation(
+  reservation: ReservationWithProperty | OwnerReservationRecord,
+  ownerPayment?: OwnerReservationPaymentTrace
+) {
   const latestPayment = reservation.payments[0] ?? null;
 
   return {
@@ -552,6 +587,7 @@ function mapOwnerReservation(reservation: ReservationWithProperty | OwnerReserva
     guestName: reservation.guest.fullName,
     id: reservation.id,
     nights: differenceInNights(reservation.arrivalDate, reservation.departureDate),
+    ownerPayment: ownerPayment ?? buildPendingOwnerReservationPaymentTrace(reservation),
     paymentStatus: latestPayment?.status ?? "NO_PAYMENT",
     paymentStatusLabel: latestPayment ? paymentStatusLabel(latestPayment.status) : "Sin pago",
     propertyName: "property" in reservation ? reservation.property.name : "Propiedad asignada",
@@ -561,6 +597,146 @@ function mapOwnerReservation(reservation: ReservationWithProperty | OwnerReserva
     total: reservation.total?.toString() ?? "0.00",
     unitName: reservation.unit.name
   };
+}
+
+function buildOwnerReservationPaymentTraces(
+  settlements: OwnerSettlementRecord[],
+  contracts: OwnerContractRecord[]
+) {
+  const traces = new Map<string, OwnerReservationPaymentTrace>();
+  const ownerShareBpsByPropertyId = new Map(contracts.map((contract) => [contract.propertyId, contract.ownerShareBps]));
+
+  for (const settlement of settlements) {
+    const linesByReservation = new Map<string, OwnerSettlementLineRecord[]>();
+
+    for (const line of settlement.lines) {
+      if (!line.reservationId) {
+        continue;
+      }
+
+      linesByReservation.set(line.reservationId, [...(linesByReservation.get(line.reservationId) ?? []), line]);
+    }
+
+    for (const [reservationId, lines] of linesByReservation.entries()) {
+      if (traces.has(reservationId)) {
+        continue;
+      }
+
+      const firstLine = lines[0];
+      const reservation = lines.find((line) => line.reservation)?.reservation ?? null;
+      const propertyId = reservation?.propertyId ?? settlement.propertyId ?? null;
+      const ownerShareBps = propertyId ? ownerShareBpsByPropertyId.get(propertyId) : undefined;
+      const amount = calculateOwnerSettlementReservationAmount(lines, ownerShareBps);
+      const currency = firstLine?.currency ?? settlement.currency;
+      const isPaid = settlement.status === "PAID";
+
+      traces.set(reservationId, {
+        amount: amount.toFixed(2),
+        amountLabel: formatCurrencyValue(amount.toFixed(2), currency),
+        currency,
+        paidAt: settlement.paidAt?.toISOString() ?? null,
+        settlementId: settlement.id,
+        settlementPeriodLabel: buildSettlementPeriodLabel(settlement),
+        settlementStatus: settlement.status,
+        settlementStatusLabel: settlementStatusLabel(settlement.status),
+        status: isPaid ? "PAID" : "IN_SETTLEMENT",
+        statusLabel: isPaid ? "Pagado al propietario" : `En corte ${settlementStatusLabel(settlement.status)}`
+      });
+    }
+  }
+
+  for (const contract of contracts) {
+    for (const reservation of contract.property.reservations) {
+      if (!traces.has(reservation.id)) {
+        traces.set(reservation.id, buildEstimatedOwnerReservationPaymentTrace(reservation, contract));
+      }
+    }
+  }
+
+  return traces;
+}
+
+function calculateOwnerSettlementReservationAmount(lines: OwnerSettlementLineRecord[], ownerShareBps?: number) {
+  const ownerShareAmount = sumOwnerSettlementLines(lines, ["OWNER_SHARE"]);
+  const cleaningAmount = sumOwnerSettlementLines(lines, ["CLEANING"]);
+  const settlementAmount = sumOwnerSettlementLines(lines, ["SETTLEMENT"]);
+  const adjustments = sumOwnerSettlementLines(lines, ["ADJUSTMENT"]);
+  const deductions = sumOwnerSettlementLines(lines, ["OWNER_EXPENSE", "REFUND"]);
+
+  if (ownerShareAmount > 0 || settlementAmount > 0) {
+    return Math.max(0, ownerShareAmount + cleaningAmount + settlementAmount + adjustments - deductions);
+  }
+
+  const accommodationAmount = sumOwnerSettlementLines(lines, ["ACCOMMODATION"]);
+  const ownerShare = ownerShareBps === undefined ? 1 : ownerShareBps / 10_000;
+
+  return Math.max(0, accommodationAmount * ownerShare + cleaningAmount + adjustments - deductions);
+}
+
+function sumOwnerSettlementLines(lines: OwnerSettlementLineRecord[], types: string[]) {
+  return lines
+    .filter((line) => types.includes(line.type))
+    .reduce((total, line) => total + Number(line.amount.toString()), 0);
+}
+
+function buildEstimatedOwnerReservationPaymentTrace(
+  reservation: OwnerReservationRecord,
+  contract: OwnerContractRecord
+): OwnerReservationPaymentTrace {
+  const currency = reservation.currency ?? "GTQ";
+
+  if (!["CONFIRMED", "COMPLETED"].includes(reservation.status)) {
+    return buildPendingOwnerReservationPaymentTrace(reservation);
+  }
+
+  const amount = calculateEstimatedOwnerReservationPayout(reservation, contract);
+
+  return {
+    amount: amount.toFixed(2),
+    amountLabel: formatCurrencyValue(amount.toFixed(2), currency),
+    currency,
+    paidAt: null,
+    settlementId: null,
+    settlementPeriodLabel: formatMonthYear(reservation.arrivalDate),
+    settlementStatus: null,
+    settlementStatusLabel: null,
+    status: "PENDING_SETTLEMENT",
+    statusLabel: "Pendiente de corte"
+  };
+}
+
+function buildPendingOwnerReservationPaymentTrace(
+  reservation: ReservationWithProperty | OwnerReservationRecord
+): OwnerReservationPaymentTrace {
+  const currency = reservation.currency ?? "GTQ";
+
+  return {
+    amount: "0.00",
+    amountLabel: formatCurrencyValue("0.00", currency),
+    currency,
+    paidAt: null,
+    settlementId: null,
+    settlementPeriodLabel: null,
+    settlementStatus: null,
+    settlementStatusLabel: null,
+    status: "PENDING_CONFIRMATION",
+    statusLabel: "Pendiente de confirmacion"
+  };
+}
+
+function calculateEstimatedOwnerReservationPayout(reservation: OwnerReservationRecord, contract: OwnerContractRecord) {
+  const allocationTotal = reservation.financialAllocations.reduce(
+    (total, allocation) => total + Number(allocation.amount.toString()),
+    0
+  );
+
+  if (allocationTotal > 0) {
+    return allocationTotal;
+  }
+
+  const total = Number(reservation.total?.toString() ?? "0");
+
+  return total * (contract.ownerShareBps / 10_000);
 }
 
 function mapOwnerAvailabilityBlock(block: OwnerAvailabilityBlockRecord) {
@@ -909,12 +1085,12 @@ function buildEstimatedOwnerFinanceSummary(
       }
 
       const total = Number(reservation.total?.toString() ?? "0");
-      const estimatedOwnerShare = total * (contract.ownerShareBps / 10_000);
+      const estimatedOwnerShare = calculateEstimatedOwnerReservationPayout(reservation, contract);
 
       currency = reservation.currency ?? currency;
       grossAccommodation += total;
       ownerPayout += estimatedOwnerShare;
-      kuqubaShare += total - estimatedOwnerShare;
+      kuqubaShare += Math.max(0, total - estimatedOwnerShare);
       lineCount += 1;
       propertyIds.add(contract.propertyId);
     }
@@ -965,6 +1141,7 @@ function mapOwnerSettlement(settlement: OwnerSettlementRecord) {
       label: line.label,
       occurredAt: line.occurredAt.toISOString(),
       reservationCode: line.reservation?.privateCode ?? null,
+      reservationId: line.reservationId,
       sourceMemo: line.sourceMemo,
       type: line.type,
       typeLabel: ledgerEntryTypeLabel(line.type)

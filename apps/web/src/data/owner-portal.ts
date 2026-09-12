@@ -36,6 +36,19 @@ export type OwnerContract = {
   }>;
 };
 
+export type OwnerReservationOwnerPayment = {
+  amount: string;
+  amountLabel: string;
+  currency: string;
+  paidAt?: string | null;
+  settlementId?: string | null;
+  settlementPeriodLabel?: string | null;
+  settlementStatus?: string | null;
+  settlementStatusLabel?: string | null;
+  status: "PENDING_CONFIRMATION" | "PENDING_SETTLEMENT" | "IN_SETTLEMENT" | "PAID";
+  statusLabel: string;
+};
+
 export type OwnerReservation = {
   arrivalDate: string;
   currency: string;
@@ -43,6 +56,7 @@ export type OwnerReservation = {
   guestName: string;
   id: string;
   nights: number;
+  ownerPayment: OwnerReservationOwnerPayment;
   paymentStatus: string;
   paymentStatusLabel: string;
   propertyName: string;
@@ -153,6 +167,7 @@ export type OwnerSettlement = {
     label: string;
     occurredAt: string;
     reservationCode?: string | null;
+    reservationId?: string | null;
     sourceMemo?: string | null;
     type: string;
     typeLabel: string;
