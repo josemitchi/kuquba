@@ -381,46 +381,40 @@ function OwnerDashboard({
         </div>
       ) : null}
 
-      <div className="mt-8 grid gap-8 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
-        <aside className="space-y-5">
-          <OwnerModuleNav
-            activeModule={activeModule}
-            onSelect={setActiveModule}
+      <div className="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-stretch">
+        <OwnerModuleNav activeModule={activeModule} onSelect={setActiveModule} snapshot={snapshot} />
+        <OwnerIdentityCard session={session} snapshot={snapshot} />
+      </div>
+
+      <div className="mt-6 min-w-0">
+        {activeModule === "properties" ? (
+          <PropertiesModule
+            onSelectProperty={setSelectedPropertyId}
+            selectedProperty={selectedProperty}
+            selectedPropertyId={selectedProperty?.id ?? null}
             snapshot={snapshot}
           />
-          <OwnerIdentityCard session={session} snapshot={snapshot} />
-        </aside>
+        ) : null}
 
-        <div className="min-w-0">
-          {activeModule === "properties" ? (
-            <PropertiesModule
-              onSelectProperty={setSelectedPropertyId}
-              selectedProperty={selectedProperty}
-              selectedPropertyId={selectedProperty?.id ?? null}
-              snapshot={snapshot}
-            />
-          ) : null}
+        {activeModule === "reservations" ? <ReservationsModule snapshot={snapshot} /> : null}
 
-          {activeModule === "reservations" ? <ReservationsModule snapshot={snapshot} /> : null}
+        {activeModule === "finance" ? <SettlementPanel snapshot={snapshot} /> : null}
 
-          {activeModule === "finance" ? <SettlementPanel snapshot={snapshot} /> : null}
+        {activeModule === "blocks" ? (
+          <BlocksModule
+            blockingPropertyId={blockingPropertyId}
+            onAvailabilityBlockRequest={onAvailabilityBlockRequest}
+            snapshot={snapshot}
+          />
+        ) : null}
 
-          {activeModule === "blocks" ? (
-            <BlocksModule
-              blockingPropertyId={blockingPropertyId}
-              onAvailabilityBlockRequest={onAvailabilityBlockRequest}
-              snapshot={snapshot}
-            />
-          ) : null}
-
-          {activeModule === "documents" ? (
-            <DocumentsModule
-              onContractAccept={onContractAccept}
-              snapshot={snapshot}
-              updatingContractId={updatingContractId}
-            />
-          ) : null}
-        </div>
+        {activeModule === "documents" ? (
+          <DocumentsModule
+            onContractAccept={onContractAccept}
+            snapshot={snapshot}
+            updatingContractId={updatingContractId}
+          />
+        ) : null}
       </div>
     </>
   );
@@ -440,7 +434,7 @@ function OwnerModuleNav({
       aria-label="Modulos del propietario"
       className="rounded-[8px] border border-line bg-white p-2 shadow-soft"
     >
-      <div className="grid gap-1 sm:grid-cols-5 xl:grid-cols-1">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
         {ownerModules.map((module) => {
           const Icon = module.icon;
           const isActive = activeModule === module.key;
@@ -818,40 +812,37 @@ function getContractSplitTerms(contract: OwnerProperty["contract"]) {
 }
 function PropertySummaryPanel({ property }: { property: OwnerProperty }) {
   return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
+    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
       <SectionHeading
         eyebrow="Detalle seleccionado"
         title={property.name}
         value={property.serviceLevel}
       />
-      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <div>
-          <div className="grid gap-3 md:grid-cols-3">
-            {property.operations.map((operation) => (
-              <div
-                className="rounded-[6px] border border-line bg-ivory p-3 text-sm"
-                key={operation.label}
-              >
-                <p className="font-semibold text-midnight">{operation.label}</p>
-                <p className="mt-1 leading-6 text-ink/62">{operation.state}</p>
-              </div>
-            ))}
-          </div>
 
-          <PropertySplitOverview contract={property.contract} />
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {[property.reviewLabel, ...property.highlights].map((item) => (
-              <span
-                className="rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72"
-                key={item}
-              >
-                {item}
-              </span>
-            ))}
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        {property.operations.map((operation) => (
+          <div
+            className="min-h-[96px] rounded-[6px] border border-line bg-ivory p-4 text-sm"
+            key={operation.label}
+          >
+            <p className="font-semibold text-midnight">{operation.label}</p>
+            <p className="mt-2 leading-6 text-ink/62">{operation.state}</p>
           </div>
-        </div>
-        <PropertyRevenuePanel property={property} />
+        ))}
+      </div>
+
+      <PropertyRevenuePanel property={property} />
+      <PropertySplitOverview contract={property.contract} />
+
+      <div className="mt-5 flex flex-wrap gap-2 rounded-[6px] border border-line bg-ivory p-3">
+        {[property.reviewLabel, ...property.highlights].map((item) => (
+          <span
+            className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-midnight/72"
+            key={item}
+          >
+            {item}
+          </span>
+        ))}
       </div>
     </section>
   );
@@ -859,7 +850,7 @@ function PropertySummaryPanel({ property }: { property: OwnerProperty }) {
 
 function PropertyRevenuePanel({ property }: { property: OwnerProperty }) {
   return (
-    <div className="mt-5 grid gap-3 border-t border-line pt-5 sm:grid-cols-3">
+    <div className="mt-5 grid gap-3 border-t border-line pt-5 md:grid-cols-3">
       <FinanceFact
         detail={property.estimatedRevenue.label}
         label="Reservas confirmadas"
@@ -1071,36 +1062,42 @@ function PropertyFact({
 
 function TasksPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
   return (
-    <section className="rounded-[8px] border border-line bg-white p-6 shadow-soft">
+    <section className="rounded-[8px] border border-line bg-white p-5 shadow-soft md:p-6">
       <SectionHeading
         eyebrow="Acciones abiertas"
         title="Pendientes operativos"
         value={`${snapshot.tasks.length} tareas`}
       />
-      <div className="mt-5 divide-y divide-line">
-        {snapshot.tasks.map((task) => (
-          <div
-            className="grid gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[1fr_auto] md:items-center"
-            key={task.id}
-          >
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-sm font-semibold text-midnight">{task.title}</h3>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${taskPriorityClasses[task.priority]}`}
-                >
-                  {task.ownerAction ? "Accion propietario" : "KUQUBA"}
-                </span>
+      {snapshot.tasks.length > 0 ? (
+        <div className="mt-5 divide-y divide-line">
+          {snapshot.tasks.map((task) => (
+            <div
+              className="grid gap-3 py-4 first:pt-0 last:pb-0 md:grid-cols-[1fr_auto] md:items-center"
+              key={task.id}
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-midnight">{task.title}</h3>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[0.7rem] font-semibold ${taskPriorityClasses[task.priority]}`}
+                  >
+                    {task.ownerAction ? "Accion propietario" : "KUQUBA"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm leading-6 text-ink/62">{task.property}</p>
               </div>
-              <p className="mt-1 text-sm leading-6 text-ink/62">{task.property}</p>
+              <p className="flex items-center gap-2 text-sm font-semibold text-midnight">
+                <Clock3 aria-hidden className="h-4 w-4 text-green" />
+                {task.due}
+              </p>
             </div>
-            <p className="flex items-center gap-2 text-sm font-semibold text-midnight">
-              <Clock3 aria-hidden className="h-4 w-4 text-green" />
-              {task.due}
-            </p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-5 rounded-[6px] border border-line bg-ivory p-4 text-sm leading-6 text-ink/64">
+          No hay pendientes operativos abiertos para este periodo.
+        </div>
+      )}
     </section>
   );
 }
@@ -1259,10 +1256,10 @@ function SettlementPanel({ snapshot }: { snapshot: OwnerPortalSnapshot }) {
 
 function FinanceFact({ detail, label, value }: { detail: string; label: string; value: string }) {
   return (
-    <div className="rounded-[6px] border border-line bg-ivory px-3 py-2">
+    <div className="min-h-[118px] rounded-[6px] border border-line bg-ivory p-4">
       <p className="text-xs font-semibold uppercase text-ink/48">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-midnight">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-ink/56">{detail}</p>
+      <p className="mt-2 break-words text-xl font-semibold text-midnight">{value}</p>
+      <p className="mt-2 text-xs leading-5 text-ink/56">{detail}</p>
     </div>
   );
 }
