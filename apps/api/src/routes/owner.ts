@@ -376,7 +376,7 @@ function buildOwnerPortal(owner: OwnerPortalRecord) {
   const ownerActionCount = owner.tasks.filter((task) => task.ownerAction).length;
   const pendingContractCount = contracts.filter(isOwnerContractPending).length;
   const activeContractCount = contracts.filter((contract) => contract.status === "ACTIVE").length;
-  const financeSummary = buildOwnerFinanceSummary(owner.settlements);
+  const financeSummary = buildOwnerFinanceSummary(owner.settlements, contracts);
   const reservationSummaries = reservations.slice(0, 20).map(mapOwnerReservation);
 
   return {
@@ -804,9 +804,13 @@ async function loadContractForOwner(contractId: string, ownerId: string) {
 }
 
 function mapOwnerContract(contract: OwnerContractRecord | OwnerContractForSignature) {
+  const startsOnLabel = formatDateLabel(contract.startsOn, true);
+  const endsOnLabel = contract.endsOn ? formatDateLabel(contract.endsOn, true) : "Indefinida";
+
   return {
     canAcceptDev: contract.status === "ISSUED",
     currentVersion: contract.currentVersion,
+    endsOn: contract.endsOn?.toISOString() ?? null,
     id: contract.id,
     issuedAt: contract.issuedAt?.toISOString() ?? null,
     signedAt: contract.signedAt?.toISOString() ?? null,
@@ -827,7 +831,11 @@ function mapOwnerContract(contract: OwnerContractRecord | OwnerContractForSignat
       },
       {
         label: "Vigencia",
-        value: formatDateLabel(contract.startsOn, true)
+        value: `${startsOnLabel} - ${endsOnLabel}`
+      },
+      {
+        label: "Culminacion",
+        value: endsOnLabel
       }
     ],
     title: contract.title,
@@ -842,49 +850,102 @@ function mapOwnerContract(contract: OwnerContractRecord | OwnerContractForSignat
   };
 }
 
-function buildOwnerFinanceSummary(settlements: OwnerSettlementRecord[]) {
-  const latestSettlement = settlements[0];
+function buildOwnerFinanceSummary(
+  settlements: OwnerSettlementRecord[],
+  contracts: OwnerContractRecord[]
+) {
+  const period = getCurrentOwnerSettlementPeriod();
+  const currentSettlement = settlements.find(
+    (settlement) => settlement.periodStart >= period.start && settlement.periodStart < period.nextStart
+  );
 
-  if (!latestSettlement) {
-    return {
-      adjustments: "0.00",
-      cleaningFees: "0.00",
-      currency: "GTQ",
-      generatedAt: null,
-      grossAccommodation: "0.00",
-      kuqubaServiceFees: "0.00",
-      lineCount: 0,
-      ownerExpenses: "0.00",
-      ownerPayout: "0.00",
-      ownerPayoutLabel: formatCurrencyValue("0.00", "GTQ"),
-      paidAt: null,
-      periodLabel: formatMonthYear(new Date()),
-      propertyCount: 0,
-      status: "DRAFT" as const,
-      statusLabel: settlementStatusLabel("DRAFT"),
-      taxes: "0.00"
-    };
+  if (!currentSettlement) {
+    return buildEstimatedOwnerFinanceSummary(contracts, period);
+  }
+
+  if (currentSettlement.lines.length === 0 && Number(currentSettlement.ownerPayout.toString()) === 0) {
+    return buildEstimatedOwnerFinanceSummary(contracts, period);
   }
 
   return {
-    adjustments: decimalToAmount(latestSettlement.adjustments),
-    cleaningFees: decimalToAmount(latestSettlement.cleaningFees),
-    currency: latestSettlement.currency,
-    generatedAt: latestSettlement.generatedAt.toISOString(),
-    grossAccommodation: decimalToAmount(latestSettlement.grossAccommodation),
-    kuqubaServiceFees: decimalToAmount(latestSettlement.kuqubaServiceFees),
-    lineCount: latestSettlement.lines.length,
-    ownerExpenses: decimalToAmount(latestSettlement.ownerExpenses),
-    ownerPayout: decimalToAmount(latestSettlement.ownerPayout),
-    ownerPayoutLabel: formatCurrencyValue(latestSettlement.ownerPayout, latestSettlement.currency),
-    paidAt: latestSettlement.paidAt?.toISOString() ?? null,
-    periodLabel: buildSettlementPeriodLabel(latestSettlement),
-    propertyCount: new Set(settlements.map((settlement) => settlement.propertyId).filter(Boolean))
-      .size,
-    status: latestSettlement.status,
-    statusLabel: settlementStatusLabel(latestSettlement.status),
-    taxes: decimalToAmount(latestSettlement.taxes)
+    adjustments: decimalToAmount(currentSettlement.adjustments),
+    cleaningFees: decimalToAmount(currentSettlement.cleaningFees),
+    currency: currentSettlement.currency,
+    generatedAt: currentSettlement.generatedAt.toISOString(),
+    grossAccommodation: decimalToAmount(currentSettlement.grossAccommodation),
+    kuqubaServiceFees: decimalToAmount(currentSettlement.kuqubaServiceFees),
+    lineCount: currentSettlement.lines.length,
+    ownerExpenses: decimalToAmount(currentSettlement.ownerExpenses),
+    ownerPayout: decimalToAmount(currentSettlement.ownerPayout),
+    ownerPayoutLabel: formatCurrencyValue(currentSettlement.ownerPayout, currentSettlement.currency),
+    paidAt: currentSettlement.paidAt?.toISOString() ?? null,
+    periodLabel: buildSettlementPeriodLabel(currentSettlement),
+    propertyCount: currentSettlement.propertyId ? 1 : 0,
+    status: currentSettlement.status,
+    statusLabel: settlementStatusLabel(currentSettlement.status),
+    taxes: decimalToAmount(currentSettlement.taxes)
   };
+}
+
+function buildEstimatedOwnerFinanceSummary(
+  contracts: OwnerContractRecord[],
+  period: ReturnType<typeof getCurrentOwnerSettlementPeriod>
+) {
+  let currency = "GTQ";
+  let grossAccommodation = 0;
+  let ownerPayout = 0;
+  let kuqubaShare = 0;
+  let lineCount = 0;
+  const propertyIds = new Set<string>();
+
+  for (const contract of contracts) {
+    for (const reservation of contract.property.reservations) {
+      if (reservation.status !== "CONFIRMED") {
+        continue;
+      }
+
+      if (reservation.arrivalDate < period.start || reservation.arrivalDate >= period.nextStart) {
+        continue;
+      }
+
+      const total = Number(reservation.total?.toString() ?? "0");
+      const estimatedOwnerShare = total * (contract.ownerShareBps / 10_000);
+
+      currency = reservation.currency ?? currency;
+      grossAccommodation += total;
+      ownerPayout += estimatedOwnerShare;
+      kuqubaShare += total - estimatedOwnerShare;
+      lineCount += 1;
+      propertyIds.add(contract.propertyId);
+    }
+  }
+
+  return {
+    adjustments: "0.00",
+    cleaningFees: "0.00",
+    currency,
+    generatedAt: null,
+    grossAccommodation: grossAccommodation.toFixed(2),
+    kuqubaServiceFees: kuqubaShare.toFixed(2),
+    lineCount,
+    ownerExpenses: "0.00",
+    ownerPayout: ownerPayout.toFixed(2),
+    ownerPayoutLabel: formatCurrencyValue(ownerPayout.toFixed(2), currency),
+    paidAt: null,
+    periodLabel: formatMonthYear(period.start),
+    propertyCount: propertyIds.size,
+    status: "DRAFT" as const,
+    statusLabel: lineCount > 0 ? "Estimado segun contrato" : settlementStatusLabel("DRAFT"),
+    taxes: "0.00"
+  };
+}
+
+function getCurrentOwnerSettlementPeriod(referenceDate = new Date()) {
+  const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1));
+  const nextStart = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 1));
+  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 0));
+
+  return { end, nextStart, start };
 }
 
 function mapOwnerSettlement(settlement: OwnerSettlementRecord) {

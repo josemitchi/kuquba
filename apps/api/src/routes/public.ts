@@ -790,11 +790,13 @@ function mapPublicAvailabilityDay(input: {
   reason: string | null;
   status: PublicStayAvailabilityStatus;
 }): PublicStayAvailabilityDay {
+  const publicStatus = input.status === "AVAILABLE" ? input.status : "HOLD";
+
   return {
     date: input.date,
-    reason: input.reason,
-    status: input.status,
-    statusLabel: getPublicAvailabilityStatusLabel(input.status, input.reason)
+    reason: null,
+    status: publicStatus,
+    statusLabel: getPublicAvailabilityStatusLabel(publicStatus)
   };
 }
 
@@ -818,23 +820,8 @@ function mapConflictReasonToAvailabilityStatus(reason: string): PublicStayAvaila
   return "HOLD";
 }
 
-function getPublicAvailabilityStatusLabel(
-  status: PublicStayAvailabilityStatus,
-  reason: string | null
-) {
-  const labels: Record<PublicStayAvailabilityStatus, string> = {
-    AVAILABLE: "Disponible",
-    CAPACITY_EXCEEDED: "Capacidad insuficiente",
-    HOLD: "Reserva temporal",
-    MAINTENANCE: "Mantenimiento",
-    OPS_HOLD: "Bloqueo operativo",
-    OWNER_HOLD: "Bloqueo propietario",
-    RATE_MISSING:
-      reason === "minimum_nights_not_met" ? "Minimo de noches no cumplido" : "Sin tarifa activa",
-    RESERVED: "Reservada"
-  };
-
-  return labels[status];
+function getPublicAvailabilityStatusLabel(status: PublicStayAvailabilityStatus) {
+  return status === "AVAILABLE" ? "Disponible" : "No disponible";
 }
 
 type PublicReservationHoldBody = z.infer<typeof stayHoldSchema>;
@@ -1904,8 +1891,8 @@ async function createPublicStayQuote(input: {
     status,
     total: amounts.total,
     unitName: stayCode.unit.name,
-    unavailableReason,
-    unavailableReasonLabel: unavailableReason ? getUnavailableReasonLabel(unavailableReason) : null
+    unavailableReason: status === "AVAILABLE" ? null : "unavailable",
+    unavailableReasonLabel: status === "AVAILABLE" ? null : getUnavailableReasonLabel("unavailable")
   };
 }
 

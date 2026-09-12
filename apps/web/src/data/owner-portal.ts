@@ -11,6 +11,7 @@ export type OwnerPortalMetric = {
 export type OwnerContract = {
   canAcceptDev: boolean;
   currentVersion: number;
+  endsOn?: string | null;
   id: string;
   issuedAt?: string | null;
   signedAt?: string | null;
@@ -251,6 +252,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         title: "Contrato KUQUBA v1 - Casa Brisa del Paredon",
         summary: "Administracion profesional para Casa Brisa del Paredon en El Paredon.",
         startsOn: "2026-01-01T00:00:00.000Z",
+        endsOn: "2026-12-31T00:00:00.000Z",
         issuedAt: "2025-12-15T00:00:00.000Z",
         signedAt: "2025-12-20T00:00:00.000Z",
         signatureProvider: "seed_dev_signature",
@@ -259,7 +261,8 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         terms: [
           { label: "Participacion owner", value: "Por definir" },
           { label: "Participacion KUQUBA", value: "Por definir" },
-          { label: "Vigencia", value: "01 Ene 2026" }
+          { label: "Vigencia", value: "01 Ene 2026 - 31 Dic 2026" },
+          { label: "Culminacion", value: "31 Dic 2026" }
         ],
         versions: [
           {
@@ -311,6 +314,7 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         title: "Contrato KUQUBA v1 - Villa Arena Negra",
         summary: "Administracion profesional para Villa Arena Negra en Monterrico.",
         startsOn: "2026-08-01T00:00:00.000Z",
+        endsOn: null,
         issuedAt: "2026-08-15T00:00:00.000Z",
         signedAt: null,
         signatureProvider: null,
@@ -319,7 +323,8 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         terms: [
           { label: "Participacion owner", value: "Por definir" },
           { label: "Participacion KUQUBA", value: "Por definir" },
-          { label: "Vigencia", value: "01 Ago 2026" }
+          { label: "Vigencia", value: "01 Ago 2026 - Indefinida" },
+          { label: "Culminacion", value: "Indefinida" }
         ],
         versions: [
           {

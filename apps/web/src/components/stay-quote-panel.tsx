@@ -776,16 +776,17 @@ function AvailabilityGuide({
                       ? day.date >= selectedRange.arrivalDate &&
                         day.date < selectedRange.departureDate
                       : false;
+                    const availabilityLabel = getGuestAvailabilityLabel(day);
 
                     return (
                       <button
-                        aria-label={`${formatFullDate(day.date)}: ${day.statusLabel}`}
+                        aria-label={`${formatFullDate(day.date)}: ${availabilityLabel}`}
                         aria-pressed={isSelected}
                         className={`focus-ring aspect-square rounded-[6px] border text-[0.72rem] font-semibold transition ${getAvailabilityDayClasses(day, isSelected)}`}
                         disabled={day.status !== "AVAILABLE"}
                         key={day.date}
                         onClick={() => onDaySelect(day)}
-                        title={day.statusLabel}
+                        title={availabilityLabel}
                         type="button"
                       >
                         {formatDayNumber(day.date)}
@@ -801,12 +802,8 @@ function AvailabilityGuide({
                   label="Disponible"
                 />
                 <AvailabilityLegend
-                  className="border-terracotta/28 bg-terracotta/10 text-terracotta"
-                  label="Ocupada"
-                />
-                <AvailabilityLegend
-                  className="border-midnight/18 bg-white text-ink/58"
-                  label="Sin tarifa/bloqueada"
+                  className="border-line bg-ivory text-ink/58"
+                  label="No disponible"
                 />
                 <AvailabilityLegend
                   className="border-green bg-green text-white"
@@ -833,9 +830,7 @@ function QuoteResult({ quote }: { quote: StayQuote }) {
           <AlertCircle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-terracotta" />
           <div>
             <p className="font-semibold">Fechas no disponibles</p>
-            <p className="mt-1 text-ink/68">
-              {quote.unavailableReasonLabel ?? "No disponible para estas fechas."}
-            </p>
+            <p className="mt-1 text-ink/68">No disponible para estas fechas.</p>
           </div>
         </div>
       </div>
@@ -1288,11 +1283,11 @@ function getAvailabilityDayClasses(day: StayAvailabilityDay, isSelected: boolean
     return "border-green/24 bg-white text-green hover:border-green hover:bg-green/10";
   }
 
-  if (day.status === "RESERVED" || day.status === "HOLD") {
-    return "cursor-not-allowed border-terracotta/24 bg-terracotta/10 text-terracotta/75";
-  }
+  return "cursor-not-allowed border-line bg-ivory text-ink/38";
+}
 
-  return "cursor-not-allowed border-line bg-white text-ink/38";
+function getGuestAvailabilityLabel(day: StayAvailabilityDay) {
+  return day.status === "AVAILABLE" ? "Disponible" : "No disponible";
 }
 
 function buildAvailabilityMonths(days: StayAvailabilityDay[]): AvailabilityMonth[] {

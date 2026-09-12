@@ -857,6 +857,7 @@ function PropertyTabs({
 
 function PropertySplitOverview({ contract }: { contract: OwnerProperty["contract"] }) {
   const split = getContractSplitTerms(contract);
+  const validity = getContractValidityTerms(contract);
 
   return (
     <div className="rounded-[8px] border border-line bg-ivory p-4">
@@ -866,6 +867,14 @@ function PropertySplitOverview({ contract }: { contract: OwnerProperty["contract
           <div className="rounded-[6px] border border-line bg-white px-3 py-2" key={term.label}>
             <dt className="text-xs font-semibold uppercase text-ink/48">{term.label}</dt>
             <dd className="mt-1 text-lg font-semibold text-midnight">{term.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <dl className="mt-3 grid gap-3 border-t border-line pt-3 text-sm sm:grid-cols-2">
+        {validity.map((term) => (
+          <div className="rounded-[6px] border border-line bg-white px-3 py-2" key={term.label}>
+            <dt className="text-xs font-semibold uppercase text-ink/48">{term.label}</dt>
+            <dd className="mt-1 text-sm font-semibold leading-5 text-midnight">{term.value}</dd>
           </div>
         ))}
       </dl>
@@ -884,6 +893,31 @@ function getContractSplitTerms(contract: OwnerProperty["contract"]) {
   return [
     { label: "Propietario", value: ownerTerm?.value ?? "Por definir" },
     { label: "KUQUBA", value: kuqubaTerm?.value ?? "Por definir" }
+  ];
+}
+
+function getContractValidityTerms(contract: OwnerProperty["contract"]) {
+  const terms = contract.terms.filter((term) => {
+    const label = term.label.toLowerCase();
+
+    return label.includes("vigencia") || label.includes("culminacion");
+  });
+
+  if (terms.length > 0) {
+    return terms;
+  }
+
+  return [
+    {
+      label: "Vigencia",
+      value: `${formatContractDate(contract.startsOn)} - ${
+        contract.endsOn ? formatContractDate(contract.endsOn) : "Indefinida"
+      }`
+    },
+    {
+      label: "Culminacion",
+      value: contract.endsOn ? formatContractDate(contract.endsOn) : "Indefinida"
+    }
   ];
 }
 function PropertyPhotoGallery({ property }: { property: OwnerProperty }) {
@@ -1715,7 +1749,7 @@ function ownerCalendarToneClass(tone: OwnerCalendarEventTone) {
     hold: "bg-[#f0b35a] text-midnight",
     maintenance: "bg-terracotta/85 text-white",
     ops: "bg-midnight/85 text-white",
-    owner: "bg-[#2563eb] text-white",
+    owner: "bg-[#7c3aed] text-white",
     pending: "bg-[#d7c36a] text-midnight"
   };
 
@@ -1751,7 +1785,7 @@ function getOwnerCalendarDayClasses(event: OwnerCalendarEvent | null, isSelected
     return "border-midnight/18 bg-midnight/10 text-midnight";
   }
 
-  return "border-[#2563eb]/28 bg-[#2563eb]/10 text-[#1d4ed8]";
+  return "border-[#7c3aed]/50 bg-[#ede9fe] text-[#5b21b6]";
 }
 
 function getOwnerMonthStart(date: Date) {
