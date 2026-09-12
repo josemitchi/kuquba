@@ -6,15 +6,19 @@ import {
   CalendarCheck2,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ClipboardCheck,
   Clock3,
   FileText,
   LogOut,
   MapPin,
+  Maximize2,
   ShieldCheck,
   TrendingUp,
   UserRound,
   Wrench,
+  X,
   type LucideIcon
 } from "lucide-react";
 import Image from "next/image";
@@ -84,6 +88,33 @@ const propertyTabs: Array<{ icon: LucideIcon; key: OwnerPropertyTabKey; label: s
   { icon: ClipboardCheck, key: "operations", label: "Operaciones" },
   { icon: FileText, key: "documents", label: "Documentos" }
 ];
+
+type OwnerCalendarEventTone = "confirmed" | "hold" | "maintenance" | "ops" | "owner" | "pending";
+
+type OwnerCalendarDay = {
+  date: Date;
+  dayLabel: string;
+  key: string;
+  monthLabel: string;
+  weekdayLabel: string;
+};
+
+type OwnerCalendarEvent = {
+  endsOn: string;
+  id: string;
+  label: string;
+  requester: string;
+  startsOn: string;
+  tone: OwnerCalendarEventTone;
+  type: "block" | "reservation";
+  unitName: string;
+};
+
+type OwnerCalendarUnit = {
+  events: OwnerCalendarEvent[];
+  key: string;
+  unitName: string;
+};
 
 export function OwnerPortalHomePage() {
   const { isValidating, logout, session } = useDevPortalSession("owner");
@@ -850,18 +881,67 @@ function getContractSplitTerms(contract: OwnerProperty["contract"]) {
 }
 function PropertyPhotoGallery({ property }: { property: OwnerProperty }) {
   const photos = getPropertyPhotos(property);
-  const primaryPhoto = photos[0] ?? { alt: property.imageAlt, label: "Principal", src: property.image };
+  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+  const [viewerPhotoIndex, setViewerPhotoIndex] = useState<number | null>(null);
+  const activePhoto = photos[activePhotoIndex] ?? photos[0] ?? { alt: property.imageAlt, label: "Principal", src: property.image };
+  const viewerPhoto = viewerPhotoIndex === null ? null : photos[viewerPhotoIndex];
+
+  useEffect(() => {
+    setActivePhotoIndex(0);
+    setViewerPhotoIndex(null);
+  }, [property.id]);
+
+  useEffect(() => {
+    if (viewerPhotoIndex === null) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setViewerPhotoIndex(null);
+      }
+
+      if (event.key === "ArrowLeft") {
+        setViewerPhotoIndex((currentIndex) =>
+          currentIndex === null ? currentIndex : (currentIndex - 1 + photos.length) % photos.length
+        );
+      }
+
+      if (event.key === "ArrowRight") {
+        setViewerPhotoIndex((currentIndex) =>
+          currentIndex === null ? currentIndex : (currentIndex + 1) % photos.length
+        );
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [photos.length, viewerPhotoIndex]);
+
+  function openViewer(photoIndex: number) {
+    setActivePhotoIndex(photoIndex);
+    setViewerPhotoIndex(photoIndex);
+  }
+
+  function showViewerPhoto(nextIndex: number) {
+    setViewerPhotoIndex((nextIndex + photos.length) % photos.length);
+  }
 
   return (
     <section className="rounded-[8px] border border-line bg-ivory p-3">
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="relative min-h-[320px] overflow-hidden rounded-[6px] bg-midnight">
+        <button
+          aria-label={`Ampliar ${activePhoto.label}`}
+          className="focus-ring group relative min-h-[320px] overflow-hidden rounded-[6px] bg-midnight text-left"
+          onClick={() => openViewer(activePhotoIndex)}
+          type="button"
+        >
           <Image
-            alt={primaryPhoto.alt}
-            className="object-cover"
+            alt={activePhoto.alt}
+            className="object-cover transition duration-300 group-hover:scale-[1.02]"
             fill
             sizes="(min-width: 1280px) 48vw, (min-width: 1024px) 60vw, 100vw"
-            src={primaryPhoto.src}
+            src={activePhoto.src}
           />
           <span
             className={
@@ -871,27 +951,105 @@ function PropertyPhotoGallery({ property }: { property: OwnerProperty }) {
           >
             {property.statusLabel}
           </span>
-        </div>
+          <span className="absolute bottom-4 right-4 inline-flex items-center gap-2 rounded-full bg-midnight/80 px-3 py-2 text-xs font-semibold text-white shadow-soft backdrop-blur">
+            <Maximize2 aria-hidden className="h-4 w-4" />
+            Ampliar foto
+          </span>
+        </button>
 
         <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-          {photos.map((photo) => (
-            <figure className="overflow-hidden rounded-[6px] border border-line bg-white" key={photo.src}>
-              <div className="relative min-h-[104px] bg-midnight">
-                <Image
-                  alt={photo.alt}
-                  className="object-cover"
-                  fill
-                  sizes="(min-width: 1024px) 220px, 33vw"
-                  src={photo.src}
-                />
-              </div>
-              <figcaption className="px-3 py-2 text-xs font-semibold text-midnight/72">
-                {photo.label}
-              </figcaption>
-            </figure>
-          ))}
+          {photos.map((photo, index) => {
+            const isActive = index === activePhotoIndex;
+            return (
+              <button
+                aria-pressed={isActive}
+                className={
+                  "focus-ring overflow-hidden rounded-[6px] border bg-white text-left transition " +
+                  (isActive ? "border-green shadow-soft" : "border-line hover:border-green")
+                }
+                key={photo.src}
+                onClick={() => setActivePhotoIndex(index)}
+                type="button"
+              >
+                <div className="relative min-h-[104px] bg-midnight">
+                  <Image
+                    alt={photo.alt}
+                    className="object-cover"
+                    fill
+                    sizes="(min-width: 1024px) 220px, 33vw"
+                    src={photo.src}
+                  />
+                </div>
+                <span className="block px-3 py-2 text-xs font-semibold text-midnight/72">
+                  {photo.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
+
+      {viewerPhoto ? (
+        <div
+          aria-label="Visor de fotos de propiedad"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-midnight/92 p-4 text-white"
+          role="dialog"
+        >
+          <button
+            aria-label="Cerrar visor"
+            className="absolute inset-0 h-full w-full cursor-zoom-out"
+            onClick={() => setViewerPhotoIndex(null)}
+            type="button"
+          />
+          <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-white/62">{property.name}</p>
+                <p className="text-lg font-semibold">{viewerPhoto.label}</p>
+              </div>
+              <button
+                aria-label="Cerrar"
+                className="focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/24 bg-white/10 text-white transition hover:bg-white/18"
+                onClick={() => setViewerPhotoIndex(null)}
+                type="button"
+              >
+                <X aria-hidden className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-[8px] bg-black/35">
+              <Image
+                alt={viewerPhoto.alt}
+                className="object-contain"
+                fill
+                sizes="100vw"
+                src={viewerPhoto.src}
+              />
+              {photos.length > 1 ? (
+                <>
+                  <button
+                    aria-label="Foto anterior"
+                    className="focus-ring absolute left-3 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/24 bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
+                    onClick={() => showViewerPhoto((viewerPhotoIndex ?? 0) - 1)}
+                    type="button"
+                  >
+                    <ChevronLeft aria-hidden className="h-6 w-6" />
+                  </button>
+                  <button
+                    aria-label="Foto siguiente"
+                    className="focus-ring absolute right-3 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/24 bg-white/12 text-white backdrop-blur transition hover:bg-white/22"
+                    onClick={() => showViewerPhoto((viewerPhotoIndex ?? 0) + 1)}
+                    type="button"
+                  >
+                    <ChevronRight aria-hidden className="h-6 w-6" />
+                  </button>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1004,29 +1162,20 @@ function PropertyBlocksTab({
   }) => void;
   property: OwnerProperty;
 }) {
+  const calendarDays = buildOwnerCalendarDays();
+  const calendarUnits = buildOwnerCalendarUnits(property);
+
   return (
     <div className="space-y-5">
-      {property.requestedBlocks.length > 0 ? (
-        <div className="grid gap-3 md:grid-cols-2">
-          {property.requestedBlocks.map((block) => (
-            <div className="rounded-[8px] border border-line bg-ivory p-4" key={block.id}>
-              <p className="text-xs font-semibold uppercase text-green">{block.reasonLabel}</p>
-              <p className="mt-2 text-sm font-semibold text-midnight">
-                {formatShortDate(block.startsOn)} - {formatShortDate(block.endsOn)}
-              </p>
-              {block.note ? <p className="mt-2 text-sm leading-6 text-ink/62">{block.note}</p> : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <EmptyPanel text="Sin bloqueos activos o solicitados para esta propiedad." />
-      )}
+      <OwnerOccupancyCalendar days={calendarDays} units={calendarUnits} />
 
       <OwnerAvailabilityBlockForm
         isSubmitting={blockingPropertyId === property.id}
         onSubmit={onAvailabilityBlockRequest}
         property={property}
       />
+
+      <OwnerAvailabilityBlocksTable property={property} />
     </div>
   );
 }
@@ -1179,6 +1328,284 @@ function OwnerEmptyState() {
   return <EmptyPanel text="No hay propiedades asignadas a este propietario." />;
 }
 
+function OwnerOccupancyCalendar({ days, units }: { days: OwnerCalendarDay[]; units: OwnerCalendarUnit[] }) {
+  return (
+    <section className="rounded-[8px] border border-line bg-white p-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase text-green">Calendario de ocupacion</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Disponibilidad por unidad</h3>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs font-semibold text-ink/64">
+          <OwnerCalendarLegendDot label="Confirmada" tone="confirmed" />
+          <OwnerCalendarLegendDot label="Hold" tone="hold" />
+          <OwnerCalendarLegendDot label="Propietario" tone="owner" />
+          <OwnerCalendarLegendDot label="Operaciones" tone="ops" />
+          <OwnerCalendarLegendDot label="Mantenimiento" tone="maintenance" />
+          <span className="inline-flex items-center gap-2">
+            <span className="h-3 w-3 rounded-sm border border-line bg-white" />
+            Disponible
+          </span>
+        </div>
+      </div>
+
+      {units.length === 0 ? (
+        <EmptyPanel text="No hay unidades para mostrar calendario de ocupacion." />
+      ) : (
+        <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
+          <div className="min-w-[1360px]">
+            <div
+              className="grid border-b border-line bg-ivory text-xs"
+              style={{ gridTemplateColumns: `180px repeat(${days.length}, minmax(32px, 1fr))` }}
+            >
+              <div className="sticky left-0 z-10 bg-ivory px-3 py-2 font-semibold uppercase text-ink/48">
+                Unidad
+              </div>
+              {days.map((day) => (
+                <div className="border-l border-line px-1 py-2 text-center" key={day.key}>
+                  <p className="font-semibold text-midnight">{day.dayLabel}</p>
+                  <p className="mt-1 text-[0.62rem] uppercase text-ink/45">{day.monthLabel}</p>
+                </div>
+              ))}
+            </div>
+            <div className="divide-y divide-line bg-white">
+              {units.map((unit) => (
+                <div
+                  className="grid text-xs"
+                  key={unit.key}
+                  style={{ gridTemplateColumns: `180px repeat(${days.length}, minmax(32px, 1fr))` }}
+                >
+                  <div className="sticky left-0 z-10 bg-white px-3 py-3">
+                    <p className="font-semibold text-midnight">{unit.unitName}</p>
+                    <p className="mt-1 text-[0.7rem] uppercase text-ink/45">Casa completa</p>
+                  </div>
+                  {days.map((day) => {
+                    const events = unit.events.filter((event) => ownerEventOverlapsDay(event, day.date));
+                    const primaryEvent = events[0] ?? null;
+                    const title = events.map((event) => `${event.label} / ${event.requester}`).join(" | ") || "Disponible";
+
+                    return (
+                      <div
+                        className={
+                          "min-h-11 border-l border-line px-1 py-2 transition " +
+                          (primaryEvent ? ownerCalendarToneClass(primaryEvent.tone) : "bg-white hover:bg-green/8")
+                        }
+                        key={day.key}
+                        title={title}
+                      >
+                        {primaryEvent ? (
+                          <span className="block truncate text-[0.62rem] font-semibold">
+                            {primaryEvent.label}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function OwnerCalendarLegendDot({ label, tone }: { label: string; tone: OwnerCalendarEventTone }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className={`h-3 w-3 rounded-sm ${ownerCalendarToneClass(tone)}`} />
+      {label}
+    </span>
+  );
+}
+
+function OwnerAvailabilityBlocksTable({ property }: { property: OwnerProperty }) {
+  const blocks = [...property.requestedBlocks].sort(
+    (left, right) => parseOwnerDateOnly(left.startsOn).getTime() - parseOwnerDateOnly(right.startsOn).getTime()
+  );
+
+  if (blocks.length === 0) {
+    return <EmptyPanel text="Sin bloqueos activos o solicitados para esta propiedad." />;
+  }
+
+  return (
+    <section className="rounded-[8px] border border-line bg-white p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase text-green">Bloqueos registrados</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Solicitudes y operaciones</h3>
+        </div>
+        <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
+          {blocks.length} bloqueo(s)
+        </span>
+      </div>
+      <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
+        <table className="w-full min-w-[780px] border-collapse text-left text-xs">
+          <thead className="bg-ivory text-ink/48">
+            <tr>
+              <th className="px-3 py-2 font-semibold uppercase">Fechas</th>
+              <th className="px-3 py-2 font-semibold uppercase">Unidad</th>
+              <th className="px-3 py-2 font-semibold uppercase">Tipo</th>
+              <th className="px-3 py-2 font-semibold uppercase">Solicitado por</th>
+              <th className="px-3 py-2 font-semibold uppercase">Nota</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line bg-white">
+            {blocks.map((block) => (
+              <tr key={block.id}>
+                <td className="px-3 py-3 font-semibold text-midnight">
+                  {formatShortDate(block.startsOn)} - {formatShortDate(block.endsOn)}
+                </td>
+                <td className="px-3 py-3 text-ink/64">{getPropertyUnitName(property, block.unitId)}</td>
+                <td className="px-3 py-3">
+                  <span className={`inline-flex rounded-full px-2 py-1 font-semibold ${ownerCalendarToneClass(getBlockTone(block.reason))}`}>
+                    {block.reasonLabel}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-ink/64">{getBlockRequesterLabel(block.reason)}</td>
+                <td className="px-3 py-3 text-ink/64">{block.note ?? "Sin nota"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function buildOwnerCalendarDays() {
+  const startDate = addOwnerDays(getTodayUtc(), -1);
+
+  return Array.from({ length: 35 }, (_, index) => {
+    const date = addOwnerDays(startDate, index);
+    return {
+      date,
+      dayLabel: new Intl.DateTimeFormat("es-GT", { day: "2-digit", timeZone: "UTC" }).format(date),
+      key: toOwnerDateKey(date),
+      monthLabel: new Intl.DateTimeFormat("es-GT", { month: "short", timeZone: "UTC" }).format(date),
+      weekdayLabel: new Intl.DateTimeFormat("es-GT", { weekday: "short", timeZone: "UTC" }).format(date)
+    } satisfies OwnerCalendarDay;
+  });
+}
+
+function buildOwnerCalendarUnits(property: OwnerProperty) {
+  const units = new Map<string, OwnerCalendarUnit>();
+
+  for (const unit of property.units) {
+    ensureOwnerCalendarUnit(units, unit.id, unit.name);
+  }
+
+  for (const reservation of property.reservations) {
+    if (!["HOLD", "PENDING_PAYMENT", "CONFIRMED"].includes(reservation.status)) {
+      continue;
+    }
+
+    const unit = property.units.find((candidate) => candidate.name === reservation.unitName);
+    const unitKey = unit?.id ?? reservation.unitName;
+    const calendarUnit = ensureOwnerCalendarUnit(units, unitKey, reservation.unitName);
+    calendarUnit.events.push({
+      endsOn: reservation.departureDate,
+      id: reservation.id,
+      label: reservation.statusLabel,
+      requester: "Huesped",
+      startsOn: reservation.arrivalDate,
+      tone:
+        reservation.status === "CONFIRMED"
+          ? "confirmed"
+          : reservation.status === "PENDING_PAYMENT"
+            ? "pending"
+            : "hold",
+      type: "reservation",
+      unitName: reservation.unitName
+    });
+  }
+
+  for (const block of property.requestedBlocks) {
+    const unitName = getPropertyUnitName(property, block.unitId);
+    const calendarUnit = ensureOwnerCalendarUnit(units, block.unitId, unitName);
+    calendarUnit.events.push({
+      endsOn: block.endsOn,
+      id: block.id,
+      label: block.reasonLabel,
+      requester: getBlockRequesterLabel(block.reason),
+      startsOn: block.startsOn,
+      tone: getBlockTone(block.reason),
+      type: "block",
+      unitName
+    });
+  }
+
+  return Array.from(units.values()).sort((left, right) => left.unitName.localeCompare(right.unitName));
+}
+
+function ensureOwnerCalendarUnit(
+  units: Map<string, OwnerCalendarUnit>,
+  key: string,
+  unitName: string
+) {
+  const existing = units.get(key);
+  if (existing) {
+    return existing;
+  }
+
+  const unit = { events: [], key, unitName } satisfies OwnerCalendarUnit;
+  units.set(key, unit);
+  return unit;
+}
+
+function ownerEventOverlapsDay(event: OwnerCalendarEvent, date: Date) {
+  const startsOn = parseOwnerDateOnly(event.startsOn).getTime();
+  const endsOn = parseOwnerDateOnly(event.endsOn).getTime();
+  const day = date.getTime();
+  return day >= startsOn && day < endsOn;
+}
+
+function getPropertyUnitName(property: OwnerProperty, unitId: string) {
+  return property.units.find((unit) => unit.id === unitId)?.name ?? "Unidad asignada";
+}
+
+function getBlockRequesterLabel(reason: string) {
+  return reason === "OWNER_HOLD" ? "Propietario" : "Operaciones";
+}
+
+function getBlockTone(reason: string): OwnerCalendarEventTone {
+  if (reason === "MAINTENANCE") return "maintenance";
+  if (reason === "OPS_HOLD") return "ops";
+  return "owner";
+}
+
+function ownerCalendarToneClass(tone: OwnerCalendarEventTone) {
+  const classes: Record<OwnerCalendarEventTone, string> = {
+    confirmed: "bg-green/90 text-white",
+    hold: "bg-[#f0b35a] text-midnight",
+    maintenance: "bg-terracotta/85 text-white",
+    ops: "bg-midnight/85 text-white",
+    owner: "bg-[#6f8f9d] text-white",
+    pending: "bg-[#d7c36a] text-midnight"
+  };
+
+  return classes[tone];
+}
+
+function parseOwnerDateOnly(value: string) {
+  return new Date(`${value}T00:00:00.000Z`);
+}
+
+function addOwnerDays(date: Date, days: number) {
+  const nextDate = new Date(date);
+  nextDate.setUTCDate(nextDate.getUTCDate() + days);
+  return nextDate;
+}
+
+function getTodayUtc() {
+  const today = new Date();
+  return new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+}
+
+function toOwnerDateKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
 function EmptyPanel({ text }: { text: string }) {
   return (
     <div className="rounded-[8px] border border-line bg-ivory p-5 text-sm leading-6 text-ink/64">
@@ -1530,14 +1957,19 @@ function formatCurrency(amount: string, currency: string) {
   }).format(Number(amount));
 }
 
+function parseDisplayDate(value: string) {
+  return new Date(value.includes("T") ? value : `${value}T00:00:00.000Z`);
+}
+
 function formatShortDate(value?: string | null) {
   if (!value) {
     return "Pendiente";
   }
 
-  return new Date(value).toLocaleDateString("es-GT", {
+  return parseDisplayDate(value).toLocaleDateString("es-GT", {
     day: "2-digit",
     month: "short",
+    timeZone: "UTC",
     year: "numeric"
   });
 }
@@ -1547,13 +1979,13 @@ function formatContractDate(value?: string | null) {
     return "Pendiente";
   }
 
-  return new Date(value).toLocaleDateString("es-GT", {
+  return parseDisplayDate(value).toLocaleDateString("es-GT", {
     day: "2-digit",
     month: "short",
+    timeZone: "UTC",
     year: "numeric"
   });
 }
-
 function formatSessionExpiry(value: string) {
   return new Date(value).toLocaleString("es-GT", {
     dateStyle: "medium",
