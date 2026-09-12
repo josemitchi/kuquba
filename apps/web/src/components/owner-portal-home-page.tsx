@@ -66,6 +66,7 @@ type OwnerAvailabilityBlockResponse = OwnerPortalResponse & {
 };
 
 type Notice = { kind: "success" | "error"; text: string } | null;
+type SuggestedOwnerBlockDates = { endsOn: string; startsOn: string };
 type OwnerPortalViewKey = "finance" | "properties";
 
 const ownerPortalViews: Array<{ icon: LucideIcon; key: OwnerPortalViewKey; label: string }> = [
@@ -93,10 +94,16 @@ type OwnerCalendarEventTone = "confirmed" | "hold" | "maintenance" | "ops" | "ow
 
 type OwnerCalendarDay = {
   date: Date;
-  dayLabel: string;
+  events: OwnerCalendarEvent[];
   key: string;
-  monthLabel: string;
-  weekdayLabel: string;
+};
+
+type OwnerCalendarMonth = {
+  availableDays: number;
+  days: OwnerCalendarDay[];
+  key: string;
+  label: string;
+  leadingBlanks: number;
 };
 
 type OwnerCalendarEvent = {
@@ -1163,13 +1170,28 @@ function PropertyBlocksTab({
   property: OwnerProperty;
 }) {
   const blocks = getSortedPropertyBlocks(property);
-  const calendarDays = buildOwnerCalendarDays();
   const calendarUnits = buildOwnerCalendarUnits(property);
+  const [suggestedBlockDates, setSuggestedBlockDates] = useState<SuggestedOwnerBlockDates | null>(null);
+
+  useEffect(() => {
+    setSuggestedBlockDates(null);
+  }, [property.id]);
+
+  function handleAvailableDaySelect(dateKey: string) {
+    setSuggestedBlockDates({
+      endsOn: toOwnerDateKey(addOwnerDays(parseOwnerDateOnly(dateKey), 1)),
+      startsOn: dateKey
+    });
+  }
 
   return (
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <OwnerOccupancyCalendar days={calendarDays} units={calendarUnits} />
+        <OwnerOccupancyCalendar
+          onAvailableDaySelect={handleAvailableDaySelect}
+          selectedDate={suggestedBlockDates?.startsOn ?? null}
+          units={calendarUnits}
+        />
         <OwnerBlocksSummary blocks={blocks} />
       </div>
 
@@ -1177,6 +1199,7 @@ function PropertyBlocksTab({
         isSubmitting={blockingPropertyId === property.id}
         onSubmit={onAvailabilityBlockRequest}
         property={property}
+        suggestedDates={suggestedBlockDates}
       />
       <OwnerAvailabilityBlocksTable blocks={blocks} property={property} />
     </div>
@@ -1330,13 +1353,30 @@ function OwnerEmptyState() {
   return <EmptyPanel text="No hay propiedades asignadas a este propietario." />;
 }
 
-function OwnerOccupancyCalendar({ days, units }: { days: OwnerCalendarDay[]; units: OwnerCalendarUnit[] }) {
+function OwnerOccupancyCalendar({
+  onAvailableDaySelect,
+  selectedDate,
+  units
+}: {
+  onAvailableDaySelect: (dateKey: string) => void;
+  selectedDate: string | null;
+  units: OwnerCalendarUnit[];
+}) {
+  const months = buildOwnerCalendarMonths(units);
+  const [visibleMonthIndex, setVisibleMonthIndex] = useState(0);
+  const boundedMonthIndex = Math.min(visibleMonthIndex, Math.max(months.length - 1, 0));
+  const visibleMonth = months[boundedMonthIndex] ?? null;
+
+  useEffect(() => {
+    setVisibleMonthIndex(0);
+  }, [units]);
+
   return (
     <section className="rounded-[8px] border border-line bg-white p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-green">Mapa de disponibilidad</p>
-          <h3 className="mt-1 text-lg font-semibold text-midnight">Ocupacion de los proximos 21 dias</h3>
+          <p className="text-xs font-semibold uppercase text-green">Calendario de disponibilidad</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Ocupacion mensual</h3>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold text-ink/64">
           <OwnerCalendarLegendDot label="Confirmada" tone="confirmed" />
@@ -1345,66 +1385,109 @@ function OwnerOccupancyCalendar({ days, units }: { days: OwnerCalendarDay[]; uni
           <OwnerCalendarLegendDot label="Operaciones" tone="ops" />
           <OwnerCalendarLegendDot label="Mantenimiento" tone="maintenance" />
           <span className="inline-flex items-center gap-2">
-            <span className="h-3 w-3 rounded-sm border border-line bg-white" />
+            <span className="h-3 w-3 rounded-sm border border-green/24 bg-white" />
             Libre
           </span>
         </div>
       </div>
 
-      {units.length === 0 ? (
+      {units.length === 0 || !visibleMonth ? (
         <EmptyPanel text="No hay unidades para mostrar disponibilidad." />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-[6px] border border-line bg-white">
-          <div className="min-w-[920px]">
-            <div
-              className="grid border-b border-line bg-ivory text-xs"
-              style={{ gridTemplateColumns: `150px repeat(${days.length}, minmax(34px, 1fr))` }}
+        <>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <button
+              className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green disabled:cursor-not-allowed disabled:opacity-45"
+              disabled={boundedMonthIndex === 0}
+              onClick={() => setVisibleMonthIndex((current) => Math.max(0, current - 1))}
+              type="button"
             >
-              <div className="sticky left-0 z-10 bg-ivory px-3 py-2 font-semibold uppercase text-ink/48">
-                Unidad
-              </div>
-              {days.map((day) => (
-                <div className="border-l border-line px-1 py-2 text-center" key={day.key}>
-                  <p className="text-[0.64rem] uppercase text-ink/45">{day.weekdayLabel}</p>
-                  <p className="mt-1 font-semibold text-midnight">{day.dayLabel}</p>
-                  <p className="mt-1 text-[0.6rem] uppercase text-ink/45">{day.monthLabel}</p>
-                </div>
-              ))}
-            </div>
-            <div className="divide-y divide-line">
-              {units.map((unit) => (
-                <div
-                  className="grid text-xs"
-                  key={unit.key}
-                  style={{ gridTemplateColumns: `150px repeat(${days.length}, minmax(34px, 1fr))` }}
-                >
-                  <div className="sticky left-0 z-10 bg-white px-3 py-3">
-                    <p className="font-semibold text-midnight">{unit.unitName}</p>
-                  </div>
-                  {days.map((day) => {
-                    const events = unit.events.filter((event) => ownerEventOverlapsDay(event, day.date));
-                    const primaryEvent = events[0] ?? null;
-                    const title = events.map((event) => `${event.label} / ${event.requester}`).join(" | ") || "Libre";
-
-                    return (
-                      <div
-                        aria-label={title}
-                        className={
-                          "min-h-12 border-l border-line px-1 py-2 " +
-                          (primaryEvent ? ownerCalendarToneClass(primaryEvent.tone) : "bg-white")
-                        }
-                        key={day.key}
-                        title={title}
-                      >
-                        <span className="sr-only">{title}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
+              Anterior
+            </button>
+            <span className="text-xs font-semibold text-ink/58">
+              {boundedMonthIndex + 1} de {months.length}
+            </span>
+            <button
+              className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[6px] border border-line bg-white px-3 text-xs font-semibold text-midnight transition hover:border-green disabled:cursor-not-allowed disabled:opacity-45"
+              disabled={boundedMonthIndex >= months.length - 1}
+              onClick={() => setVisibleMonthIndex((current) => Math.min(months.length - 1, current + 1))}
+              type="button"
+            >
+              Siguiente
+            </button>
           </div>
-        </div>
+
+          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+            {months.map((month, index) => (
+              <button
+                className={
+                  "focus-ring min-h-9 shrink-0 rounded-[6px] border px-3 text-xs font-semibold capitalize transition " +
+                  (index === boundedMonthIndex
+                    ? "border-green bg-green text-white"
+                    : "border-line bg-white text-midnight hover:border-green hover:text-green")
+                }
+                key={month.key}
+                onClick={() => setVisibleMonthIndex(index)}
+                type="button"
+              >
+                {formatOwnerCompactMonthTitle(month.key)}
+              </button>
+            ))}
+          </div>
+
+          <section className="mt-3 rounded-[8px] border border-line bg-white/80 p-3 shadow-[0_10px_30px_rgba(13,34,51,0.04)]">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-sm font-semibold capitalize text-midnight">{visibleMonth.label}</h3>
+              <span className="w-fit rounded-full bg-green/10 px-2.5 py-1 text-[0.68rem] font-semibold text-green">
+                {visibleMonth.availableDays} libre{visibleMonth.availableDays === 1 ? "" : "s"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-[0.65rem] font-semibold uppercase text-ink/45">
+              {ownerCalendarWeekdays.map((weekday) => (
+                <span key={`${visibleMonth.key}-${weekday}`}>{weekday}</span>
+              ))}
+            </div>
+
+            <div className="mt-1.5 grid grid-cols-7 gap-1.5">
+              {Array.from({ length: visibleMonth.leadingBlanks }, (_, index) => (
+                <span
+                  aria-hidden
+                  className="aspect-square min-h-16 rounded-[6px] border border-transparent"
+                  key={`${visibleMonth.key}-blank-${index}`}
+                />
+              ))}
+
+              {visibleMonth.days.map((day) => {
+                const primaryEvent = getPrimaryOwnerCalendarEvent(day.events);
+                const title = day.events.map((event) => `${event.label} / ${event.unitName} / ${event.requester}`).join(" | ") || "Libre";
+
+                return (
+                  <button
+                    aria-label={`${formatFullOwnerDate(day.key)}: ${title}`}
+                    aria-pressed={day.key === selectedDate}
+                    className={
+                      "focus-ring min-h-16 rounded-[6px] border p-2 text-left text-xs transition disabled:cursor-not-allowed " +
+                      getOwnerCalendarDayClasses(primaryEvent, day.key === selectedDate)
+                    }
+                    disabled={primaryEvent !== null}
+                    key={day.key}
+                    onClick={() => onAvailableDaySelect(day.key)}
+                    title={title}
+                    type="button"
+                  >
+                    <p className="font-semibold">{formatOwnerDayNumber(day.key)}</p>
+                    {primaryEvent ? (
+                      <p className="mt-2 max-h-8 overflow-hidden text-[0.68rem] font-semibold leading-4">
+                        {primaryEvent.label}
+                      </p>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </>
       )}
     </section>
   );
@@ -1513,21 +1596,33 @@ function getSortedPropertyBlocks(property: OwnerProperty) {
   );
 }
 
-function buildOwnerCalendarDays() {
-  const startDate = addOwnerDays(getTodayUtc(), -1);
+const ownerCalendarWeekdays = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
 
-  return Array.from({ length: 21 }, (_, index) => {
-    const date = addOwnerDays(startDate, index);
+function buildOwnerCalendarMonths(units: OwnerCalendarUnit[]) {
+  const monthStart = getOwnerMonthStart(getTodayUtc());
+
+  return Array.from({ length: 3 }, (_, monthIndex) => {
+    const currentMonthStart = addOwnerMonths(monthStart, monthIndex);
+    const monthKey = currentMonthStart.toISOString().slice(0, 7);
+    const days = Array.from({ length: getOwnerDaysInMonth(currentMonthStart) }, (_, dayIndex) => {
+      const date = addOwnerDays(currentMonthStart, dayIndex);
+      const key = toOwnerDateKey(date);
+      const events = units.flatMap((unit) =>
+        unit.events.filter((event) => ownerEventOverlapsDay(event, date))
+      );
+
+      return { date, events, key } satisfies OwnerCalendarDay;
+    });
+
     return {
-      date,
-      dayLabel: new Intl.DateTimeFormat("es-GT", { day: "2-digit", timeZone: "UTC" }).format(date),
-      key: toOwnerDateKey(date),
-      monthLabel: new Intl.DateTimeFormat("es-GT", { month: "short", timeZone: "UTC" }).format(date),
-      weekdayLabel: new Intl.DateTimeFormat("es-GT", { weekday: "short", timeZone: "UTC" }).format(date)
-    } satisfies OwnerCalendarDay;
+      availableDays: days.filter((day) => day.events.length === 0).length,
+      days,
+      key: monthKey,
+      label: formatOwnerMonthTitle(monthKey),
+      leadingBlanks: getOwnerMondayFirstWeekdayIndex(toOwnerDateKey(currentMonthStart))
+    } satisfies OwnerCalendarMonth;
   });
 }
-
 function buildOwnerCalendarUnits(property: OwnerProperty) {
   const units = new Map<string, OwnerCalendarUnit>();
 
@@ -1627,6 +1722,83 @@ function ownerCalendarToneClass(tone: OwnerCalendarEventTone) {
   return classes[tone];
 }
 
+function getPrimaryOwnerCalendarEvent(events: OwnerCalendarEvent[]) {
+  return events[0] ?? null;
+}
+
+function getOwnerCalendarDayClasses(event: OwnerCalendarEvent | null, isSelected: boolean) {
+  if (isSelected) {
+    return "border-green bg-green text-white shadow-sm";
+  }
+
+  if (!event) {
+    return "border-green/24 bg-white text-green hover:border-green hover:bg-green/10";
+  }
+
+  if (event.tone === "confirmed") {
+    return "border-green/24 bg-green/10 text-green";
+  }
+
+  if (event.tone === "hold" || event.tone === "pending") {
+    return "border-[#f0b35a]/35 bg-[#f0b35a]/16 text-midnight";
+  }
+
+  if (event.tone === "maintenance") {
+    return "border-terracotta/28 bg-terracotta/10 text-terracotta";
+  }
+
+  if (event.tone === "ops") {
+    return "border-midnight/18 bg-midnight/10 text-midnight";
+  }
+
+  return "border-[#6f8f9d]/28 bg-[#6f8f9d]/12 text-[#476979]";
+}
+
+function getOwnerMonthStart(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function addOwnerMonths(date: Date, months: number) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+}
+
+function getOwnerDaysInMonth(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+}
+
+function getOwnerMondayFirstWeekdayIndex(value: string) {
+  const weekday = new Date(`${value}T00:00:00.000Z`).getUTCDay();
+  return (weekday + 6) % 7;
+}
+
+function formatOwnerMonthTitle(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    month: "long",
+    timeZone: "UTC",
+    year: "numeric"
+  }).format(new Date(`${value}-01T00:00:00.000Z`));
+}
+
+function formatOwnerCompactMonthTitle(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    month: "short",
+    timeZone: "UTC"
+  }).format(new Date(`${value}-01T00:00:00.000Z`));
+}
+
+function formatOwnerDayNumber(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    day: "2-digit",
+    timeZone: "UTC"
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function formatFullOwnerDate(value: string) {
+  return new Intl.DateTimeFormat("es-GT", {
+    dateStyle: "full",
+    timeZone: "UTC"
+  }).format(new Date(`${value}T00:00:00.000Z`));
+}
 function parseOwnerDateOnly(value: string) {
   return new Date(`${value}T00:00:00.000Z`);
 }
@@ -1677,7 +1849,8 @@ function getPropertyTabCount(
 function OwnerAvailabilityBlockForm({
   isSubmitting,
   onSubmit,
-  property
+  property,
+  suggestedDates
 }: {
   isSubmitting: boolean;
   onSubmit: (input: {
@@ -1688,6 +1861,7 @@ function OwnerAvailabilityBlockForm({
     unitId: string;
   }) => void;
   property: OwnerProperty;
+  suggestedDates: SuggestedOwnerBlockDates | null;
 }) {
   const defaultUnitId = property.units[0]?.id ?? "";
   const [startsOn, setStartsOn] = useState("");
@@ -1701,6 +1875,15 @@ function OwnerAvailabilityBlockForm({
     setNote("");
     setUnitId(defaultUnitId);
   }, [defaultUnitId, property.id]);
+
+  useEffect(() => {
+    if (!suggestedDates) {
+      return;
+    }
+
+    setStartsOn(suggestedDates.startsOn);
+    setEndsOn(suggestedDates.endsOn);
+  }, [suggestedDates]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
