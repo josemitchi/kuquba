@@ -62,7 +62,12 @@ type OwnerAvailabilityBlockResponse = OwnerPortalResponse & {
 };
 
 type Notice = { kind: "success" | "error"; text: string } | null;
+type OwnerPortalViewKey = "finance" | "properties";
 
+const ownerPortalViews: Array<{ icon: LucideIcon; key: OwnerPortalViewKey; label: string }> = [
+  { icon: TrendingUp, key: "finance", label: "Dashboard financiero" },
+  { icon: Building2, key: "properties", label: "Propiedades" }
+];
 type OwnerPropertyTabKey =
   | "overview"
   | "reservations"
@@ -355,6 +360,7 @@ function OwnerDashboard({
   snapshot: OwnerPortalSnapshot;
   updatingContractId: string | null;
 }) {
+  const [activeOwnerView, setActiveOwnerView] = useState<OwnerPortalViewKey>("finance");
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(
     snapshot.properties[0]?.id ?? null
   );
@@ -375,7 +381,11 @@ function OwnerDashboard({
 
   return (
     <>
-      <OwnerPortfolioDashboard session={session} snapshot={snapshot} />
+      <OwnerPortalViewTabs
+        activeView={activeOwnerView}
+        onSelectView={setActiveOwnerView}
+        snapshot={snapshot}
+      />
 
       {contractNotice ? (
         <div
@@ -390,33 +400,89 @@ function OwnerDashboard({
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
-        <PropertyCatalog
-          onSelect={handleSelectProperty}
-          properties={snapshot.properties}
-          selectedPropertyId={selectedProperty?.id ?? null}
-        />
-
-        {selectedProperty ? (
-          <PropertyWorkspace
-            activeTab={activePropertyTab}
-            blockingPropertyId={blockingPropertyId}
-            onAvailabilityBlockRequest={onAvailabilityBlockRequest}
-            onContractAccept={onContractAccept}
-            onTabChange={setActivePropertyTab}
-            property={selectedProperty}
-            propertySettlements={selectedPropertySettlements}
-            propertyTasks={selectedPropertyTasks}
-            updatingContractId={updatingContractId}
+      {activeOwnerView === "finance" ? (
+        <div className="mt-5">
+          <OwnerPortfolioDashboard session={session} snapshot={snapshot} />
+        </div>
+      ) : (
+        <div className="mt-5 grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
+          <PropertyCatalog
+            onSelect={handleSelectProperty}
+            properties={snapshot.properties}
+            selectedPropertyId={selectedProperty?.id ?? null}
           />
-        ) : (
-          <OwnerEmptyState />
-        )}
-      </div>
+
+          {selectedProperty ? (
+            <PropertyWorkspace
+              activeTab={activePropertyTab}
+              blockingPropertyId={blockingPropertyId}
+              onAvailabilityBlockRequest={onAvailabilityBlockRequest}
+              onContractAccept={onContractAccept}
+              onTabChange={setActivePropertyTab}
+              property={selectedProperty}
+              propertySettlements={selectedPropertySettlements}
+              propertyTasks={selectedPropertyTasks}
+              updatingContractId={updatingContractId}
+            />
+          ) : (
+            <OwnerEmptyState />
+          )}
+        </div>
+      )}
     </>
   );
 }
 
+function OwnerPortalViewTabs({
+  activeView,
+  onSelectView,
+  snapshot
+}: {
+  activeView: OwnerPortalViewKey;
+  onSelectView: (view: OwnerPortalViewKey) => void;
+  snapshot: OwnerPortalSnapshot;
+}) {
+  return (
+    <nav
+      aria-label="Vistas del portal de propietario"
+      className="rounded-[8px] border border-line bg-white p-1.5 shadow-soft"
+    >
+      <div className="grid gap-2 sm:grid-cols-2">
+        {ownerPortalViews.map((view) => {
+          const Icon = view.icon;
+          const isActive = activeView === view.key;
+          const count = view.key === "finance" ? snapshot.settlements.length : snapshot.properties.length;
+
+          return (
+            <button
+              aria-current={isActive ? "page" : undefined}
+              className={
+                "focus-ring flex min-h-11 items-center justify-between gap-3 rounded-[6px] px-4 text-sm font-semibold transition " +
+                (isActive ? "bg-green text-white" : "text-midnight hover:bg-ivory hover:text-green")
+              }
+              key={view.key}
+              onClick={() => onSelectView(view.key)}
+              type="button"
+            >
+              <span className="inline-flex min-w-0 items-center gap-2">
+                <Icon aria-hidden className="h-4 w-4 shrink-0" />
+                <span className="truncate">{view.label}</span>
+              </span>
+              <span
+                className={
+                  "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[0.68rem] " +
+                  (isActive ? "bg-white/20 text-white" : "bg-ivory text-ink/58")
+                }
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
 function OwnerPortfolioDashboard({
   session,
   snapshot
@@ -425,7 +491,8 @@ function OwnerPortfolioDashboard({
   snapshot: OwnerPortalSnapshot;
 }) {
   const finance = snapshot.financeSummary;
-  const pendingSettlement = snapshot.settlements.find((settlement) => settlement.status !== "PAID") ?? null;
+  const pendingSettlement =
+    snapshot.settlements.find((settlement) => settlement.status !== "PAID") ?? null;
   const confirmedReservations = snapshot.reservations.filter(
     (reservation) => reservation.status === "CONFIRMED"
   ).length;
@@ -781,12 +848,21 @@ function getContractSplitTerms(contract: OwnerProperty["contract"]) {
     { label: "KUQUBA", value: kuqubaTerm?.value ?? "Por definir" }
   ];
 }
-function PropertyOverviewTab({ property }: { property: OwnerProperty }) {
+function PropertyPhotoGallery({ property }: { property: OwnerProperty }) {
+  const photos = getPropertyPhotos(property);
+  const primaryPhoto = photos[0] ?? { alt: property.imageAlt, label: "Principal", src: property.image };
+
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(300px,0.55fr)]">
-      <div className="overflow-hidden rounded-[8px] border border-line bg-ivory">
-        <div className="relative min-h-[260px] bg-midnight">
-          <Image alt={property.imageAlt} className="object-cover" fill sizes="(min-width: 1024px) 55vw, 100vw" src={property.image} />
+    <section className="rounded-[8px] border border-line bg-ivory p-3">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+        <div className="relative min-h-[320px] overflow-hidden rounded-[6px] bg-midnight">
+          <Image
+            alt={primaryPhoto.alt}
+            className="object-cover"
+            fill
+            sizes="(min-width: 1280px) 48vw, (min-width: 1024px) 60vw, 100vw"
+            src={primaryPhoto.src}
+          />
           <span
             className={
               "absolute left-4 top-4 rounded-full border px-3 py-1 text-xs font-semibold backdrop-blur " +
@@ -796,8 +872,67 @@ function PropertyOverviewTab({ property }: { property: OwnerProperty }) {
             {property.statusLabel}
           </span>
         </div>
-        <div className="p-4">
-          <p className="text-sm leading-6 text-ink/64">{property.occupancySignal}</p>
+
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          {photos.map((photo) => (
+            <figure className="overflow-hidden rounded-[6px] border border-line bg-white" key={photo.src}>
+              <div className="relative min-h-[104px] bg-midnight">
+                <Image
+                  alt={photo.alt}
+                  className="object-cover"
+                  fill
+                  sizes="(min-width: 1024px) 220px, 33vw"
+                  src={photo.src}
+                />
+              </div>
+              <figcaption className="px-3 py-2 text-xs font-semibold text-midnight/72">
+                {photo.label}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getPropertyPhotos(property: OwnerProperty) {
+  const location = property.location.toLowerCase();
+  const supportingPhotos = location.includes("paredon")
+    ? [
+        { alt: "Playa del Pacifico para " + property.name, label: "Entorno", src: "/images/hero-pacific-beach.png" },
+        { alt: "Operacion de " + property.name, label: "Operacion", src: "/images/owner-dashboard.png" }
+      ]
+    : [
+        { alt: "Villa familiar en la costa", label: "Exterior", src: "/images/pacific-family-villa.png" },
+        { alt: "Playa del Pacifico cercana", label: "Entorno", src: "/images/hero-pacific-beach.png" }
+      ];
+  const photos = [
+    { alt: property.imageAlt, label: "Principal", src: property.image },
+    ...supportingPhotos
+  ];
+
+  return photos.filter(
+    (photo, index, allPhotos) => allPhotos.findIndex((candidate) => candidate.src === photo.src) === index
+  );
+}
+
+function PropertyOverviewTab({ property }: { property: OwnerProperty }) {
+  return (
+    <div className="space-y-5">
+      <PropertyPhotoGallery property={property} />
+
+      <div className="grid gap-3 md:grid-cols-3">
+        <PropertyFact icon={CalendarCheck2} label="Proxima llegada" value={property.nextArrival} />
+        <PropertyFact icon={TrendingUp} label="Senal comercial" value={property.occupancySignal} />
+        <PropertyFact icon={Wrench} label="Pendientes" value={String(property.openItems)} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.45fr)]">
+        <PropertySplitOverview contract={property.contract} />
+        <div className="rounded-[8px] border border-line bg-ivory p-4">
+          <p className="text-xs font-semibold uppercase text-green">Seguimiento</p>
+          <p className="mt-2 text-sm leading-6 text-ink/64">{property.occupancySignal}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {[property.reviewLabel, ...property.highlights].map((item) => (
               <span
@@ -810,20 +945,9 @@ function PropertyOverviewTab({ property }: { property: OwnerProperty }) {
           </div>
         </div>
       </div>
-
-      <div className="space-y-4">
-        <dl className="grid gap-3 text-sm text-ink/72">
-          <PropertyFact icon={CalendarCheck2} label="Proxima llegada" value={property.nextArrival} />
-          <PropertyFact icon={TrendingUp} label="Senal comercial" value={property.occupancySignal} />
-          <PropertyFact icon={Wrench} label="Pendientes" value={String(property.openItems)} />
-        </dl>
-        <PropertySplitOverview contract={property.contract} />
-        <PropertyRevenuePanel property={property} />
-      </div>
     </div>
   );
 }
-
 function PropertyReservationsTab({ reservations }: { reservations: OwnerProperty["reservations"] }) {
   if (reservations.length === 0) {
     return <EmptyPanel text="Sin reservas visibles para esta propiedad en el periodo." />;
