@@ -1715,7 +1715,7 @@ function ownerCalendarToneClass(tone: OwnerCalendarEventTone) {
     hold: "bg-[#f0b35a] text-midnight",
     maintenance: "bg-terracotta/85 text-white",
     ops: "bg-midnight/85 text-white",
-    owner: "bg-[#6f8f9d] text-white",
+    owner: "bg-[#2563eb] text-white",
     pending: "bg-[#d7c36a] text-midnight"
   };
 
@@ -1751,7 +1751,7 @@ function getOwnerCalendarDayClasses(event: OwnerCalendarEvent | null, isSelected
     return "border-midnight/18 bg-midnight/10 text-midnight";
   }
 
-  return "border-[#6f8f9d]/28 bg-[#6f8f9d]/12 text-[#476979]";
+  return "border-[#2563eb]/28 bg-[#2563eb]/10 text-[#1d4ed8]";
 }
 
 function getOwnerMonthStart(date: Date) {
