@@ -1162,24 +1162,26 @@ function PropertyBlocksTab({
   }) => void;
   property: OwnerProperty;
 }) {
+  const blocks = getSortedPropertyBlocks(property);
   const calendarDays = buildOwnerCalendarDays();
   const calendarUnits = buildOwnerCalendarUnits(property);
 
   return (
     <div className="space-y-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <OwnerAvailabilityBlockForm
+          isSubmitting={blockingPropertyId === property.id}
+          onSubmit={onAvailabilityBlockRequest}
+          property={property}
+        />
+        <OwnerBlocksSummary blocks={blocks} />
+      </div>
+
       <OwnerOccupancyCalendar days={calendarDays} units={calendarUnits} />
-
-      <OwnerAvailabilityBlockForm
-        isSubmitting={blockingPropertyId === property.id}
-        onSubmit={onAvailabilityBlockRequest}
-        property={property}
-      />
-
-      <OwnerAvailabilityBlocksTable property={property} />
+      <OwnerAvailabilityBlocksTable blocks={blocks} property={property} />
     </div>
   );
 }
-
 function PropertyFinanceTab({
   property,
   settlements
@@ -1333,8 +1335,8 @@ function OwnerOccupancyCalendar({ days, units }: { days: OwnerCalendarDay[]; uni
     <section className="rounded-[8px] border border-line bg-white p-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-green">Calendario de ocupacion</p>
-          <h3 className="mt-1 text-lg font-semibold text-midnight">Disponibilidad por unidad</h3>
+          <p className="text-xs font-semibold uppercase text-green">Mapa de disponibilidad</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Ocupacion de los proximos 21 dias</h3>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold text-ink/64">
           <OwnerCalendarLegendDot label="Confirmada" tone="confirmed" />
@@ -1344,60 +1346,57 @@ function OwnerOccupancyCalendar({ days, units }: { days: OwnerCalendarDay[]; uni
           <OwnerCalendarLegendDot label="Mantenimiento" tone="maintenance" />
           <span className="inline-flex items-center gap-2">
             <span className="h-3 w-3 rounded-sm border border-line bg-white" />
-            Disponible
+            Libre
           </span>
         </div>
       </div>
 
       {units.length === 0 ? (
-        <EmptyPanel text="No hay unidades para mostrar calendario de ocupacion." />
+        <EmptyPanel text="No hay unidades para mostrar disponibilidad." />
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
-          <div className="min-w-[1360px]">
+        <div className="mt-4 overflow-x-auto rounded-[6px] border border-line bg-white">
+          <div className="min-w-[920px]">
             <div
               className="grid border-b border-line bg-ivory text-xs"
-              style={{ gridTemplateColumns: `180px repeat(${days.length}, minmax(32px, 1fr))` }}
+              style={{ gridTemplateColumns: `150px repeat(${days.length}, minmax(34px, 1fr))` }}
             >
               <div className="sticky left-0 z-10 bg-ivory px-3 py-2 font-semibold uppercase text-ink/48">
                 Unidad
               </div>
               {days.map((day) => (
                 <div className="border-l border-line px-1 py-2 text-center" key={day.key}>
-                  <p className="font-semibold text-midnight">{day.dayLabel}</p>
-                  <p className="mt-1 text-[0.62rem] uppercase text-ink/45">{day.monthLabel}</p>
+                  <p className="text-[0.64rem] uppercase text-ink/45">{day.weekdayLabel}</p>
+                  <p className="mt-1 font-semibold text-midnight">{day.dayLabel}</p>
+                  <p className="mt-1 text-[0.6rem] uppercase text-ink/45">{day.monthLabel}</p>
                 </div>
               ))}
             </div>
-            <div className="divide-y divide-line bg-white">
+            <div className="divide-y divide-line">
               {units.map((unit) => (
                 <div
                   className="grid text-xs"
                   key={unit.key}
-                  style={{ gridTemplateColumns: `180px repeat(${days.length}, minmax(32px, 1fr))` }}
+                  style={{ gridTemplateColumns: `150px repeat(${days.length}, minmax(34px, 1fr))` }}
                 >
                   <div className="sticky left-0 z-10 bg-white px-3 py-3">
                     <p className="font-semibold text-midnight">{unit.unitName}</p>
-                    <p className="mt-1 text-[0.7rem] uppercase text-ink/45">Casa completa</p>
                   </div>
                   {days.map((day) => {
                     const events = unit.events.filter((event) => ownerEventOverlapsDay(event, day.date));
                     const primaryEvent = events[0] ?? null;
-                    const title = events.map((event) => `${event.label} / ${event.requester}`).join(" | ") || "Disponible";
+                    const title = events.map((event) => `${event.label} / ${event.requester}`).join(" | ") || "Libre";
 
                     return (
                       <div
+                        aria-label={title}
                         className={
-                          "min-h-11 border-l border-line px-1 py-2 transition " +
-                          (primaryEvent ? ownerCalendarToneClass(primaryEvent.tone) : "bg-white hover:bg-green/8")
+                          "min-h-12 border-l border-line px-1 py-2 " +
+                          (primaryEvent ? ownerCalendarToneClass(primaryEvent.tone) : "bg-white")
                         }
                         key={day.key}
                         title={title}
                       >
-                        {primaryEvent ? (
-                          <span className="block truncate text-[0.62rem] font-semibold">
-                            {primaryEvent.label}
-                          </span>
-                        ) : null}
+                        <span className="sr-only">{title}</span>
                       </div>
                     );
                   })}
@@ -1410,7 +1409,6 @@ function OwnerOccupancyCalendar({ days, units }: { days: OwnerCalendarDay[]; uni
     </section>
   );
 }
-
 function OwnerCalendarLegendDot({ label, tone }: { label: string; tone: OwnerCalendarEventTone }) {
   return (
     <span className="inline-flex items-center gap-2">
@@ -1420,11 +1418,47 @@ function OwnerCalendarLegendDot({ label, tone }: { label: string; tone: OwnerCal
   );
 }
 
-function OwnerAvailabilityBlocksTable({ property }: { property: OwnerProperty }) {
-  const blocks = [...property.requestedBlocks].sort(
-    (left, right) => parseOwnerDateOnly(left.startsOn).getTime() - parseOwnerDateOnly(right.startsOn).getTime()
-  );
+function OwnerBlocksSummary({ blocks }: { blocks: OwnerProperty["requestedBlocks"] }) {
+  const ownerBlocks = blocks.filter((block) => block.reason === "OWNER_HOLD").length;
+  const operationsBlocks = blocks.length - ownerBlocks;
+  const nextBlock = blocks.find((block) => parseOwnerDateOnly(block.endsOn) >= getTodayUtc()) ?? null;
 
+  return (
+    <aside className="rounded-[8px] border border-line bg-ivory p-4">
+      <p className="text-xs font-semibold uppercase text-green">Estado de bloqueos</p>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+        <BlockingSummaryFact label="Bloqueos visibles" value={String(blocks.length)} />
+        <BlockingSummaryFact label="Propietario" value={String(ownerBlocks)} />
+        <BlockingSummaryFact label="Operaciones" value={String(operationsBlocks)} />
+      </dl>
+      <div className="mt-3 rounded-[6px] border border-line bg-white p-3">
+        <p className="text-xs font-semibold uppercase text-ink/48">Proxima ocupacion bloqueada</p>
+        <p className="mt-2 text-sm font-semibold text-midnight">
+          {nextBlock
+            ? `${formatShortDate(nextBlock.startsOn)} - ${formatShortDate(nextBlock.endsOn)}`
+            : "Sin bloqueos futuros"}
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function BlockingSummaryFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[6px] border border-line bg-white px-3 py-2">
+      <dt className="text-xs font-semibold uppercase text-ink/48">{label}</dt>
+      <dd className="mt-1 text-lg font-semibold text-midnight">{value}</dd>
+    </div>
+  );
+}
+
+function OwnerAvailabilityBlocksTable({
+  blocks,
+  property
+}: {
+  blocks: OwnerProperty["requestedBlocks"];
+  property: OwnerProperty;
+}) {
   if (blocks.length === 0) {
     return <EmptyPanel text="Sin bloqueos activos o solicitados para esta propiedad." />;
   }
@@ -1433,15 +1467,15 @@ function OwnerAvailabilityBlocksTable({ property }: { property: OwnerProperty })
     <section className="rounded-[8px] border border-line bg-white p-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase text-green">Bloqueos registrados</p>
-          <h3 className="mt-1 text-lg font-semibold text-midnight">Solicitudes y operaciones</h3>
+          <p className="text-xs font-semibold uppercase text-green">Registro</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Bloqueos de disponibilidad</h3>
         </div>
         <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
           {blocks.length} bloqueo(s)
         </span>
       </div>
       <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
-        <table className="w-full min-w-[780px] border-collapse text-left text-xs">
+        <table className="w-full min-w-[760px] border-collapse text-left text-xs">
           <thead className="bg-ivory text-ink/48">
             <tr>
               <th className="px-3 py-2 font-semibold uppercase">Fechas</th>
@@ -1473,11 +1507,16 @@ function OwnerAvailabilityBlocksTable({ property }: { property: OwnerProperty })
     </section>
   );
 }
+function getSortedPropertyBlocks(property: OwnerProperty) {
+  return [...property.requestedBlocks].sort(
+    (left, right) => parseOwnerDateOnly(left.startsOn).getTime() - parseOwnerDateOnly(right.startsOn).getTime()
+  );
+}
 
 function buildOwnerCalendarDays() {
   const startDate = addOwnerDays(getTodayUtc(), -1);
 
-  return Array.from({ length: 35 }, (_, index) => {
+  return Array.from({ length: 21 }, (_, index) => {
     const date = addOwnerDays(startDate, index);
     return {
       date,
@@ -1650,10 +1689,18 @@ function OwnerAvailabilityBlockForm({
   }) => void;
   property: OwnerProperty;
 }) {
+  const defaultUnitId = property.units[0]?.id ?? "";
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [note, setNote] = useState("");
-  const [unitId, setUnitId] = useState(property.units[0]?.id ?? "");
+  const [unitId, setUnitId] = useState(defaultUnitId);
+
+  useEffect(() => {
+    setStartsOn("");
+    setEndsOn("");
+    setNote("");
+    setUnitId(defaultUnitId);
+  }, [defaultUnitId, property.id]);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1661,28 +1708,29 @@ function OwnerAvailabilityBlockForm({
   }
 
   return (
-    <form className="mt-5 border-t border-line pt-5" onSubmit={handleSubmit}>
+    <form className="rounded-[8px] border border-line bg-white p-4" onSubmit={handleSubmit}>
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-sm font-semibold text-midnight">Solicitar bloqueo de fechas</p>
-          <p className="mt-1 text-xs leading-5 text-ink/58">
-            Crea una solicitud de bloqueo si no hay conflicto con reservas u otros bloqueos.
+          <p className="text-xs font-semibold uppercase text-green">Solicitud</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Bloquear fechas disponibles</h3>
+          <p className="mt-1 text-sm leading-6 text-ink/62">
+            Se audita contra reservas y bloqueos existentes antes de registrar la solicitud.
           </p>
         </div>
         <button
-          className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
+          className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
           disabled={isSubmitting || !startsOn || !endsOn || !unitId}
           type="submit"
         >
           <CalendarCheck2 aria-hidden className="h-4 w-4" />
-          {isSubmitting ? "Solicitando" : "Solicitar"}
+          {isSubmitting ? "Solicitando" : "Solicitar bloqueo"}
         </button>
       </div>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
+      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(160px,0.8fr)_minmax(150px,0.7fr)_minmax(150px,0.7fr)_minmax(220px,1fr)]">
         <label className="text-xs font-semibold uppercase text-ink/48">
           Unidad
           <select
-            className="focus-ring mt-2 min-h-10 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
+            className="focus-ring mt-2 min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
             onChange={(event) => setUnitId(event.target.value)}
             value={unitId}
           >
@@ -1696,7 +1744,7 @@ function OwnerAvailabilityBlockForm({
         <label className="text-xs font-semibold uppercase text-ink/48">
           Inicio
           <input
-            className="focus-ring mt-2 min-h-10 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
+            className="focus-ring mt-2 min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
             onChange={(event) => setStartsOn(event.target.value)}
             type="date"
             value={startsOn}
@@ -1705,7 +1753,8 @@ function OwnerAvailabilityBlockForm({
         <label className="text-xs font-semibold uppercase text-ink/48">
           Fin
           <input
-            className="focus-ring mt-2 min-h-10 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
+            className="focus-ring mt-2 min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
+            min={startsOn || undefined}
             onChange={(event) => setEndsOn(event.target.value)}
             type="date"
             value={endsOn}
@@ -1714,23 +1763,13 @@ function OwnerAvailabilityBlockForm({
         <label className="text-xs font-semibold uppercase text-ink/48">
           Nota
           <input
-            className="focus-ring mt-2 min-h-10 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
+            className="focus-ring mt-2 min-h-11 w-full rounded-[6px] border border-line bg-white px-3 text-sm normal-case text-midnight"
             onChange={(event) => setNote(event.target.value)}
+            placeholder="Motivo visible para operaciones"
             value={note}
           />
         </label>
       </div>
-      {property.requestedBlocks.length > 0 ? (
-        <div className="mt-4 rounded-[6px] border border-line bg-ivory p-3 text-xs leading-5 text-ink/64">
-          <p className="font-semibold text-midnight">Bloqueos solicitados y operativos visibles</p>
-          {property.requestedBlocks.slice(0, 3).map((block) => (
-            <p className="mt-1" key={block.id}>
-              {formatShortDate(block.startsOn)} - {formatShortDate(block.endsOn)} /{" "}
-              {block.reasonLabel}
-            </p>
-          ))}
-        </div>
-      ) : null}
     </form>
   );
 }
