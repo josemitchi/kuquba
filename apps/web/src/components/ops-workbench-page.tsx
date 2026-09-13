@@ -661,8 +661,8 @@ function OpsCommandBar({
   sessionReady: boolean;
 }) {
   return (
-    <div className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+    <div className="rounded-[8px] border border-line bg-white px-5 py-4 shadow-soft">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <div className="inline-flex items-center gap-2 rounded-full bg-green/10 px-3 py-1.5 text-xs font-semibold uppercase text-green">
             <ShieldCheck aria-hidden className="h-4 w-4" />
@@ -676,32 +676,20 @@ function OpsCommandBar({
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-          <div className="rounded-[8px] border border-line bg-ivory px-4 py-3">
-            <p className="text-xs font-semibold uppercase text-ink/48">Sesion</p>
-            <p className="mt-1 truncate text-sm font-semibold text-midnight">{operatorName}</p>
-            <p className="mt-1 truncate text-xs text-ink/58">{roleName}</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center lg:justify-end">
+          <div className="min-w-64 rounded-full border border-line bg-ivory px-4 py-2">
+            <p className="truncate text-sm font-semibold text-midnight">{operatorName}</p>
+            <p className="truncate text-xs text-ink/58">{roleName}</p>
           </div>
-          <div className="flex flex-col gap-3 rounded-[8px] border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:flex-col lg:items-stretch">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase text-ink/48">Sincronizacion</p>
-              <p className="mt-1 text-sm font-semibold text-midnight">
-                {isRefreshing ? "Actualizando datos" : "Datos listos"}
-              </p>
-              <p className="mt-1 text-xs text-ink/58">
-                {sessionReady ? "Workbench operativo" : "Acceso pendiente"}
-              </p>
-            </div>
-            <button
-              className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!sessionReady || isRefreshing}
-              onClick={onRefresh}
-              type="button"
-            >
-              <RefreshCw aria-hidden className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              Actualizar
-            </button>
-          </div>
+          <button
+            className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!sessionReady || isRefreshing}
+            onClick={onRefresh}
+            type="button"
+          >
+            <RefreshCw aria-hidden className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Actualizando" : "Actualizar"}
+          </button>
         </div>
       </div>
     </div>
