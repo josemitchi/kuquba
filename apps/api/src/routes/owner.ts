@@ -269,6 +269,9 @@ async function loadOwnerPortalRecord(userId: string) {
                 orderBy: { startsOn: "asc" },
                 where: { endsOn: { gte: new Date() } }
               },
+              ratePlans: {
+                orderBy: [{ startsOn: "asc" }, { createdAt: "asc" }]
+              },
               reservations: {
                 include: {
                   financialAllocations: {
@@ -367,6 +370,7 @@ async function loadOwnerPortalRecord(userId: string) {
 type OwnerPortalRecord = NonNullable<Awaited<ReturnType<typeof loadOwnerPortalRecord>>>;
 type OwnerContractRecord = OwnerPortalRecord["contracts"][number];
 type OwnerPropertyRecord = OwnerContractRecord["property"];
+type OwnerRatePlanRecord = OwnerPropertyRecord["ratePlans"][number];
 type OwnerReservationRecord = OwnerPropertyRecord["reservations"][number];
 type OwnerAvailabilityBlockRecord = OwnerPropertyRecord["availabilityBlocks"][number];
 type ReservationWithProperty = OwnerReservationRecord & { property: OwnerPropertyRecord };
@@ -530,6 +534,7 @@ function buildPropertySummary(
     reservations: activeReservations
       .slice(0, 8)
       .map((reservation) => mapOwnerReservation(reservation, reservationPaymentTraces.get(reservation.id))),
+    rateCards: buildOwnerPropertyRateCards(property.ratePlans, property.units),
     requestedBlocks: property.availabilityBlocks.map(mapOwnerAvailabilityBlock),
     units: property.units.map((unit) => ({ id: unit.id, name: unit.name })),
     operations: [
@@ -756,6 +761,126 @@ function mapOwnerAvailabilityBlock(block: OwnerAvailabilityBlockRecord) {
   };
 }
 
+const ownerRateCategories = [
+  {
+    configuredNote: "Fechas ordinarias entre semana.",
+    key: "LOW_SEASON",
+    keywords: ["base", "baja", "low"],
+    label: "Temporada baja",
+    pendingNote: "Configurar tarifa base antes de publicar disponibilidad."
+  },
+  {
+    configuredNote: "Viernes y sabado usan esta tarifa por noche.",
+    key: "WEEKEND",
+    keywords: ["fin de semana", "weekend"],
+    label: "Fin de semana",
+    pendingNote: "Configurar tarifa diferenciada para viernes y sabado."
+  },
+  {
+    configuredNote: "Tarifa dedicada para puentes y fines de semana extendidos.",
+    key: "LONG_WEEKEND",
+    keywords: ["largo", "puente", "long weekend"],
+    label: "Fin de semana largo",
+    pendingNote: "Definir tarifa para puentes y fines de semana extendidos."
+  },
+  {
+    configuredNote: "Tarifa dedicada para feriados y dias festivos.",
+    key: "HOLIDAY",
+    keywords: ["festivo", "feriado", "holiday"],
+    label: "Dias festivos",
+    pendingNote: "Definir tarifa para feriados nacionales o fechas especiales."
+  },
+  {
+    configuredNote: "Tarifa por rangos de alta demanda.",
+    key: "HIGH_SEASON",
+    keywords: ["alta", "high season"],
+    label: "Temporada alta",
+    pendingNote: "Definir tarifa y vigencia para temporadas de alta demanda."
+  }
+] as const;
+
+type OwnerRateCategoryConfig = (typeof ownerRateCategories)[number];
+
+function buildOwnerPropertyRateCards(ratePlans: OwnerRatePlanRecord[], units: OwnerPropertyRecord["units"]) {
+  const fallbackPlan = ratePlans.find((ratePlan) => ratePlan.active) ?? ratePlans[0] ?? null;
+  const unitNameById = new Map(units.map((unit) => [unit.id, unit.name]));
+
+  return ownerRateCategories.map((category) => {
+    const ratePlan = findOwnerRatePlanForCategory(category, ratePlans, fallbackPlan);
+    const amount = ratePlan ? getOwnerRateCategoryAmount(ratePlan, category.key) : null;
+    const currency = ratePlan?.currency ?? fallbackPlan?.currency ?? "GTQ";
+    const configured = Boolean(ratePlan?.active && amount);
+
+    return {
+      category: category.key,
+      categoryLabel: category.label,
+      cleaningFee: ratePlan?.cleaningFee.toString() ?? null,
+      cleaningFeeLabel: ratePlan ? formatCurrencyValue(ratePlan.cleaningFee, currency) : "Por definir",
+      configured,
+      currency,
+      endsOn: ratePlan?.endsOn?.toISOString() ?? null,
+      id: ratePlan ? `${category.key}-${ratePlan.id}` : category.key,
+      minNights: ratePlan?.minNights ?? null,
+      name: ratePlan?.name ?? "Pendiente de configuracion",
+      nightlyRate: amount,
+      nightlyRateLabel: amount ? formatCurrencyValue(amount, currency) : "Por definir",
+      note: configured ? category.configuredNote : category.pendingNote,
+      periodLabel: ratePlan ? formatRatePlanPeriod(ratePlan) : "Sin vigencia configurada",
+      startsOn: ratePlan?.startsOn?.toISOString() ?? null,
+      statusLabel: configured ? "Configurada" : ratePlan && !ratePlan.active ? "Inactiva" : "Pendiente",
+      unitId: ratePlan?.unitId ?? null,
+      unitName: ratePlan ? unitNameById.get(ratePlan.unitId) ?? "Unidad asignada" : "Todas las unidades"
+    };
+  });
+}
+
+function findOwnerRatePlanForCategory(
+  category: OwnerRateCategoryConfig,
+  ratePlans: OwnerRatePlanRecord[],
+  fallbackPlan: OwnerRatePlanRecord | null
+) {
+  const keywords = category.keywords.map(normalizeOwnerRateText);
+  const matchingPlan = ratePlans.find((ratePlan) => {
+    const normalizedName = normalizeOwnerRateText(ratePlan.name);
+
+    return keywords.some((keyword) => normalizedName.includes(keyword));
+  });
+
+  if (matchingPlan) {
+    return matchingPlan;
+  }
+
+  if (category.key === "LOW_SEASON" || category.key === "WEEKEND") {
+    return fallbackPlan;
+  }
+
+  return null;
+}
+
+function getOwnerRateCategoryAmount(
+  ratePlan: OwnerRatePlanRecord,
+  categoryKey: OwnerRateCategoryConfig["key"]
+) {
+  if (categoryKey === "WEEKEND") {
+    return ratePlan.weekendNightlyRate?.toString() ?? null;
+  }
+
+  return ratePlan.baseNightlyRate.toString();
+}
+
+function formatRatePlanPeriod(ratePlan: OwnerRatePlanRecord) {
+  const startsOnLabel = ratePlan.startsOn ? formatDateLabel(ratePlan.startsOn, true) : "Inicio abierto";
+  const endsOnLabel = ratePlan.endsOn ? formatDateLabel(ratePlan.endsOn, true) : "Sin fecha final";
+
+  return `${startsOnLabel} - ${endsOnLabel}`;
+}
+
+function normalizeOwnerRateText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 function buildOwnerPropertyRevenue(reservations: OwnerReservationRecord[], ownerShareBps: number) {
   const confirmed = reservations.filter((reservation) => reservation.status === "CONFIRMED");
   const gross = confirmed.reduce(

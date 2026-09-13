@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock3,
+  DollarSign,
   FileText,
   LogOut,
   MapPin,
@@ -82,6 +83,7 @@ const ownerPortalViews: Array<{ icon: LucideIcon; key: OwnerPortalViewKey; label
 ];
 type OwnerPropertyTabKey =
   | "overview"
+  | "rates"
   | "reservations"
   | "blocks"
   | "finance"
@@ -90,6 +92,7 @@ type OwnerPropertyTabKey =
 
 const propertyTabs: Array<{ icon: LucideIcon; key: OwnerPropertyTabKey; label: string }> = [
   { icon: Building2, key: "overview", label: "Informacion" },
+  { icon: DollarSign, key: "rates", label: "Tarifas" },
   { icon: CalendarCheck2, key: "reservations", label: "Reservas" },
   { icon: Wrench, key: "blocks", label: "Bloqueos" },
   { icon: TrendingUp, key: "finance", label: "Finanzas" },
@@ -763,6 +766,8 @@ function PropertyWorkspace({
   const content =
     activeTab === "overview" ? (
       <PropertyOverviewTab property={property} />
+    ) : activeTab === "rates" ? (
+      <PropertyRatesTab property={property} />
     ) : activeTab === "reservations" ? (
       <PropertyReservationsTab reservations={property.reservations} />
     ) : activeTab === "blocks" ? (
@@ -1156,6 +1161,76 @@ function PropertyOverviewTab({ property }: { property: OwnerProperty }) {
     </div>
   );
 }
+function PropertyRatesTab({ property }: { property: OwnerProperty }) {
+  const rateCards = property.rateCards ?? [];
+  const configuredRates = rateCards.filter((rate) => rate.configured).length;
+
+  if (rateCards.length === 0) {
+    return <EmptyPanel text="Sin tarifas configuradas para esta propiedad." />;
+  }
+
+  return (
+    <section className="rounded-[8px] border border-line bg-white p-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase text-green">Tarifario</p>
+          <h3 className="mt-1 text-lg font-semibold text-midnight">Tarifas por noche</h3>
+        </div>
+        <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
+          {configuredRates} de {rateCards.length} configurada(s)
+        </span>
+      </div>
+
+      <div className="mt-4 overflow-x-auto rounded-[6px] border border-line">
+        <table className="w-full min-w-[940px] border-collapse text-left text-xs">
+          <thead className="bg-ivory text-ink/48">
+            <tr>
+              <th className="px-3 py-2 font-semibold uppercase">Tipo</th>
+              <th className="px-3 py-2 font-semibold uppercase">Unidad</th>
+              <th className="px-3 py-2 font-semibold uppercase">Vigencia</th>
+              <th className="px-3 py-2 font-semibold uppercase">Tarifa noche</th>
+              <th className="px-3 py-2 font-semibold uppercase">Limpieza</th>
+              <th className="px-3 py-2 font-semibold uppercase">Minimo</th>
+              <th className="px-3 py-2 font-semibold uppercase">Estado</th>
+              <th className="px-3 py-2 font-semibold uppercase">Nota</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line bg-white">
+            {rateCards.map((rate) => (
+              <tr key={rate.id}>
+                <td className="px-3 py-3">
+                  <p className="font-semibold text-midnight">{rate.categoryLabel}</p>
+                  <p className="mt-1 text-[0.68rem] text-ink/52">{rate.name}</p>
+                </td>
+                <td className="px-3 py-3 text-ink/64">{rate.unitName}</td>
+                <td className="px-3 py-3 text-ink/64">{rate.periodLabel}</td>
+                <td className="px-3 py-3 font-semibold text-midnight">{rate.nightlyRateLabel}</td>
+                <td className="px-3 py-3 text-ink/64">{rate.cleaningFeeLabel}</td>
+                <td className="px-3 py-3 text-ink/64">
+                  {rate.minNights ? `${rate.minNights} noche(s)` : "Por definir"}
+                </td>
+                <td className="px-3 py-3">
+                  <span
+                    className={
+                      "inline-flex rounded-full px-2 py-1 font-semibold " +
+                      (rate.configured
+                        ? "border border-green/24 bg-green/10 text-green"
+                        : "border border-[#f0b35a]/35 bg-[#f0b35a]/16 text-midnight")
+                    }
+                  >
+                    {rate.statusLabel}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-ink/64">{rate.note}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function PropertyReservationsTab({ reservations }: { reservations: OwnerProperty["reservations"] }) {
   if (reservations.length === 0) {
     return <EmptyPanel text="Sin reservas visibles para esta propiedad en el periodo." />;
@@ -1957,11 +2032,13 @@ function getPropertyTabCount(
   settlements: OwnerPortalSnapshot["settlements"]
 ) {
   if (tab === "overview") return null;
+  if (tab === "rates") return (property.rateCards ?? []).filter((rate) => rate.configured).length;
   if (tab === "reservations") return property.reservations.length;
   if (tab === "blocks") return property.requestedBlocks.length;
   if (tab === "finance") return settlements.length;
   if (tab === "operations") return tasks.length;
-  return property.contract.versions.length;
+  if (tab === "documents") return property.contract.versions.length;
+  return null;
 }
 function OwnerAvailabilityBlockForm({
   isSubmitting,

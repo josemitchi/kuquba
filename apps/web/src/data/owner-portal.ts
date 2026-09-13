@@ -77,6 +77,27 @@ export type OwnerAvailabilityBlock = {
   unitId: string;
 };
 
+export type OwnerRateCard = {
+  category: string;
+  categoryLabel: string;
+  cleaningFee?: string | null;
+  cleaningFeeLabel: string;
+  configured: boolean;
+  currency: string;
+  endsOn?: string | null;
+  id: string;
+  minNights?: number | null;
+  name: string;
+  nightlyRate?: string | null;
+  nightlyRateLabel: string;
+  note: string;
+  periodLabel: string;
+  startsOn?: string | null;
+  statusLabel: string;
+  unitId?: string | null;
+  unitName: string;
+};
+
 export type OwnerPropertyRevenue = {
   confirmedCount: number;
   currency: string;
@@ -101,6 +122,7 @@ export type OwnerProperty = {
     label: string;
     state: string;
   }>;
+  rateCards: OwnerRateCard[];
   reservations: OwnerReservation[];
   requestedBlocks: OwnerAvailabilityBlock[];
   reviewLabel: string;
@@ -298,6 +320,108 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         grossConfirmed: "6200.00",
         label: "2 confirmada(s)"
       },
+      rateCards: [
+        {
+          category: "LOW_SEASON",
+          categoryLabel: "Temporada baja",
+          cleaningFee: "450.00",
+          cleaningFeeLabel: "Q450.00",
+          configured: true,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-paredon-low",
+          minNights: 2,
+          name: "Tarifa base El Paredon",
+          nightlyRate: "1650.00",
+          nightlyRateLabel: "Q1,650.00",
+          note: "Fechas ordinarias entre semana.",
+          periodLabel: "Inicio abierto - Sin fecha final",
+          startsOn: null,
+          statusLabel: "Configurada",
+          unitId: "unit-atitlan-main",
+          unitName: "Villa completa"
+        },
+        {
+          category: "WEEKEND",
+          categoryLabel: "Fin de semana",
+          cleaningFee: "450.00",
+          cleaningFeeLabel: "Q450.00",
+          configured: true,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-paredon-weekend",
+          minNights: 2,
+          name: "Tarifa base El Paredon",
+          nightlyRate: "1850.00",
+          nightlyRateLabel: "Q1,850.00",
+          note: "Viernes y sabado usan esta tarifa por noche.",
+          periodLabel: "Inicio abierto - Sin fecha final",
+          startsOn: null,
+          statusLabel: "Configurada",
+          unitId: "unit-atitlan-main",
+          unitName: "Villa completa"
+        },
+        {
+          category: "LONG_WEEKEND",
+          categoryLabel: "Fin de semana largo",
+          cleaningFee: null,
+          cleaningFeeLabel: "Por definir",
+          configured: false,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-paredon-long-weekend",
+          minNights: null,
+          name: "Pendiente de configuracion",
+          nightlyRate: null,
+          nightlyRateLabel: "Por definir",
+          note: "Definir tarifa para puentes y fines de semana extendidos.",
+          periodLabel: "Sin vigencia configurada",
+          startsOn: null,
+          statusLabel: "Pendiente",
+          unitId: null,
+          unitName: "Todas las unidades"
+        },
+        {
+          category: "HOLIDAY",
+          categoryLabel: "Dias festivos",
+          cleaningFee: null,
+          cleaningFeeLabel: "Por definir",
+          configured: false,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-paredon-holiday",
+          minNights: null,
+          name: "Pendiente de configuracion",
+          nightlyRate: null,
+          nightlyRateLabel: "Por definir",
+          note: "Definir tarifa para feriados nacionales o fechas especiales.",
+          periodLabel: "Sin vigencia configurada",
+          startsOn: null,
+          statusLabel: "Pendiente",
+          unitId: null,
+          unitName: "Todas las unidades"
+        },
+        {
+          category: "HIGH_SEASON",
+          categoryLabel: "Temporada alta",
+          cleaningFee: null,
+          cleaningFeeLabel: "Por definir",
+          configured: false,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-paredon-high-season",
+          minNights: null,
+          name: "Pendiente de configuracion",
+          nightlyRate: null,
+          nightlyRateLabel: "Por definir",
+          note: "Definir tarifa y vigencia para temporadas de alta demanda.",
+          periodLabel: "Sin vigencia configurada",
+          startsOn: null,
+          statusLabel: "Pendiente",
+          unitId: null,
+          unitName: "Todas las unidades"
+        }
+      ],
       reservations: [],
       requestedBlocks: [],
       units: [{ id: "unit-atitlan-main", name: "Villa completa" }],
@@ -360,6 +484,108 @@ export const ownerPortalSnapshot: OwnerPortalSnapshot = {
         grossConfirmed: "0.00",
         label: "Sin reservas confirmadas"
       },
+      rateCards: [
+        {
+          category: "LOW_SEASON",
+          categoryLabel: "Temporada baja",
+          cleaningFee: "400.00",
+          cleaningFeeLabel: "Q400.00",
+          configured: true,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-monterrico-low",
+          minNights: 2,
+          name: "Tarifa base Monterrico",
+          nightlyRate: "1450.00",
+          nightlyRateLabel: "Q1,450.00",
+          note: "Fechas ordinarias entre semana.",
+          periodLabel: "Inicio abierto - Sin fecha final",
+          startsOn: null,
+          statusLabel: "Configurada",
+          unitId: "unit-antigua-main",
+          unitName: "Casa completa"
+        },
+        {
+          category: "WEEKEND",
+          categoryLabel: "Fin de semana",
+          cleaningFee: "400.00",
+          cleaningFeeLabel: "Q400.00",
+          configured: true,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-monterrico-weekend",
+          minNights: 2,
+          name: "Tarifa base Monterrico",
+          nightlyRate: "1700.00",
+          nightlyRateLabel: "Q1,700.00",
+          note: "Viernes y sabado usan esta tarifa por noche.",
+          periodLabel: "Inicio abierto - Sin fecha final",
+          startsOn: null,
+          statusLabel: "Configurada",
+          unitId: "unit-antigua-main",
+          unitName: "Casa completa"
+        },
+        {
+          category: "LONG_WEEKEND",
+          categoryLabel: "Fin de semana largo",
+          cleaningFee: null,
+          cleaningFeeLabel: "Por definir",
+          configured: false,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-monterrico-long-weekend",
+          minNights: null,
+          name: "Pendiente de configuracion",
+          nightlyRate: null,
+          nightlyRateLabel: "Por definir",
+          note: "Definir tarifa para puentes y fines de semana extendidos.",
+          periodLabel: "Sin vigencia configurada",
+          startsOn: null,
+          statusLabel: "Pendiente",
+          unitId: null,
+          unitName: "Todas las unidades"
+        },
+        {
+          category: "HOLIDAY",
+          categoryLabel: "Dias festivos",
+          cleaningFee: null,
+          cleaningFeeLabel: "Por definir",
+          configured: false,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-monterrico-holiday",
+          minNights: null,
+          name: "Pendiente de configuracion",
+          nightlyRate: null,
+          nightlyRateLabel: "Por definir",
+          note: "Definir tarifa para feriados nacionales o fechas especiales.",
+          periodLabel: "Sin vigencia configurada",
+          startsOn: null,
+          statusLabel: "Pendiente",
+          unitId: null,
+          unitName: "Todas las unidades"
+        },
+        {
+          category: "HIGH_SEASON",
+          categoryLabel: "Temporada alta",
+          cleaningFee: null,
+          cleaningFeeLabel: "Por definir",
+          configured: false,
+          currency: "GTQ",
+          endsOn: null,
+          id: "rate-monterrico-high-season",
+          minNights: null,
+          name: "Pendiente de configuracion",
+          nightlyRate: null,
+          nightlyRateLabel: "Por definir",
+          note: "Definir tarifa y vigencia para temporadas de alta demanda.",
+          periodLabel: "Sin vigencia configurada",
+          startsOn: null,
+          statusLabel: "Pendiente",
+          unitId: null,
+          unitName: "Todas las unidades"
+        }
+      ],
       reservations: [],
       requestedBlocks: [],
       units: [{ id: "unit-antigua-main", name: "Casa completa" }],
