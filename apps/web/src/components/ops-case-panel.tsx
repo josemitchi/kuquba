@@ -41,6 +41,20 @@ type ContractStatus = "DRAFT" | "ISSUED" | "SIGNED" | "ACTIVE" | "VOID" | "SUPER
 type Priority = "high" | "normal" | "medium" | "low";
 type LoadState = "idle" | "loading" | "ready" | "error";
 type Notice = { kind: "success" | "error"; text: string } | null;
+type CasePanelTabKey = "flow" | "followUp" | "notes" | "tasks";
+
+type CasePanelTab = {
+  icon: LucideIcon;
+  key: CasePanelTabKey;
+  label: string;
+};
+
+const casePanelTabs: CasePanelTab[] = [
+  { icon: GitBranch, key: "flow", label: "Flujo" },
+  { icon: ShieldCheck, key: "followUp", label: "Seguimiento" },
+  { icon: MessageSquareText, key: "notes", label: "Notas" },
+  { icon: ClipboardList, key: "tasks", label: "Tareas" }
+];
 
 type CaseOption<T extends string> = {
   label: string;
@@ -373,10 +387,12 @@ export function OpsCasePanel({
   const [activationForm, setActivationForm] = useState<PropertyActivationForm>(buildEmptyActivationForm());
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
+  const [activeCaseTab, setActiveCaseTab] = useState<CasePanelTabKey>("flow");
 
   useEffect(() => {
     if (!sessionToken || !selectedItem) {
       setCaseDetail(null);
+      setActiveCaseTab("flow");
       setLoadState("idle");
       setNextStep("");
       setConversionMilestone("");
@@ -391,6 +407,7 @@ export function OpsCasePanel({
     }
 
     let isMounted = true;
+    setActiveCaseTab("flow");
     setLoadState("loading");
     setNotice(null);
 
@@ -882,256 +899,342 @@ export function OpsCasePanel({
           body="Abre un item de la bandeja para ver su flujo."
         />
       ) : (
-        <div className="mt-5 space-y-6">
-          <div className="flex flex-wrap gap-2">
-            <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${caseStatusClasses[caseDetail.status]}`}
-            >
-              {caseDetail.statusLabel}
-            </span>
-            <span
-              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                priorityClasses[caseDetail.priority] ?? priorityClasses.normal
-              }`}
-            >
-              Prioridad {caseDetail.priorityLabel}
-            </span>
+        <div className="mt-5 space-y-5">
+          <div className="flex flex-col gap-4 border-b border-line pb-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${caseStatusClasses[caseDetail.status]}`}
+              >
+                {caseDetail.statusLabel}
+              </span>
+              <span
+                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+                  priorityClasses[caseDetail.priority] ?? priorityClasses.normal
+                }`}
+              >
+                Prioridad {caseDetail.priorityLabel}
+              </span>
+            </div>
+
+            <div className="grid min-w-full grid-cols-3 gap-3 text-center sm:min-w-[420px] lg:min-w-[480px]">
+              <CaseMetric
+                label="Tareas"
+                value={`${caseDetail.metrics.openTaskCount}/${caseDetail.metrics.taskCount}`}
+              />
+              <CaseMetric label="Notas" value={`${caseDetail.metrics.noteCount}`} />
+              <CaseMetric label="Estado" value={caseDetail.statusLabel} />
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 border-y border-line py-4 text-center">
-            <CaseMetric
-              label="Tareas"
-              value={`${caseDetail.metrics.openTaskCount}/${caseDetail.metrics.taskCount}`}
-            />
-            <CaseMetric label="Notas" value={`${caseDetail.metrics.noteCount}`} />
-            <CaseMetric label="Estado" value={caseDetail.statusLabel} />
-          </div>
-
-          <ConversionSection
-            canApproveFormal={canApproveFormal}
+          <CasePanelTabs
+            activeTab={activeCaseTab}
             caseDetail={caseDetail}
-            conversionMilestone={conversionMilestone}
-            currentUser={currentUser}
-            formalActivityBody={formalActivityBody}
-            formalHandoffNotes={formalHandoffNotes}
-            formalTargetDate={formalTargetDate}
-            onChecklistStatusChange={handleChecklistStatusChange}
-            onConversionMilestoneChange={setConversionMilestone}
-            onConversionMilestoneSubmit={handleConversionMilestoneSubmit}
-            onConversionStatusChange={handleConversionStatusChange}
-            onConvert={handleConvertCase}
-            onFormalActivityBodyChange={setFormalActivityBody}
-            onFormalActivitySubmit={handleFormalActivitySubmit}
-            onFormalAssignmentChange={handleFormalAssignmentChange}
-            onFormalHandoffNotesChange={setFormalHandoffNotes}
-            onFormalPlanSubmit={handleFormalPlanSubmit}
-            onFormalTransition={handleFormalTransition}
-            onFormalTargetDateChange={setFormalTargetDate}
-            activationForm={activationForm}
-            onActivationFormChange={handleActivationFormChange}
-            onContractIssue={handleContractIssue}
-            onPropertyActivate={handlePropertyActivation}
-            onProposalInternalNotesChange={setProposalInternalNotes}
-            onProposalSummaryChange={setProposalSummary}
-            onProposalTermsLabelChange={setProposalTermsLabel}
-            onProposalVersionSubmit={handleProposalVersionSubmit}
-            proposalInternalNotes={proposalInternalNotes}
-            proposalSummary={proposalSummary}
-            proposalTermsLabel={proposalTermsLabel}
-            updatingKey={updatingKey}
+            onTabChange={setActiveCaseTab}
           />
 
-          <div>
-            <p className="text-xs font-semibold uppercase text-ink/48">Estado caso</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {caseDetail.options.statuses.map((option) => (
-                <button
-                  className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
-                    caseDetail.status === option.value
-                      ? "border-green bg-green text-white"
-                      : "border-line bg-white text-midnight hover:border-green hover:text-green"
-                  }`}
-                  disabled={updatingKey === "case" || caseDetail.status === option.value}
-                  key={option.value}
-                  onClick={() => handleCaseUpdate({ status: option.value })}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase text-ink/48">Prioridad</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {caseDetail.options.priorities.map((option) => (
-                <button
-                  className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
-                    caseDetail.priority === option.value
-                      ? "border-midnight bg-midnight text-white"
-                      : "border-line bg-white text-midnight hover:border-midnight"
-                  }`}
-                  disabled={updatingKey === "case" || caseDetail.priority === option.value}
-                  key={option.value}
-                  onClick={() => handleCaseUpdate({ priority: option.value })}
-                  type="button"
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <form className="space-y-3" onSubmit={handleNextStepSubmit}>
-            <label
-              className="block text-xs font-semibold uppercase text-ink/48"
-              htmlFor="case-next-step"
-            >
-              Siguiente paso
-            </label>
-            <textarea
-              className="focus-ring min-h-24 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
-              id="case-next-step"
-              maxLength={240}
-              onChange={(event) => setNextStep(event.target.value)}
-              value={nextStep}
+          {activeCaseTab === "flow" ? (
+            <ConversionSection
+              canApproveFormal={canApproveFormal}
+              caseDetail={caseDetail}
+              conversionMilestone={conversionMilestone}
+              currentUser={currentUser}
+              formalActivityBody={formalActivityBody}
+              formalHandoffNotes={formalHandoffNotes}
+              formalTargetDate={formalTargetDate}
+              onChecklistStatusChange={handleChecklistStatusChange}
+              onConversionMilestoneChange={setConversionMilestone}
+              onConversionMilestoneSubmit={handleConversionMilestoneSubmit}
+              onConversionStatusChange={handleConversionStatusChange}
+              onConvert={handleConvertCase}
+              onFormalActivityBodyChange={setFormalActivityBody}
+              onFormalActivitySubmit={handleFormalActivitySubmit}
+              onFormalAssignmentChange={handleFormalAssignmentChange}
+              onFormalHandoffNotesChange={setFormalHandoffNotes}
+              onFormalPlanSubmit={handleFormalPlanSubmit}
+              onFormalTransition={handleFormalTransition}
+              onFormalTargetDateChange={setFormalTargetDate}
+              activationForm={activationForm}
+              onActivationFormChange={handleActivationFormChange}
+              onContractIssue={handleContractIssue}
+              onPropertyActivate={handlePropertyActivation}
+              onProposalInternalNotesChange={setProposalInternalNotes}
+              onProposalSummaryChange={setProposalSummary}
+              onProposalTermsLabelChange={setProposalTermsLabel}
+              onProposalVersionSubmit={handleProposalVersionSubmit}
+              proposalInternalNotes={proposalInternalNotes}
+              proposalSummary={proposalSummary}
+              proposalTermsLabel={proposalTermsLabel}
+              updatingKey={updatingKey}
             />
-            <button
-              className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-midnight px-4 text-sm font-semibold text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:opacity-55"
-              disabled={updatingKey === "case"}
-              type="submit"
-            >
-              <Save aria-hidden className="h-4 w-4" />
-              Guardar
-            </button>
-          </form>
+          ) : null}
 
-          <div className="border-t border-line pt-5">
-            <div className="flex items-center gap-2">
-              <MessageSquareText aria-hidden className="h-4 w-4 text-green" />
-              <h3 className="text-sm font-semibold uppercase text-midnight">Notas</h3>
-            </div>
-            <form className="mt-3 space-y-3" onSubmit={handleNoteSubmit}>
-              <textarea
-                aria-label="Nueva nota"
-                className="focus-ring min-h-24 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
-                maxLength={1000}
-                onChange={(event) => setNoteBody(event.target.value)}
-                placeholder="Nueva nota"
-                value={noteBody}
-              />
-              <button
-                className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
-                disabled={updatingKey === "note" || noteBody.trim().length < 3}
-                type="submit"
-              >
-                <Plus aria-hidden className="h-4 w-4" />
-                Agregar nota
-              </button>
-            </form>
-            <div className="mt-4 space-y-3">
-              {caseDetail.notes.map((note) => (
-                <div
-                  className="border-b border-line pb-3 text-sm last:border-b-0 last:pb-0"
-                  key={note.id}
-                >
-                  <p className="leading-6 text-ink/76">{note.body}</p>
-                  <p className="mt-2 text-xs text-ink/50">
-                    {note.author?.displayName ?? "KUQUBA"} - {formatDateTime(note.createdAt)}
-                  </p>
-                </div>
-              ))}
-              {caseDetail.notes.length === 0 ? (
-                <p className="text-sm leading-6 text-ink/62">Sin notas.</p>
-              ) : null}
-            </div>
-          </div>
-          <div className="border-t border-line pt-5">
-            <div className="flex items-center gap-2">
-              <ClipboardList aria-hidden className="h-4 w-4 text-green" />
-              <h3 className="text-sm font-semibold uppercase text-midnight">Tareas</h3>
-            </div>
-            <form className="mt-3 grid gap-3" onSubmit={handleTaskSubmit}>
-              <input
-                aria-label="Nueva tarea"
-                className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm text-ink outline-none"
-                maxLength={160}
-                onChange={(event) => setTaskTitle(event.target.value)}
-                placeholder="Nueva tarea"
-                value={taskTitle}
-              />
-              <div className="grid gap-3 sm:grid-cols-[1fr_120px]">
-                <input
-                  aria-label="Fecha o contexto"
-                  className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm text-ink outline-none"
-                  maxLength={80}
-                  onChange={(event) => setTaskDueLabel(event.target.value)}
-                  placeholder="Fecha o contexto"
-                  value={taskDueLabel}
-                />
-                <select
-                  aria-label="Prioridad de tarea"
-                  className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight outline-none"
-                  onChange={(event) => setTaskPriority(event.target.value as Priority)}
-                  value={taskPriority}
-                >
-                  {caseDetail.options.priorities.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
-                disabled={updatingKey === "task:create" || taskTitle.trim().length < 3}
-                type="submit"
-              >
-                <Plus aria-hidden className="h-4 w-4" />
-                Crear tarea
-              </button>
-            </form>
-            <div className="mt-4 space-y-3">
-              {caseDetail.tasks.map((task) => (
-                <div className="border-b border-line pb-3 last:border-b-0 last:pb-0" key={task.id}>
-                  <button
-                    className="focus-ring flex w-full items-start gap-3 rounded-[6px] text-left disabled:cursor-not-allowed disabled:opacity-55"
-                    disabled={updatingKey === `task:${task.id}`}
-                    onClick={() => handleTaskStatusChange(task)}
-                    type="button"
-                  >
-                    {task.status === "DONE" ? (
-                      <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
-                    ) : (
-                      <Circle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-terracotta" />
-                    )}
-                    <span className="min-w-0">
-                      <span
-                        className={`block text-sm font-semibold leading-5 ${
-                          task.status === "DONE" ? "text-ink/48 line-through" : "text-midnight"
+          {activeCaseTab === "followUp" ? (
+            <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+              <div className="rounded-[8px] border border-line bg-ivory p-4">
+                <p className="text-xs font-semibold uppercase text-green">Clasificacion</p>
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase text-ink/48">Estado caso</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {caseDetail.options.statuses.map((option) => (
+                      <button
+                        className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                          caseDetail.status === option.value
+                            ? "border-green bg-green text-white"
+                            : "border-line bg-white text-midnight hover:border-green hover:text-green"
                         }`}
+                        disabled={updatingKey === "case" || caseDetail.status === option.value}
+                        key={option.value}
+                        onClick={() => handleCaseUpdate({ status: option.value })}
+                        type="button"
                       >
-                        {task.title}
-                      </span>
-                      <span className="mt-1 block text-xs text-ink/52">
-                        {task.dueLabel ?? "Sin fecha"} - {task.priorityLabel} - {task.statusLabel}
-                      </span>
-                    </span>
-                  </button>
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              ))}
-              {caseDetail.tasks.length === 0 ? (
-                <p className="text-sm leading-6 text-ink/62">Sin tareas.</p>
-              ) : null}
+
+                <div className="mt-5">
+                  <p className="text-xs font-semibold uppercase text-ink/48">Prioridad</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {caseDetail.options.priorities.map((option) => (
+                      <button
+                        className={`focus-ring min-h-9 rounded-[6px] border px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-55 ${
+                          caseDetail.priority === option.value
+                            ? "border-midnight bg-midnight text-white"
+                            : "border-line bg-white text-midnight hover:border-midnight"
+                        }`}
+                        disabled={updatingKey === "case" || caseDetail.priority === option.value}
+                        key={option.value}
+                        onClick={() => handleCaseUpdate({ priority: option.value })}
+                        type="button"
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <form className="rounded-[8px] border border-line bg-white p-4" onSubmit={handleNextStepSubmit}>
+                <label
+                  className="block text-xs font-semibold uppercase text-ink/48"
+                  htmlFor="case-next-step"
+                >
+                  Siguiente paso
+                </label>
+                <textarea
+                  className="focus-ring mt-2 min-h-32 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
+                  id="case-next-step"
+                  maxLength={240}
+                  onChange={(event) => setNextStep(event.target.value)}
+                  value={nextStep}
+                />
+                <button
+                  className="focus-ring mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-midnight px-4 text-sm font-semibold text-white transition hover:bg-ink disabled:cursor-not-allowed disabled:opacity-55"
+                  disabled={updatingKey === "case"}
+                  type="submit"
+                >
+                  <Save aria-hidden className="h-4 w-4" />
+                  Guardar seguimiento
+                </button>
+              </form>
             </div>
-          </div>
+          ) : null}
+
+          {activeCaseTab === "notes" ? (
+            <div className="rounded-[8px] border border-line bg-white p-4">
+              <div className="flex items-center gap-2">
+                <MessageSquareText aria-hidden className="h-4 w-4 text-green" />
+                <h3 className="text-sm font-semibold uppercase text-midnight">Notas</h3>
+              </div>
+              <form className="mt-3 space-y-3" onSubmit={handleNoteSubmit}>
+                <textarea
+                  aria-label="Nueva nota"
+                  className="focus-ring min-h-28 w-full resize-none rounded-[6px] border border-line bg-white px-3 py-2 text-sm leading-6 text-ink outline-none"
+                  maxLength={1000}
+                  onChange={(event) => setNoteBody(event.target.value)}
+                  placeholder="Nueva nota"
+                  value={noteBody}
+                />
+                <button
+                  className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
+                  disabled={updatingKey === "note" || noteBody.trim().length < 3}
+                  type="submit"
+                >
+                  <Plus aria-hidden className="h-4 w-4" />
+                  Agregar nota
+                </button>
+              </form>
+              <div className="mt-4 space-y-3">
+                {caseDetail.notes.map((note) => (
+                  <div
+                    className="border-b border-line pb-3 text-sm last:border-b-0 last:pb-0"
+                    key={note.id}
+                  >
+                    <p className="leading-6 text-ink/76">{note.body}</p>
+                    <p className="mt-2 text-xs text-ink/50">
+                      {note.author?.displayName ?? "KUQUBA"} - {formatDateTime(note.createdAt)}
+                    </p>
+                  </div>
+                ))}
+                {caseDetail.notes.length === 0 ? (
+                  <p className="text-sm leading-6 text-ink/62">Sin notas.</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {activeCaseTab === "tasks" ? (
+            <div className="rounded-[8px] border border-line bg-white p-4">
+              <div className="flex items-center gap-2">
+                <ClipboardList aria-hidden className="h-4 w-4 text-green" />
+                <h3 className="text-sm font-semibold uppercase text-midnight">Tareas</h3>
+              </div>
+              <form className="mt-3 grid gap-3" onSubmit={handleTaskSubmit}>
+                <input
+                  aria-label="Nueva tarea"
+                  className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm text-ink outline-none"
+                  maxLength={160}
+                  onChange={(event) => setTaskTitle(event.target.value)}
+                  placeholder="Nueva tarea"
+                  value={taskTitle}
+                />
+                <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+                  <input
+                    aria-label="Fecha o contexto"
+                    className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm text-ink outline-none"
+                    maxLength={80}
+                    onChange={(event) => setTaskDueLabel(event.target.value)}
+                    placeholder="Fecha o contexto"
+                    value={taskDueLabel}
+                  />
+                  <select
+                    aria-label="Prioridad de tarea"
+                    className="focus-ring min-h-10 rounded-[6px] border border-line bg-white px-3 text-sm font-semibold text-midnight outline-none"
+                    onChange={(event) => setTaskPriority(event.target.value as Priority)}
+                    value={taskPriority}
+                  >
+                    {caseDetail.options.priorities.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  className="focus-ring inline-flex min-h-10 w-fit items-center justify-center gap-2 rounded-[6px] bg-green px-4 text-sm font-semibold text-white transition hover:bg-[#0f5c50] disabled:cursor-not-allowed disabled:opacity-55"
+                  disabled={updatingKey === "task:create" || taskTitle.trim().length < 3}
+                  type="submit"
+                >
+                  <Plus aria-hidden className="h-4 w-4" />
+                  Crear tarea
+                </button>
+              </form>
+              <div className="mt-4 space-y-3">
+                {caseDetail.tasks.map((task) => (
+                  <div className="border-b border-line pb-3 last:border-b-0 last:pb-0" key={task.id}>
+                    <button
+                      className="focus-ring flex w-full items-start gap-3 rounded-[6px] text-left disabled:cursor-not-allowed disabled:opacity-55"
+                      disabled={updatingKey === `task:${task.id}`}
+                      onClick={() => handleTaskStatusChange(task)}
+                      type="button"
+                    >
+                      {task.status === "DONE" ? (
+                        <CheckCircle2 aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-green" />
+                      ) : (
+                        <Circle aria-hidden className="mt-0.5 h-5 w-5 shrink-0 text-terracotta" />
+                      )}
+                      <span className="min-w-0">
+                        <span
+                          className={`block text-sm font-semibold leading-5 ${
+                            task.status === "DONE" ? "text-ink/48 line-through" : "text-midnight"
+                          }`}
+                        >
+                          {task.title}
+                        </span>
+                        <span className="mt-1 block text-xs text-ink/52">
+                          {task.dueLabel ?? "Sin fecha"} - {task.priorityLabel} - {task.statusLabel}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
+                ))}
+                {caseDetail.tasks.length === 0 ? (
+                  <p className="text-sm leading-6 text-ink/62">Sin tareas.</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </section>
   );
 }
 
+function CasePanelTabs({
+  activeTab,
+  caseDetail,
+  onTabChange
+}: {
+  activeTab: CasePanelTabKey;
+  caseDetail: OpsCaseDetail;
+  onTabChange: (tab: CasePanelTabKey) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2 border-b border-line pb-3" role="tablist">
+      {casePanelTabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = activeTab === tab.key;
+        const badge = getCasePanelTabBadge(tab.key, caseDetail);
+
+        return (
+          <button
+            aria-selected={isActive}
+            className={
+              "focus-ring inline-flex min-h-10 items-center gap-2 rounded-[6px] border px-3 text-sm font-semibold transition " +
+              (isActive
+                ? "border-green bg-green text-white"
+                : "border-line bg-white text-midnight hover:border-green hover:text-green")
+            }
+            key={tab.key}
+            onClick={() => onTabChange(tab.key)}
+            role="tab"
+            type="button"
+          >
+            <Icon aria-hidden className="h-4 w-4" />
+            {tab.label}
+            {badge ? (
+              <span
+                className={
+                  "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[0.68rem] " +
+                  (isActive ? "bg-white/20 text-white" : "bg-ivory text-ink/58")
+                }
+              >
+                {badge}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function getCasePanelTabBadge(tab: CasePanelTabKey, caseDetail: OpsCaseDetail) {
+  if (tab === "notes") {
+    return String(caseDetail.metrics.noteCount);
+  }
+
+  if (tab === "tasks") {
+    return `${caseDetail.metrics.openTaskCount}/${caseDetail.metrics.taskCount}`;
+  }
+
+  if (tab === "flow") {
+    return caseDetail.conversion ? "activo" : "nuevo";
+  }
+
+  return null;
+}
 function ConversionSection({
   canApproveFormal,
   caseDetail,
