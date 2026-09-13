@@ -175,6 +175,13 @@ async function main() {
   });
   await seedDevUser(prisma, {
     organizationId: organization.id,
+    email: "operaciones@kuquba.com",
+    displayName: "Operaciones KUQUBA",
+    roleKey: "ops_admin",
+    identityProvider: "EMAIL_OTP"
+  });
+  await seedDevUser(prisma, {
+    organizationId: organization.id,
     email: "iam.admin@kuquba.local",
     displayName: "Administrador IAM Dev",
     roleKey: "iam_admin",

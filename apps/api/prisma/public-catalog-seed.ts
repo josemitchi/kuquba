@@ -9,6 +9,7 @@ process.env.DATABASE_URL ??= defaultDevDatabaseUrl;
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const ownerId = "00000000-0000-4000-8000-000000000101";
 const publicDemoOwnerEmail = "josemitchi@gmail.com";
+const publicOpsEmail = "operaciones@kuquba.com";
 
 const defaultOwnerShareBps = 6500;
 const defaultKuqubaShareBps = 3500;
@@ -315,6 +316,7 @@ export async function seedPublicCatalog(prisma: PrismaClient) {
   });
 
   const ownerUser = await seedPortalOwnerUser(prisma, organization.id);
+  await seedPortalOpsUser(prisma, organization.id);
 
   const owner = await prisma.owner.upsert({
     where: { id: ownerId },
@@ -406,6 +408,71 @@ async function seedPortalOwnerUser(prisma: PrismaClient, organizationIdValue: st
   return user;
 }
 
+async function seedPortalOpsUser(prisma: PrismaClient, organizationIdValue: string) {
+  const user = await prisma.user.upsert({
+    where: {
+      organizationId_email: {
+        organizationId: organizationIdValue,
+        email: publicOpsEmail
+      }
+    },
+    create: {
+      organizationId: organizationIdValue,
+      email: publicOpsEmail,
+      displayName: "Operaciones KUQUBA"
+    },
+    update: {
+      displayName: "Operaciones KUQUBA"
+    }
+  });
+
+  await prisma.identity.upsert({
+    where: {
+      provider_subject: {
+        provider: "EMAIL_OTP",
+        subject: publicOpsEmail
+      }
+    },
+    create: {
+      userId: user.id,
+      provider: "EMAIL_OTP",
+      subject: publicOpsEmail,
+      status: "VERIFIED",
+      verifiedAt: new Date()
+    },
+    update: {
+      userId: user.id,
+      status: "VERIFIED",
+      verifiedAt: new Date()
+    }
+  });
+
+  const opsRole = await prisma.role.findUniqueOrThrow({
+    where: {
+      key: "ops_admin"
+    }
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId_scope_resourceId: {
+        userId: user.id,
+        roleId: opsRole.id,
+        scope: "ORGANIZATION",
+        resourceId: organizationIdValue
+      }
+    },
+    create: {
+      userId: user.id,
+      roleId: opsRole.id,
+      scope: "ORGANIZATION",
+      resourceId: organizationIdValue
+    },
+    update: {}
+  });
+
+  return user;
+}
 async function seedStay(
   prisma: PrismaClient,
   organizationIdValue: string,
