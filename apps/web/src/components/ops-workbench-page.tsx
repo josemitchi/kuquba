@@ -212,13 +212,23 @@ const opsModuleOptions: Array<{ key: OpsModuleKey; label: string; icon: LucideIc
   { key: "reservations", label: "Reservas", icon: CalendarDays },
   { key: "properties", label: "Propiedades", icon: Building2 },
   { key: "billing", label: "Cobros", icon: Receipt },
-  { key: "operations", label: "Operaciones", icon: CalendarDays },
+  { key: "operations", label: "Operaciones", icon: Wrench },
   { key: "iam", label: "IAM", icon: ShieldCheck },
   { key: "audit", label: "Auditoria", icon: SlidersHorizontal }
 ];
 
 const defaultOpsModuleOption = opsModuleOptions[0] as (typeof opsModuleOptions)[number];
 const opsActiveModuleStorageKey = "kuquba.ops.activeModule";
+
+const opsModuleDescriptions: Record<OpsModuleKey, string> = {
+  audit: "Eventos recientes y trazabilidad por accion.",
+  billing: "Reglas financieras, cargos y distribucion contractual.",
+  iam: "Usuarios, roles, permisos y alcance operativo.",
+  operations: "Limpiezas, mantenimiento y seguimiento en campo.",
+  properties: "Catalogo operativo, contenido y parametros de publicacion.",
+  reservations: "Reservas, disponibilidad, estados y bloqueos.",
+  requests: "Leads, solicitudes y expedientes de conversion."
+};
 
 const statusFilterOptions: Array<{ label: string; value: StatusFilter }> = [
   { label: "Todos", value: "ALL" },
@@ -467,33 +477,15 @@ export function OpsWorkbenchPage() {
         </div>
       </header>
 
-      <section className="container-shell py-8">
+      <section className="container-shell py-6">
         <div className="min-w-0">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-green/10 px-4 py-2 text-sm font-semibold text-green">
-                <ShieldCheck aria-hidden className="h-4 w-4" />
-                Operacion interna
-              </div>
-              <h1 className="mt-5 font-display text-4xl leading-tight text-midnight md:text-5xl">
-                Bandeja ops
-              </h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-ink/68 md:text-base">
-                Revision de leads de propietarios y solicitudes de propuesta con estado persistido y
-                auditoria por accion.
-              </p>
-            </div>
-
-            <button
-              className="focus-ring inline-flex min-h-11 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!session || loadState === "loading"}
-              onClick={handleRefresh}
-              type="button"
-            >
-              <RefreshCw aria-hidden className="h-4 w-4" />
-              Actualizar
-            </button>
-          </div>
+          <OpsCommandBar
+            isRefreshing={loadState === "loading" || operationsLoadState === "loading"}
+            onRefresh={handleRefresh}
+            operatorName={session?.user.displayName ?? "Sin sesion"}
+            roleName={session?.role.name ?? "Acceso pendiente"}
+            sessionReady={Boolean(session)}
+          />
 
           {session ? (
             <OpsModuleNav
@@ -529,45 +521,51 @@ export function OpsWorkbenchPage() {
               </div>
 
               <div className="mt-5 rounded-[8px] border border-line bg-white p-4 shadow-soft">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {queueOptions.map((option) => {
-                      const Icon = option.icon;
-                      const isActive = activeQueue === option.key;
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase text-ink/48">Bandeja</p>
+                    <div className="flex flex-wrap gap-2">
+                      {queueOptions.map((option) => {
+                        const Icon = option.icon;
+                        const isActive = activeQueue === option.key;
 
-                      return (
-                        <button
-                          className={`focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border px-4 text-sm font-semibold transition ${
-                            isActive
-                              ? "border-green bg-green text-white"
-                              : "border-line bg-white text-midnight hover:border-green hover:text-green"
-                          }`}
-                          key={option.key}
-                          onClick={() => setActiveQueue(option.key)}
-                          type="button"
-                        >
-                          <Icon aria-hidden className="h-4 w-4" />
-                          {option.label}
-                        </button>
-                      );
-                    })}
+                        return (
+                          <button
+                            className={`focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border px-4 text-sm font-semibold transition ${
+                              isActive
+                                ? "border-green bg-green text-white"
+                                : "border-line bg-white text-midnight hover:border-green hover:text-green"
+                            }`}
+                            key={option.key}
+                            onClick={() => setActiveQueue(option.key)}
+                            type="button"
+                          >
+                            <Icon aria-hidden className="h-4 w-4" />
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    {statusFilterOptions.map((option) => (
-                      <button
-                        className={`focus-ring min-h-10 rounded-[6px] border px-3 text-sm font-semibold transition ${
-                          statusFilter === option.value
-                            ? "border-midnight bg-midnight text-white"
-                            : "border-line bg-white text-midnight hover:border-midnight"
-                        }`}
-                        key={option.value}
-                        onClick={() => setStatusFilter(option.value)}
-                        type="button"
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase text-ink/48">Estado</p>
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      {statusFilterOptions.map((option) => (
+                        <button
+                          className={`focus-ring min-h-10 rounded-[6px] border px-3 text-sm font-semibold transition ${
+                            statusFilter === option.value
+                              ? "border-midnight bg-midnight text-white"
+                              : "border-line bg-white text-midnight hover:border-midnight"
+                          }`}
+                          key={option.value}
+                          onClick={() => setStatusFilter(option.value)}
+                          type="button"
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -649,6 +647,67 @@ export function OpsWorkbenchPage() {
   );
 }
 
+function OpsCommandBar({
+  isRefreshing,
+  onRefresh,
+  operatorName,
+  roleName,
+  sessionReady
+}: {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  operatorName: string;
+  roleName: string;
+  sessionReady: boolean;
+}) {
+  return (
+    <div className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
+        <div className="min-w-0">
+          <div className="inline-flex items-center gap-2 rounded-full bg-green/10 px-3 py-1.5 text-xs font-semibold uppercase text-green">
+            <ShieldCheck aria-hidden className="h-4 w-4" />
+            Operacion interna
+          </div>
+          <h1 className="mt-3 font-display text-3xl leading-tight text-midnight md:text-4xl">
+            Centro de operaciones
+          </h1>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-ink/66">
+            Bandeja unificada para solicitudes, reservas, propiedades, cobros, tareas y auditoria.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="rounded-[8px] border border-line bg-ivory px-4 py-3">
+            <p className="text-xs font-semibold uppercase text-ink/48">Sesion</p>
+            <p className="mt-1 truncate text-sm font-semibold text-midnight">{operatorName}</p>
+            <p className="mt-1 truncate text-xs text-ink/58">{roleName}</p>
+          </div>
+          <div className="flex flex-col gap-3 rounded-[8px] border border-line bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:flex-col lg:items-stretch">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase text-ink/48">Sincronizacion</p>
+              <p className="mt-1 text-sm font-semibold text-midnight">
+                {isRefreshing ? "Actualizando datos" : "Datos listos"}
+              </p>
+              <p className="mt-1 text-xs text-ink/58">
+                {sessionReady ? "Workbench operativo" : "Acceso pendiente"}
+              </p>
+            </div>
+            <button
+              className="focus-ring inline-flex min-h-10 items-center justify-center gap-2 rounded-[6px] border border-line bg-white px-4 text-sm font-semibold text-midnight transition hover:border-green hover:text-green disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={!sessionReady || isRefreshing}
+              onClick={onRefresh}
+              type="button"
+            >
+              <RefreshCw aria-hidden className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              Actualizar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OpsModuleHeader({
   module,
   summary
@@ -659,15 +718,18 @@ function OpsModuleHeader({
   const Icon = module.icon;
 
   return (
-    <div className="mt-6 rounded-[8px] border border-line bg-white px-4 py-3 shadow-soft">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[6px] bg-green text-white">
+    <div className="mt-4 rounded-[8px] border border-line bg-white px-4 py-3 shadow-soft">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-green/10 text-green">
             <Icon aria-hidden className="h-5 w-5" />
           </span>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-green">Modulo activo</p>
-            <h2 className="text-lg font-semibold text-midnight">{module.label}</h2>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 className="text-lg font-semibold text-midnight">{module.label}</h2>
+              <p className="text-sm text-ink/58">{opsModuleDescriptions[module.key]}</p>
+            </div>
           </div>
         </div>
         <span className="w-fit rounded-full border border-line bg-ivory px-3 py-1 text-xs font-semibold text-midnight/72">
@@ -696,9 +758,9 @@ function OpsModuleNav({
   return (
     <nav
       aria-label="Modulos Ops"
-      className="mt-6 rounded-[8px] border border-line bg-white p-2 shadow-soft"
+      className="mt-4 rounded-[8px] border border-line bg-white p-2 shadow-soft"
     >
-      <div className="grid gap-1 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
         {visibleOptions.map((option) => {
           const Icon = option.icon;
           const isActive = activeModule === option.key;
@@ -707,7 +769,7 @@ function OpsModuleNav({
             <button
               aria-current={isActive ? "page" : undefined}
               className={
-                "focus-ring flex min-h-12 items-center justify-between gap-2 rounded-[6px] px-3 text-left text-sm font-semibold transition " +
+                "focus-ring grid min-h-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-[6px] px-3 text-left text-sm font-semibold transition " +
                 (isActive ? "bg-green text-white" : "text-midnight hover:bg-ivory hover:text-green")
               }
               key={option.key}
@@ -872,7 +934,7 @@ function OpsOperationsPanel({
       : maintenanceTickets.filter((ticket) => ticket.status === maintenanceStatusFilter);
 
   return (
-    <section className="mt-7 border-y border-line py-6">
+    <section className="mt-5 border-y border-line py-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 items-center justify-center rounded-[6px] bg-green/10 text-green">
@@ -1247,10 +1309,13 @@ function renderWorkbenchContent({
 }
 function MetricCard({ metric }: { metric: WorkbenchMetric }) {
   return (
-    <article className="rounded-[8px] border border-line bg-white p-5 shadow-soft">
-      <p className="text-xs font-semibold uppercase text-ink/48">{metric.label}</p>
-      <p className="mt-3 text-3xl font-semibold text-midnight">{metric.value}</p>
-      <p className="mt-2 text-sm text-ink/62">{metric.hint}</p>
+    <article className="min-h-[118px] rounded-[8px] border border-line bg-white p-4 shadow-soft">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase text-ink/48">{metric.label}</p>
+        <span aria-hidden className="mt-1 h-2 w-2 shrink-0 rounded-full bg-green/45" />
+      </div>
+      <p className="mt-4 text-2xl font-semibold text-midnight">{metric.value}</p>
+      <p className="mt-1 text-sm leading-5 text-ink/62">{metric.hint}</p>
     </article>
   );
 }
